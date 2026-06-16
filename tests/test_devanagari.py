@@ -2,8 +2,8 @@
 
 import pytest
 
-from lipantar import convert
-from lipantar.devanagari import convert_devanagari, supported_devanagari_fonts
+from nepal_ttf2utf import convert
+from nepal_ttf2utf.devanagari import convert_devanagari, supported_devanagari_fonts
 
 
 def test_preeti_known_words():

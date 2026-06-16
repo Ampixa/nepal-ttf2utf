@@ -64,7 +64,7 @@ class LimbuConverter:
 
     @classmethod
     def default(cls) -> "LimbuConverter":
-        with resources.as_file(resources.files("lipantar.maps") / "Limbu.map") as p:
+        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "Limbu.map") as p:
             return cls.from_map_file(p)
 
     def convert(self, text: str) -> LimbuConversion:

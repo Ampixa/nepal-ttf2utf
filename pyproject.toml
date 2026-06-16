@@ -1,5 +1,5 @@
 [project]
-name = "lipantar"
+name = "nepal-ttf2utf"
 version = "0.1.0"
 description = "Legacy ASCII-font to Unicode converter for the scripts of Nepal and its diaspora (Devanagari incl. nayanepal/Gorkhapatra, and Limbu/Sirijonga)."
 readme = "README.md"
@@ -13,14 +13,14 @@ dependencies = ["npttf2utf>=0.3"]
 dev = ["pytest>=7"]
 
 [project.urls]
-Homepage = "https://github.com/Ampixa/lipantar"
+Homepage = "https://github.com/Ampixa/nepal-ttf2utf"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/lipantar"]
+packages = ["src/nepal_ttf2utf"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/lipantar/maps" = "lipantar/maps"
+"src/nepal_ttf2utf/maps" = "nepal_ttf2utf/maps"

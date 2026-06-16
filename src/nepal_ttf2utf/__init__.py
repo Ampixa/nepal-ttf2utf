@@ -1,11 +1,11 @@
-"""lipantar — legacy ASCII-font -> Unicode for the scripts of Nepal and its diaspora.
+"""nepal_ttf2utf — legacy ASCII-font -> Unicode for the scripts of Nepal and its diaspora.
 
 Fills the gap left by Nepali-only converters (e.g. npttf2utf, which covers a few
 Devanagari ASCII fonts): one library covering Devanagari legacy fonts *including
 newspaper fonts like nayanepal/Gorkhapatra* and the Limbu/Sirijonga script, with
 correct handling of the special characters most converters silently drop.
 
-    from lipantar import convert
+    from nepal_ttf2utf import convert
     convert("g]kfn", font="preeti")       # -> 'नेपाल'   (Devanagari)
     convert("...", font="nayanepal")       # -> Gorkhapatra Devanagari, Unicode
     convert("<namdhinggo bytes>", font="namdhinggo")  # -> Unicode Limbu (Sirijonga)

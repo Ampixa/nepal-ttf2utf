@@ -1,7 +1,7 @@
 """Limbu/Sirijonga (Namdhinggo legacy) conversion tests."""
 
-from lipantar import convert, convert_limbu
-from lipantar.limbu import LimbuConverter
+from nepal_ttf2utf import convert, convert_limbu
+from nepal_ttf2utf.limbu import LimbuConverter
 
 
 def _has_limbu(s: str) -> bool:

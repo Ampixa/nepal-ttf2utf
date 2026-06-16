@@ -1,19 +1,19 @@
-# lipantar
+# nepal-ttf2utf
 
 **Legacy ASCII-font → Unicode for the scripts of Nepal and its diaspora.**
 
-लिप्यन्तर — "script conversion." Nepal's languages still live in pre-Unicode,
-ASCII-mapped fonts (newspapers, government docs, textbooks). Existing converters
-(e.g. [`npttf2utf`](https://github.com/casualsnek/npttf2utf)) cover a handful of
-**Nepali Devanagari** fonts and silently drop the special characters that minority
-languages depend on. `lipantar` aims to cover **every script our Nepal-language
-corpus actually touches**, correctly.
+Nepal's languages still live in pre-Unicode, ASCII-mapped fonts (newspapers,
+government docs, textbooks). Existing converters such as
+[`npttf2utf`](https://github.com/casualsnek/npttf2utf) cover a handful of **Nepali
+Devanagari** fonts and silently drop the special characters that minority languages
+depend on. `nepal-ttf2utf` aims to cover **every script our Nepal-language corpus
+actually touches**, correctly — and it builds on `npttf2utf` rather than replacing it.
 
 ```python
-from lipantar import convert
+from nepal_ttf2utf import convert
 
-convert("g]kfn", font="preeti")            # 'नेपाल'
-convert("k|sflzt", font="nayanepal")       # 'प्रकाशित'  (Gorkhapatra newspaper font)
+convert("g]kfn", font="preeti")               # 'नेपाल'
+convert("k|sflzt", font="nayanepal")          # 'प्रकाशित'  (Gorkhapatra newspaper font)
 convert(namdhinggo_bytes, font="namdhinggo")  # Unicode Limbu/Sirijonga (U+1900–194F)
 ```
 
@@ -24,8 +24,8 @@ convert(namdhinggo_bytes, font="namdhinggo")  # Unicode Limbu/Sirijonga (U+1900�
   Devanagari; anchors गोरखापत्रद्वारा / प्रकाशित / नेपाल / मगर correct).
 - **A different script entirely**: Limbu/Sirijonga (its own Unicode block) — `npttf2utf`
   can't touch it. We bundle the SIL Namdhinggo map + the vowel/subjoined reordering.
-- **No silent drops**: a `strict=True` mode surfaces leftover bytes (reph, conjuncts,
-  nukta, the Kiranti glottal stop) instead of dropping them.
+- **No silent drops**: `strict=True` surfaces leftover bytes (reph, conjuncts, nukta,
+  the Kiranti glottal stop) instead of dropping them.
 
 ## Coverage
 
