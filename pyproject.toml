@@ -1,12 +1,12 @@
 [project]
 name = "nepal-ttf2utf"
 version = "0.1.0"
-description = "Legacy ASCII-font to Unicode converter for the scripts of Nepal and its diaspora (Devanagari incl. nayanepal/Gorkhapatra, and Limbu/Sirijonga)."
+description = "Legacy ASCII-font to Unicode converter for the scripts of Nepal and its diaspora (Devanagari incl. nayanepal/Gorkhapatra, Limbu/Sirijonga, Kirat Rai, Sunuwar, and Lepcha)."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "Ampixa" }]
-keywords = ["nepali", "devanagari", "limbu", "sirijonga", "preeti", "unicode", "legacy-font", "ocr", "nepal"]
+keywords = ["nepali", "devanagari", "limbu", "sirijonga", "kirat-rai", "sunuwar", "lepcha", "preeti", "unicode", "legacy-font", "ocr", "nepal", "sikkim"]
 dependencies = ["npttf2utf>=0.3"]
 
 [project.optional-dependencies]
@@ -21,6 +21,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nepal_ttf2utf"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/nepal_ttf2utf/maps" = "nepal_ttf2utf/maps"
