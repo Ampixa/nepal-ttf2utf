@@ -1,8 +1,8 @@
 {
   "_doc": "Byte->Unicode map for the 'Ol Chiki Optimum' legacy display font family (BaseFont OLCKOptimum-Medium / OLCKOptimum-ExtraBlack; foundry Sengellabs, B.N. Murmu & N.C. Murmu). Despite the marketing name 'Unicode-ready', the embedded font's own cmap keys each Ol Chiki glyph OUTLINE to a Latin ASCII codepoint (identity-Latin encoding, same class as the Sikkim Herald Lepcha body font): the PDF's extractable text is Latin letters, but the rendered shape is Ol Chiki (Santali). Confirmed source: Ampixa ocr-tech data/external-language-resources/native-script-real-2026-07-06/ol-chiki/aale-chhatka-2023.pdf + aale-chhatka-september-2023.pdf (Aale Chhatka e-magazine, self-published, archive.org).",
   "_derivation": "Derived by glyph-shape identity (IoU on centered/scaled binary renders, via PIL+the extracted embedded TTF) against Noto Sans Ol Chiki (data/fonts/all/ol_chiki/NotoSansOlChiki-Regular.ttf) for all 48 Ol Chiki block codepoints (U+1C50-1C7F), combined with a Hungarian optimal-assignment pass to resolve many-candidates-vs-few-targets conflicts, THEN corrected against two priors the raw shape score alone got wrong: (1) corpus byte frequency (the single most-typed byte, 'o' at 1481 occurrences, was reassigned to LA -- the alphabet's first/most fundamental letter -- overriding a marginally-cheaper global optimum that would have given LA to the far rarer byte 'T', 528 occurrences); (2) the Ol Chiki alphabet's own structure: the 6 Latin vowel-family bytes (a e i o u + capital O) landed exactly on the 6 row-starter letters LAA/LE/LI/LA/LU/LO -- a structural sanity check that would not hold under a wrong mapping. Positional/contextual evidence from the corpus itself confirmed two non-obvious entries: 'N' (only 12 occurrences, always immediately after a vowel and before a consonant, e.g. 'hoN', 'TaNhena') is the MU TTUDDAG nasalization mark, matching a stray genuine U+1C78 already typed via a fallback Unicode font elsewhere in the same document; '|' (206 occurrences, always sentence-final after a space) is the OL CHIKI PUNCTUATION MUCAAD danda-equivalent -- its raw pixel IoU against Noto's MUCAAD glyph was misleadingly 0.0 (a 1-2px vertical bar shifted a few pixels nets zero overlap) but the shapes are visually identical single vertical strokes and the sentence-final position is decisive. OLCKOptimum-ExtraBlack (mean IoU 0.79, min 0.66 across all mapped bytes) and OLCKOptimum-Black (mean IoU 0.88, min 0.74; only 10 characters of corpus evidence, from a single September-2023 issue page) were both verified outline-compatible with OLCKOptimum-Medium, so one map serves all three weights. The OLCKLatic-* headline/display font family is a DIFFERENT, unverified encoding (mean IoU only 0.35-0.42 against Optimum-Medium on the same bytes) and is OUT OF SCOPE for this map.",
-  "_confidence": "51 letter/mark bytes + 10 digits are CONFIRMED (visual shape match, several corroborated by corpus position/frequency/structure as noted above). Two bytes are UNCERTAIN and carried in a separate 'uncertain_map': lowercase 'n' (839 occurrences -- common, but no candidate Ol Chiki codepoint scored above 0.52 IoU once its stronger competitors claimed the plausible targets; best remaining guess is EN, U+1C71) and uppercase 'T' (528 occurrences; best remaining guess is AT, U+1C5B). Both guesses are leftover-by-elimination, not independently well-matched -- treat as placeholders pending a native-reader transcription, not confident guesses. Case pairs: the font designer reused the IDENTICAL glyph outline for 20 of the 26 upper/lowercase pairs (verified: IoU(lower,upper)=1.000 exactly for a/A b/B c/C e/E f/F g/G i/I j/J k/K l/L p/P q/Q r/R s/S u/U v/V w/W x/X y/Y z/Z -- confirmed by direct outline comparison of the extracted TTF, not guessed), so each such uppercase byte maps to the SAME codepoint as its lowercase twin. Only d/D, h/H, m/M, n/N, o/O, t/T have genuinely DIFFERENT outlines per case (IoU 0.22-0.55) and were derived independently. Uppercase 'W' and 'X' never occur in the corpus (0 occurrences in either 2023 issue) but their shape-identity with lowercase w/x was confirmed directly from the font file, so they are included on that basis alone.",
-  "_uncertain_bytes": ["6E", "54"],
+  "_confidence": "53 letter/mark bytes + 10 digits are CONFIRMED. Lowercase 'n' is U+1C71 OL CHIKI LETTER EN and uppercase 'T' is U+1C5B OL CHIKI LETTER AT, promoted from the former uncertain_map on 2026-07-13 after ocr-tech outputs/olchiki-uncertain-bytes-2026-07-13 combined glyph, corpus-context, and lexicon evidence. No uncertain OLCKOptimum bytes remain. Case pairs: the font designer reused the IDENTICAL glyph outline for 20 of the 26 upper/lowercase pairs (verified: IoU(lower,upper)=1.000 exactly for a/A b/B c/C e/E f/F g/G i/I j/J k/K l/L p/P q/Q r/R s/S u/U v/V w/W x/X y/Y z/Z -- confirmed by direct outline comparison of the extracted TTF, not guessed), so each such uppercase byte maps to the SAME codepoint as its lowercase twin. Only d/D, h/H, m/M, n/N, o/O, t/T have genuinely DIFFERENT outlines per case (IoU 0.22-0.55) and were derived independently. Uppercase 'W' and 'X' never occur in the corpus (0 occurrences in either 2023 issue) but their shape-identity with lowercase w/x was confirmed directly from the font file, so they are included on that basis alone.",
+  "_uncertain_bytes": [],
   "map": {
     "30": ["1C50"],
     "31": ["1C51"],
@@ -28,6 +28,7 @@
     "6B": ["1C60"],
     "6C": ["1C5E"],
     "6D": ["1C62"],
+    "6E": ["1C71"],
     "6F": ["1C5A"],
     "70": ["1C6F"],
     "71": ["1C67"],
@@ -61,6 +62,7 @@
     "51": ["1C67"],
     "52": ["1C68"],
     "53": ["1C65"],
+    "54": ["1C5B"],
     "55": ["1C69"],
     "56": ["1C63"],
     "57": ["1C76"],
@@ -70,8 +72,5 @@
 
     "7C": ["1C7E"]
   },
-  "uncertain_map": {
-    "6E": ["1C71"],
-    "54": ["1C5B"]
-  }
+  "uncertain_map": {}
 }

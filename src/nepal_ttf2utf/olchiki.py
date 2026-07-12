@@ -26,17 +26,18 @@ CHIKI PUNCTUATION MUCAAD danda-equivalent, whose raw pixel IoU against Noto's gl
 misleadingly 0.0 (a 1-2px vertical bar shifted by a few pixels nets zero overlap) but
 whose shape and position are unambiguous.
 
-Coverage: 51 letter/mark bytes + 10 digits are CONFIRMED. Two bytes remain UNCERTAIN
-(``n`` and ``T``, the two candidates left over after every better-matching Ol Chiki
-codepoint was claimed by a stronger competitor) -- carried as best-guesses but NOT
-applied unless the caller opts in, per the honest-uncertainty convention used
-throughout this package (see ``sunuwar.py``). Twenty of the 26 upper/lowercase byte
-pairs share an IDENTICAL glyph outline in the font (verified IoU=1.000 against each
-other, not guessed) and so map to the same codepoint as their lowercase twin; only
-``d/D h/H m/M n/N o/O t/T`` have genuinely different per-case outlines and were
-derived independently. Uppercase ``W``/``X`` never occur in the source corpus but
-their outline-identity with lowercase ``w``/``x`` was confirmed directly from the
-font file, so they are mapped on that basis alone.
+Coverage: 53 letter/mark bytes + 10 digits are CONFIRMED; no OLCKOptimum
+bytes remain uncertain. The formerly uncertain bytes were promoted on 2026-07-13:
+``n`` maps to U+1C71 OL CHIKI LETTER EN and ``T`` maps to U+1C5B OL CHIKI LETTER
+AT, based on combined glyph, corpus-context, and lexicon evidence in ocr-tech
+``outputs/olchiki-uncertain-bytes-2026-07-13/``. Twenty of the 26 upper/lowercase
+byte pairs share an IDENTICAL glyph outline in the font (verified IoU=1.000
+against each other, not guessed) and so map to the same codepoint as their
+lowercase twin; only ``d/D h/H m/M n/N o/O t/T`` have genuinely different
+per-case outlines and were derived independently. Uppercase ``W``/``X`` never
+occur in the source corpus but their outline-identity with lowercase ``w``/``x``
+was confirmed directly from the font file, so they are mapped on that basis
+alone.
 
 Scope: this module covers ONLY the 'Ol Chiki Optimum' body/heading font family
 (Medium + ExtraBlack weights, verified outline-compatible with each other). The
@@ -118,9 +119,8 @@ class OLChikiConverter:
 
     Each legacy byte maps to exactly one Ol Chiki codepoint (no reordering needed --
     unlike Lepcha, this font's vowel/modifier signs are typed in logical order
-    already). By default only the CONFIRMED table is applied; set
-    ``apply_uncertain=True`` to additionally apply the best-guess UNCERTAIN table
-    (for exploration only -- never for ground-truth output).
+    already). No OLCKOptimum bytes are currently uncertain; ``apply_uncertain`` is
+    retained for compatibility with the shared converter interface.
     """
 
     def __init__(
@@ -207,12 +207,11 @@ def convert_olchiki(
 ) -> OLChikiConversion:
     """Convert 'Ol Chiki Optimum' legacy font text to Unicode Ol Chiki (NFC).
 
-    Returns an :class:`OLChikiConversion`. The two uncertain bytes (``n``, ``T``) are
-    left as-is and recorded in ``uncertain_bytes`` unless ``apply_uncertain=True``.
-    Bytes that are neither confirmed letters/marks, digits, uncertain letters, nor
-    known passthrough punctuation are surfaced in ``unmapped_bytes``. With
-    ``strict=True`` the presence of any uncertain or unmapped byte raises
-    ``ValueError`` instead of passing silently.
+    Returns an :class:`OLChikiConversion`. No OLCKOptimum bytes are currently
+    uncertain; bytes that are neither confirmed letters/marks, digits, nor known
+    passthrough punctuation are surfaced in ``unmapped_bytes``. With ``strict=True``
+    the presence of any uncertain or unmapped byte raises ``ValueError`` instead of
+    passing silently.
     """
     global _DEFAULT
     if _DEFAULT is None or apply_uncertain:

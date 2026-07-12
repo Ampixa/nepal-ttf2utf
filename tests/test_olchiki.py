@@ -1,8 +1,8 @@
 """'Ol Chiki Optimum' legacy display-font conversion tests.
 
 Anchors are the shape-identity / corpus-position-verified assignments from the
-source derivation (Aale Chhatka Santali e-magazine). The two uncertain bytes
-(``n``, ``T``) are left flagged, never guessed, unless the caller opts in.
+source derivation (Aale Chhatka Santali e-magazine). The formerly uncertain bytes
+(``n``, ``T``) are now confirmed by the 2026-07-13 ocr-tech evidence packet.
 """
 
 import json
@@ -54,10 +54,10 @@ def test_olchiki_identical_shape_case_pairs_map_to_same_codepoint():
 
 
 def test_olchiki_genuinely_case_distinct_pairs_differ():
-    # d/D h/H m/M o/O t/T have different outlines per case (n/N is uncertain/
-    # modifier, handled separately) and must NOT collapse to the same codepoint.
+    # d/D h/H m/M n/N o/O t/T have different outlines per case and must NOT
+    # collapse to the same codepoint.
     conv = OLChikiConverter.default()
-    for lc in "dhmot":
+    for lc in "dhmnot":
         assert conv.convert(lc).unicode_text != conv.convert(lc.upper()).unicode_text, lc
 
 
@@ -108,29 +108,26 @@ def test_olchiki_confirmed_and_uncertain_maps_dont_overlap_bytes():
     assert not confirmed_bytes & uncertain_bytes
 
 
-def test_olchiki_only_n_and_uppercase_t_remain_uncertain():
+def test_olchiki_no_uncertain_bytes_remain():
+    raw = _load_raw_map()
+    assert raw["uncertain_map"] == {}
+
+
+def test_olchiki_resolved_n_and_uppercase_t_are_confirmed():
     res = convert_olchiki("nT")
-    assert set(res.uncertain_bytes) == {"n", "T"}
-    assert res.unicode_text == "nT"
+    assert res.unicode_text == "ᱱᱛ"
+    assert res.uncertain_bytes == []
+    assert res.olchiki_char_count == 2
 
 
-def test_olchiki_uncertain_bytes_not_applied_by_default():
-    res = convert_olchiki("n")
-    assert res.unicode_text == "n"
-    assert "n" in res.uncertain_bytes
-    assert res.olchiki_char_count == 0
+def test_olchiki_apply_uncertain_is_noop_when_no_uncertain_entries_remain():
+    assert convert_olchiki("nT").unicode_text == convert_olchiki(
+        "nT", apply_uncertain=True
+    ).unicode_text
 
 
-def test_olchiki_uncertain_applied_when_opted_in():
-    res = convert_olchiki("n", apply_uncertain=True)
-    assert 0x1C50 <= ord(res.unicode_text) <= 0x1C7F
-    res_t = convert_olchiki("T", apply_uncertain=True)
-    assert 0x1C50 <= ord(res_t.unicode_text) <= 0x1C7F
-
-
-def test_olchiki_strict_mode_surfaces_uncertain_byte():
-    with pytest.raises(ValueError):
-        convert_olchiki("n", strict=True)
+def test_olchiki_strict_mode_accepts_resolved_n_and_t():
+    assert convert_olchiki("nT", strict=True).unicode_text == "ᱱᱛ"
 
 
 def test_olchiki_strict_mode_surfaces_unmapped_byte():
