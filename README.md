@@ -39,16 +39,19 @@ Font names are case-insensitive.
 The measurements and source links behind the non-public mappings are recorded
 in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
-### Formats not mapped
+### Unsupported and already-Unicode formats
 
-- The Newa material examined for this project already contains true Unicode
-  Newa; it does not establish a legacy-byte mapping.
-- Monlam Unicode, Microsoft Himalaya, Qomolangma, and Jomolhari spans examined
-  here already contain Unicode Tibetan; do not pass them through TibetanMachine.
-- Some Bhote and Sherpa pages use Devanagari despite Tibetan-looking font or
-  language labels. Route conversion by the actual font span and text block.
-- Ranjana and Magar Akkha do not yet have standardized Unicode encodings, so a
-  Unicode converter cannot be provided.
+- The available Newa samples contain encoded Unicode Newa characters rather
+  than legacy font bytes. They therefore provide no basis for a legacy Newa
+  conversion map.
+- Monlam Unicode, Microsoft Himalaya, Qomolangma, and Jomolhari are represented
+  as Unicode Tibetan in the available corpus. The `tibetanmachine` converter is
+  limited to text encoded with the legacy TibetanMachine layout.
+- Font and language labels alone do not determine the output script. Some Bhote
+  and Sherpa material is encoded in Devanagari, so conversion pipelines must
+  route each font span according to its actual encoding and code-point block.
+- The project provides no Ranjana or Magar Akkha converter because Unicode does
+  not currently define separate standardized encodings for those scripts.
 
 These are evidence gaps, not placeholder mappings. A short native-reader
 transcription containing the single unresolved Herald Kirat Rai `Z` or the Herald Lepcha
