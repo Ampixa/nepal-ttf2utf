@@ -97,6 +97,45 @@ set in
 A native transcription of affected words or recovered original font evidence is
 still required.
 
+## Videha Janaki Tirhuta
+
+The audited source is the 152-page Videha issue
+`videha_01_01_08_tirhuta.pdf` from Internet Archive item
+[`videha_15_04_2008_tirhuta`](https://archive.org/details/videha_15_04_2008_tirhuta),
+whose metadata marks the item
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The PDF has
+SHA-256
+`91ec43fdc5ccd22cf449457f94e159650b944fea5cf35c7baec89a695d146722`.
+
+Its Janaki text layer uses semantically corresponding Devanagari codepoints for
+Tirhuta glyphs, but the Type0 font's incomplete `ToUnicode` table emits U+FFFD
+for many precomposed conjuncts. PyMuPDF retains the glyph ID for each failed
+character. A hash-pinned companion audit recovered all 3,306 U+FFFD
+occurrences across 164 glyph IDs:
+
+- 162 glyph IDs, covering 3,293 occurrences, had one unique Devanagari source
+  sequence that HarfBuzz shaped to the glyph in Janaki 1.000;
+- the remaining 13 occurrences were the two explicit half forms `dN.half`
+  and `dNn.half`, resolved by the font's GSUB evidence to `न्` and `ण्`;
+- the existing semantic remap then produced 64,896 Tirhuta-block characters;
+- 30,396 of 30,581 PyMuPDF trace fragments converted without residuals
+  (99.395049%); the remaining fragments contain 183 U+25CC dotted-circle
+  values, one literal `*`, and one literal `^`.
+
+The embedded Janaki faces are accepted only at SHA-256
+`b51da8d0c99bf8cc0e7ee85f18681272b0f57eb80f277838f4e2cdcaa5253755`
+(Type0/Identity-H) and
+`1e3da463c92b8563d4f22db4c0f31b366668988da5008dccdff68f96a44e3501`
+(TrueType/WinAnsi). The reference Janaki 1.000 font has SHA-256
+`f480331e6bb2a7cf76f95e346afda1d4eda6d64ac6597729cb5c988ea2c88694`;
+its metadata credits Madan Puraskar Pustakalaya and states “All rights
+reserved.” It is decode-only evidence and is not distributed by this package.
+The functional map contains no font binary, glyph outline, cmap, or GSUB table.
+
+These are aggregate text-fragment diagnostics, not audited line labels or an
+OCR evaluation. The U+25CC cases still require pixel review or exclusion, and
+only one issue is local, so no edition-disjoint evaluation split exists yet.
+
 ## TibetanMachine
 
 The recovered Gorkhapatra manifests contain 81 unique pages across 41 PDFs; 44
