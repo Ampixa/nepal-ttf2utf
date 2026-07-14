@@ -152,7 +152,7 @@ class SunuwarConverter:
                 out.append(ch)
                 continue
             out.append(ch)
-            if ord(ch) > 0x7F and not (_SUNUWAR_BLOCK_LO <= ord(ch) <= _SUNUWAR_BLOCK_HI):
+            if not (_SUNUWAR_BLOCK_LO <= ord(ch) <= _SUNUWAR_BLOCK_HI):
                 unmapped.add(ch)
         converted = unicodedata.normalize("NFC", "".join(out))
         sun_count = sum(1 for c in converted if _SUNUWAR_BLOCK_LO <= ord(c) <= _SUNUWAR_BLOCK_HI)

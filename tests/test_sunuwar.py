@@ -108,6 +108,20 @@ def test_sunuwar_spaces_and_punctuation_pass_through():
     assert "," in res.unicode_text
 
 
+def test_sunuwar_unmapped_ascii_is_surfaced():
+    res = convert_sunuwar("B")
+    assert "B" in res.unmapped_bytes
+    with pytest.raises(ValueError):
+        convert_sunuwar("B", strict=True)
+
+
+def test_sunuwar_genuine_unicode_passes_through():
+    text = chr(0x11BC0)
+    res = convert_sunuwar(text, strict=True)
+    assert res.unicode_text == text
+    assert not res.unmapped_bytes
+
+
 def test_convert_dispatches_to_sunuwar():
     out = convert("A{z}", font="sunuwar")
     assert any(0x11BC0 <= ord(c) <= 0x11BFF for c in out)

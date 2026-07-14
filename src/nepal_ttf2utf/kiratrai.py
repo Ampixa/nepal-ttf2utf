@@ -14,7 +14,7 @@ Unicode class. This module reads the map natively (no ``teckit_compile`` depende
 and applies the forward Legacy->Unicode pass, longest-match-first so the multi-byte
 ligature rules win over the single-byte class rules.
 
-Coverage is partial (~93%): 6 legacy bytes (``f - I F . x R , L :``) are not in SIL's
+Coverage is partial: 7 observed legacy bytes (``f R x F I L \\``) are not in SIL's
 published class table, so they pass through unchanged and are surfaced in
 ``unmapped_codepoints`` (or raised in ``strict`` mode) — never silently dropped.
 """
@@ -35,6 +35,11 @@ _UNICLASS_RE = re.compile(r"^UniClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _CLASS_RULE_RE = re.compile(r"^\[([^\]]+)\]\s*<?>\s*\[([^\]]+)\]\s*$")
 
 _KIRATRAI_LO, _KIRATRAI_HI = 0x16D40, 0x16D7F
+
+# Observed AKRS bytes absent from SIL's map. Six render distinct script glyphs;
+# backslash has no glyph in the source font. These are evidence-backed gaps, not
+# candidates for speculative shape matching.
+KIRATRAI_UNMAPPED_BYTES: frozenset[str] = frozenset("fRxFIL\\")
 
 
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
@@ -211,7 +216,7 @@ class KiratRaiConverter:
             char = text[index]
             output.append(char)
             code = ord(char)
-            if code > 0x7F and not (_KIRATRAI_LO <= code <= _KIRATRAI_HI):
+            if not (_KIRATRAI_LO <= code <= _KIRATRAI_HI):
                 unmapped.append(f"U+{code:04X}")
             index += 1
         converted = unicodedata.normalize("NFC", "".join(output))
@@ -236,7 +241,7 @@ _DEFAULT: KiratRaiConverter | None = None
 def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
     """Convert ``kiratraifont``-legacy Kirat Rai text to Unicode Kirat Rai (NFC).
 
-    Returns a :class:`KiratRaiConversion`. Bytes outside SIL's class table (the 6
+    Returns a :class:`KiratRaiConversion`. Bytes outside SIL's class table (the 7
     known-pending bytes) are passed through and surfaced in ``unmapped_codepoints``.
     With ``strict=True`` any such leftover raises ``ValueError`` instead.
     """

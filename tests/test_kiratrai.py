@@ -50,10 +50,17 @@ def test_convert_dispatches_to_kiratrai():
 
 
 def test_kiratrai_unmapped_byte_surfaced_not_dropped():
-    # An out-of-block byte (á / U+00E1) is not in SIL's class table: it must be
-    # surfaced (raised in strict mode, reported in lenient mode), never dropped.
-    res = convert_kiratrai("á")
-    assert "U+00E1" in res.unmapped_codepoints
-    assert "á" in res.unicode_text
+    # 'f' is a real AKRS glyph missing from SIL's class table. Although it is
+    # ASCII-shaped in extracted text, it must still be surfaced.
+    res = convert_kiratrai("f")
+    assert "U+0066" in res.unmapped_codepoints
+    assert "f" in res.unicode_text
     with pytest.raises(ValueError):
-        convert_kiratrai("á", strict=True)
+        convert_kiratrai("f", strict=True)
+
+
+def test_kiratrai_genuine_unicode_passes_through():
+    text = "\U00016D43"
+    res = convert_kiratrai(text, strict=True)
+    assert res.unicode_text == text
+    assert not res.unmapped_codepoints

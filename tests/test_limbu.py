@@ -1,5 +1,7 @@
 """Limbu/Sirijonga (Namdhinggo legacy) conversion tests."""
 
+import pytest
+
 from nepal_ttf2utf import convert, convert_limbu
 from nepal_ttf2utf.limbu import LimbuConverter
 
@@ -28,3 +30,13 @@ def test_converter_loads_default_map():
     res = conv.convert("kfMG")
     assert res.limbu_char_count >= 1
     assert isinstance(res.unmapped_codepoints, list)
+
+
+def test_limbu_unmapped_ascii_is_surfaced_in_strict_mode():
+    # The upstream map explicitly leaves '#' unresolved.
+    res = LimbuConverter.default().convert("#")
+    assert "U+0023" in res.unmapped_codepoints
+    with pytest.raises(ValueError):
+        convert_limbu("#", strict=True)
+    with pytest.raises(ValueError):
+        convert("#", font="namdhinggo", strict=True)

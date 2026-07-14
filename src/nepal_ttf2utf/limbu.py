@@ -85,7 +85,7 @@ class LimbuConverter:
             if matched:
                 continue
             output.append(text[index])
-            if code > 0x7F and not (0x1900 <= code <= 0x194F):
+            if not (0x1900 <= code <= 0x194F):
                 unmapped.append(f"U+{code:04X}")
             index += 1
         converted = _reorder_limbu(("".join(output)))
@@ -133,9 +133,20 @@ def _reorder_limbu(text: str) -> str:
 _DEFAULT: LimbuConverter | None = None
 
 
-def convert_limbu(text: str) -> str:
-    """Convert Namdhinggo-legacy Limbu text to Unicode Limbu (NFC)."""
+def convert_limbu(text: str, *, strict: bool = False) -> str:
+    """Convert Namdhinggo-legacy Limbu text to Unicode Limbu (NFC).
+
+    The string return type is retained for compatibility. Use
+    :meth:`LimbuConverter.convert` for counts and the unmapped-codepoint list.
+    With ``strict=True``, any byte absent from the SIL map raises ``ValueError``.
+    """
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = LimbuConverter.default()
-    return _DEFAULT.convert(text).unicode_text
+    result = _DEFAULT.convert(text)
+    if strict and result.unmapped_codepoints:
+        raise ValueError(
+            "unmapped/leftover characters after Limbu conversion: "
+            + " ".join(result.unmapped_codepoints)
+        )
+    return result.unicode_text

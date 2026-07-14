@@ -132,6 +132,11 @@ class LepchaConverter:
             if target is not None:
                 out.extend(target)
                 replacements += 1
+            elif LEPCHA_LO <= code <= LEPCHA_HI:
+                # Preserve genuine Unicode Lepcha mixed into a legacy run. Keeping
+                # this as a string token also prevents the legacy visual-order pass
+                # from reinterpreting already-logical Unicode input.
+                out.append(ch)
             else:
                 # Unmapped legacy byte (layout/punctuation glyph not in the map).
                 out.append(ch)

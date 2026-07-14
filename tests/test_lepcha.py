@@ -92,6 +92,13 @@ def test_convert_dispatches_to_lepcha():
     assert any(0x1C00 <= ord(c) <= 0x1C4F for c in out)
 
 
+def test_lepcha_genuine_unicode_passes_through():
+    text = "ᰀᰪ"
+    res = convert_lepcha(text, strict=True)
+    assert res.unicode_text == text
+    assert not res.unmapped_bytes
+
+
 def test_lepcha_empty_map_rejected():
     with pytest.raises(ValueError):
         LepchaConverter({})
