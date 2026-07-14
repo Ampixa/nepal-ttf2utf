@@ -15,12 +15,14 @@ every legacy byte is a full letter, digit, or punctuation mark. A first pass fix
 digits + 19 letter bytes by printed-crop visual match; a second bijective pass resolved
 8 more (``v q x r u g h j``) by shape (IoU + chamfer) with a hole-count constraint,
 adjudicated against the L2/21-157R Unicode proposal chart and validated by a printed-ink
-single-glyph round-trip. Coverage is ~89% (692/1403 lines fully confirmed).
+single-glyph round-trip.
 
-One byte (``|``) stays UNCERTAIN — its shape favours SHYELE (U+11BD2) while its
-distribution favours UTTHI (U+11BC5); neither can be certified by round-trip, so it is
-left flagged (it needs a native-reader transcription). It is NOT applied by default
-(``convert`` leaves it as-is and records it) so no unverified codepoint reaches output.
+The final observed byte, ``|``, is U+11BC5 SUNUWAR LETTER UTTHI. The Sikkim form in
+Richard Ishida's reviewed orthography notes is the same flowing open-2 shape as the
+legacy glyph: a 600-dpi corpus crop has normalized largest-component IoU 0.7395 with
+the labeled Sikkim UTTHI image, versus 0.3681 with Sikkim SHYELE. This regional form
+explains why comparison against Noto's Nepal-style glyph originally left it uncertain.
+All observed Sunuwar letter and digit bytes are now confirmed.
 
 Provenance / evidence: ocr-tech ``outputs/sunuwar-map-derivation/`` (contact sheets,
 printed-crop verification, round-trip panels).
@@ -80,20 +82,13 @@ SUNUWAR_LETTERS_CONFIRMED: dict[str, str] = {
     "j": chr(
         0x11BCF
     ),  # jyahsunuwar  (dagger '+')   embedded-glyph 0.504 decisive (dagger=dagger); n=198
+    # Sikkim UTTHI has a regional flowing open-2 form. It matches the Sikkim-labeled
+    # reference glyph at IoU 0.7395 (versus 0.3681 for SHYELE); n=1079.
+    "|": chr(0x11BC5),  # utthisunuwar /u/
 }
 
-# --- Letters: UNCERTAIN tier. Best current guess, kept for future verification but
-# NOT applied unless the caller opts in. ---
-SUNUWAR_LETTERS_UNCERTAIN: dict[str, str] = {
-    # '|' (n=1079, the single most frequent uncertain byte) is the only byte that remains
-    # unresolved. Its Kirat1 glyph is a flowing open '2'/integral curl with NO internal
-    # loop (0 holes). Shape favours SHYELE/ʃ (U+11BD2) while its distribution (heavily
-    # word-medial/final, very frequent) argues a common VOWEL — UTTHI /u/ (U+11BC5).
-    # Shape and phonology disagree and neither can be certified by round-trip, so '|' is
-    # left flagged. UNBLOCK: a native-reader transcription of any short Sikkim-Herald
-    # passage containing '|'. Best guess below is utthi, on the phonology argument.
-    "|": chr(0x11BC5),  # utthi? (or shyele U+11BD2) -- shape vs phonology conflict; needs a reader
-}
+# Kept as a public compatibility constant. No observed bytes remain uncertain.
+SUNUWAR_LETTERS_UNCERTAIN: dict[str, str] = {}
 
 # Punctuation / danda-like bytes: passed through unchanged (not Sunuwar letters).
 SUNUWAR_PASSTHROUGH: frozenset[str] = frozenset(
@@ -146,9 +141,8 @@ class SunuwarConversion:
 class SunuwarConverter:
     """Apply the derived Sunuwar legacy byte -> Unicode map.
 
-    By default only the CONFIRMED letters + digits are applied. Set
-    ``apply_uncertain=True`` to additionally apply the best-guess UNCERTAIN map (for
-    exploration only — never for ground-truth output).
+    All observed letter and digit bytes are confirmed. ``apply_uncertain`` remains an
+    accepted compatibility argument but currently has no effect.
     """
 
     def __init__(self, apply_uncertain: bool = False) -> None:
@@ -205,11 +199,10 @@ def convert_sunuwar(
 ) -> SunuwarConversion:
     """Convert Sunuwar/Jenticha legacy font text to Unicode Sunuwar (NFC).
 
-    Returns a :class:`SunuwarConversion`. The uncertain byte (``|``) is left as-is and
-    recorded in ``uncertain_bytes`` unless ``apply_uncertain=True``. Bytes that are
-    neither letters, digits, nor known punctuation are surfaced in ``unmapped_bytes``.
-    With ``strict=True`` the presence of any uncertain or unmapped byte raises
-    ``ValueError`` instead of passing silently.
+    Returns a :class:`SunuwarConversion`. All observed script bytes are confirmed;
+    ``apply_uncertain`` is retained for API compatibility and is currently a no-op.
+    Bytes that are neither letters, digits, nor known punctuation are surfaced in
+    ``unmapped_bytes``. With ``strict=True`` any unmapped byte raises ``ValueError``.
     """
     result = SunuwarConverter(apply_uncertain=apply_uncertain).convert(text)
     if strict and (result.uncertain_bytes or result.unmapped_bytes):

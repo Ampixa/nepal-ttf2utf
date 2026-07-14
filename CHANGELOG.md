@@ -10,6 +10,8 @@
   encoding, strict-mode, and font-listing support.
 - Make strict mode consistently report leftover ASCII bytes across script
   converters and preserve already-Unicode script text.
+- Resolve the final observed Sunuwar byte, `|`, as the Sikkim regional form of
+  U+11BC5 SUNUWAR LETTER UTTHI from labeled regional-glyph and corpus evidence.
 - Document evidence-backed coverage and remaining unresolved byte mappings.
 - Add licensing notices, clean source/wheel packaging, and continuous
   verification across supported Python versions.
