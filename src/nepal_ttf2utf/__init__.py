@@ -29,6 +29,7 @@ from .lepcha import LepchaConversion, LepchaConverter, convert_lepcha
 from .limbu import LimbuConversion, LimbuConverter, convert_limbu
 from .olchiki import OLChikiConversion, OLChikiConverter, convert_olchiki
 from .sunuwar import SunuwarConversion, SunuwarConverter, convert_sunuwar
+from .tirhuta import TirhutaConversion, TirhutaConverter, convert_tirhuta
 
 __all__ = [
     "convert",
@@ -39,6 +40,7 @@ __all__ = [
     "convert_sunuwar",
     "convert_lepcha",
     "convert_olchiki",
+    "convert_tirhuta",
     "DevanagariConversion",
     "LimbuConversion",
     "LimbuConverter",
@@ -50,6 +52,8 @@ __all__ = [
     "LepchaConverter",
     "OLChikiConversion",
     "OLChikiConverter",
+    "TirhutaConversion",
+    "TirhutaConverter",
     "supported_devanagari_fonts",
 ]
 
@@ -65,6 +69,8 @@ _SUNUWAR_FONTS = {"sunuwar", "jenticha", "koits", "kirat1"}
 _LEPCHA_FONTS = {"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"}
 # Santali Ol Chiki 'Optimum' legacy display font (OLCKOptimum-Medium/-ExtraBlack).
 _OLCHIKI_FONTS = {"olck-optimum", "olchiki-optimum", "olchiki", "aale-chhatka"}
+# Janaki stores Tirhuta glyphs under semantically corresponding Devanagari codepoints.
+_TIRHUTA_FONTS = {"janaki", "tirhuta", "mithilakshar"}
 
 
 def supported_fonts() -> dict[str, str]:
@@ -75,6 +81,7 @@ def supported_fonts() -> dict[str, str]:
     fonts.update({f: "Sunuwar" for f in sorted(_SUNUWAR_FONTS)})
     fonts.update({f: "Lepcha" for f in sorted(_LEPCHA_FONTS)})
     fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_FONTS)})
+    fonts.update({f: "Tirhuta" for f in sorted(_TIRHUTA_FONTS)})
     return fonts
 
 
@@ -95,7 +102,7 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
     """
     key = font.strip().lower()
     if key in _LIMBU_FONTS:
-        return convert_limbu(text)
+        return convert_limbu(text, strict=strict)
     if key in _KIRATRAI_FONTS:
         return convert_kiratrai(text, strict=strict).unicode_text
     if key in _SUNUWAR_FONTS:
@@ -104,4 +111,6 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
         return convert_lepcha(text, strict=strict).unicode_text
     if key in _OLCHIKI_FONTS:
         return convert_olchiki(text, strict=strict).unicode_text
+    if key in _TIRHUTA_FONTS:
+        return convert_tirhuta(text, strict=strict).unicode_text
     return convert_devanagari(text, font=key, strict=strict).unicode_text
