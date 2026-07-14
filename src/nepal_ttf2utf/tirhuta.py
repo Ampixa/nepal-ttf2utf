@@ -89,7 +89,8 @@ def _build_map() -> dict[int, tuple[int, ...]]:
 
     # Devanagari LLA and the precomposed nukta consonants have decomposed
     # Tirhuta spellings.
-    table[0x0933] = (0x1149D, 0x114C3)
+    # Devanagari LLA: Pandey L2/11-175R section 4.12 attests /l./ as LA+NUKTA.
+    table[0x0933] = (0x114AA, 0x114C3)
     nukta_bases = (0x1148F, 0x11490, 0x11491, 0x11496, 0x1149B, 0x1149C, 0x114A4, 0x114A8)
     for source, base in zip(range(0x0958, 0x0960), nukta_bases):
         table[source] = (base, 0x114C3)
