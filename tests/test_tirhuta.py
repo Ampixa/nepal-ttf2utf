@@ -60,5 +60,5 @@ def test_devanagari_lla_maps_to_la_plus_nukta():
     from nepal_ttf2utf.tirhuta import convert_tirhuta
 
     result = convert_tirhuta("ळ")
-    assert "\U000114AA\U000114C3" in result.unicode_text
-    assert "\U0001149D" not in result.unicode_text
+    assert "\U000114aa\U000114c3" in result.unicode_text
+    assert "\U0001149d" not in result.unicode_text

@@ -1,0 +1,147 @@
+"""TibetanMachine legacy font -> Unicode Tibetan (U+0F00-U+0FFF).
+
+The mapping is the TibetanMachine table from BDRC's Apache-2.0
+``py-tiblegenc`` project. A recovered Gorkhapatra sample converted through the
+same table produced 13,623 characters, including 12,801 Tibetan-block
+characters and no U+FFFD replacements. This module converts an already
+extracted text span; PDF font-span extraction and mixed-font segmentation stay
+the caller's responsibility.
+
+Monlam Unicode, Microsoft Himalaya, Qomolangma, and Jomolhari text observed in
+the corpus is already Unicode and must not be sent through this legacy table.
+"""
+
+from __future__ import annotations
+
+import csv
+import unicodedata
+from dataclasses import dataclass
+from importlib import resources
+from pathlib import Path
+
+TIBETAN_LO, TIBETAN_HI = 0x0F00, 0x0FFF
+
+
+@dataclass(frozen=True)
+class TibetanMachineConversion:
+    legacy_text: str
+    unicode_text: str
+    tibetan_char_count: int
+    replacement_count: int
+    empty_codepoints: list[str]
+    unmapped_codepoints: list[str]
+
+
+class TibetanMachineConverter:
+    """Apply BDRC's TibetanMachine character table to extracted legacy text."""
+
+    def __init__(self, table: dict[int, str]) -> None:
+        if not table:
+            raise ValueError("TibetanMachineConverter requires a non-empty map")
+        self._table = dict(table)
+
+    @classmethod
+    def from_map_file(cls, path: str | Path) -> "TibetanMachineConverter":
+        map_path = Path(path)
+        if not map_path.is_file():
+            raise FileNotFoundError(f"TibetanMachine map does not exist: {map_path}")
+
+        table: dict[int, str] = {}
+        with map_path.open(encoding="utf-8", newline="") as stream:
+            rows = (line for line in stream if not line.startswith("#"))
+            for row in csv.DictReader(rows):
+                try:
+                    source = int(row["source_codepoint"])
+                except (KeyError, TypeError, ValueError) as error:
+                    raise ValueError(f"invalid TibetanMachine source row: {row!r}") from error
+                if not (0 <= source <= 0x10FFFF) or source in table:
+                    raise ValueError(f"invalid/duplicate TibetanMachine source: {source}")
+                target = row.get("target")
+                if target is None:
+                    raise ValueError(f"missing TibetanMachine target for source {source}")
+                if any(not (TIBETAN_LO <= ord(char) <= TIBETAN_HI) for char in target):
+                    raise ValueError(f"non-Tibetan target for TibetanMachine source {source}")
+                table[source] = target
+
+        # PDF/text extractors may expose WinAnsi values either as their decoded
+        # CP1252 character (for example U+20AC) or as the raw byte value. BDRC's
+        # converter supports both representations; add the non-conflicting raw
+        # aliases for CP1252's 0x80..0x9F region here too.
+        aliases: dict[int, str] = {}
+        for source, target in table.items():
+            if source <= 0xFF:
+                continue
+            try:
+                encoded = chr(source).encode("cp1252")
+            except UnicodeEncodeError:
+                continue
+            if len(encoded) == 1 and encoded[0] not in table:
+                aliases[encoded[0]] = target
+        table.update(aliases)
+        return cls(table)
+
+    @classmethod
+    def default(cls) -> "TibetanMachineConverter":
+        with resources.as_file(
+            resources.files("nepal_ttf2utf.maps") / "TibetanMachine.csv"
+        ) as path:
+            return cls.from_map_file(path)
+
+    def convert(self, text: str) -> TibetanMachineConversion:
+        output: list[str] = []
+        empty: set[str] = set()
+        unmapped: set[str] = set()
+        replacements = 0
+
+        for char in text:
+            codepoint = ord(char)
+            # Match py-tiblegenc's pre-table normalization: NBSP is a real
+            # space, not the table's visually empty U+00A0 slot.
+            if char == "\u00a0":
+                output.append(" ")
+                replacements += 1
+                continue
+            if codepoint in self._table:
+                target = self._table[codepoint]
+                output.append(target)
+                replacements += 1
+                if not target:
+                    empty.add(f"U+{codepoint:04X}")
+                continue
+            output.append(char)
+            if char in " \t\r\n" or TIBETAN_LO <= codepoint <= TIBETAN_HI:
+                continue
+            unmapped.add(f"U+{codepoint:04X}")
+
+        converted = unicodedata.normalize("NFC", "".join(output))
+        return TibetanMachineConversion(
+            legacy_text=text,
+            unicode_text=converted,
+            tibetan_char_count=sum(TIBETAN_LO <= ord(char) <= TIBETAN_HI for char in converted),
+            replacement_count=replacements,
+            empty_codepoints=sorted(empty),
+            unmapped_codepoints=sorted(unmapped),
+        )
+
+
+_DEFAULT: TibetanMachineConverter | None = None
+
+
+def convert_tibetanmachine(text: str, *, strict: bool = False) -> TibetanMachineConversion:
+    """Convert a TibetanMachine-encoded text span to Unicode Tibetan (NFC).
+
+    Defined empty-glyph entries follow BDRC's table in lenient mode but are
+    reported in ``empty_codepoints``. Strict mode raises on either an empty
+    entry or an unknown character so corpus pipelines can gate lossless output.
+    """
+    global _DEFAULT
+    if _DEFAULT is None:
+        _DEFAULT = TibetanMachineConverter.default()
+    result = _DEFAULT.convert(text)
+    if strict and (result.empty_codepoints or result.unmapped_codepoints):
+        flagged = result.empty_codepoints + result.unmapped_codepoints
+        raise ValueError(
+            "empty/unmapped characters after TibetanMachine conversion: "
+            + " ".join(sorted(set(flagged)))
+        )
+    return result
