@@ -60,14 +60,26 @@ SUNUWAR_LETTERS_CONFIRMED: dict[str, str] = {
     # uncertain bytes to the still-free codepoints, scored by Kirat1-glyph-vs-Noto-glyph
     # shape (IoU + chamfer) with a topological hole-count constraint, adjudicated against
     # the L2/21-157R proposal chart and validated by a printed-ink single-glyph round-trip.
-    "v": chr(0x11BC4),  # reusunuwar   (N+diagonal)   shape 0.545>=floor; bijection+context-match; n=765
-    "q": chr(0x11BE0),  # klokosunuwar (bowl+stem)    shape 0.567>=floor; bijection+context-match; n=579
-    "x": chr(0x11BD3),  # varcasunuwar (N+hook)       shape 0.522>=floor; bijection+context-match; n=97
+    "v": chr(
+        0x11BC4
+    ),  # reusunuwar   (N+diagonal)   shape 0.545>=floor; bijection+context-match; n=765
+    "q": chr(
+        0x11BE0
+    ),  # klokosunuwar (bowl+stem)    shape 0.567>=floor; bijection+context-match; n=579
+    "x": chr(
+        0x11BD3
+    ),  # varcasunuwar (N+hook)       shape 0.522>=floor; bijection+context-match; n=97
     "r": chr(0x11BD9),  # pharsunuwar  ('alpha')      shape 0.521>=floor; hole-match 1=1; n=40
-    "u": chr(0x11BD4),  # yatsunuwar   (looped 'e')   topology-locked (1 hole=loop); printed-ink 7/8 vote
-    "g": chr(0x11BD5),  # avasunuwar   (forked vert)  embedded-glyph 0.454 decisive over gil; printed-ink
+    "u": chr(
+        0x11BD4
+    ),  # yatsunuwar   (looped 'e')   topology-locked (1 hole=loop); printed-ink 7/8 vote
+    "g": chr(
+        0x11BD5
+    ),  # avasunuwar   (forked vert)  embedded-glyph 0.454 decisive over gil; printed-ink
     "h": chr(0x11BDA),  # ngarsunuwar  ('3')          printed-ink 7/8 vote over donga('5'); n=180
-    "j": chr(0x11BCF),  # jyahsunuwar  (dagger '+')   embedded-glyph 0.504 decisive (dagger=dagger); n=198
+    "j": chr(
+        0x11BCF
+    ),  # jyahsunuwar  (dagger '+')   embedded-glyph 0.504 decisive (dagger=dagger); n=198
 }
 
 # --- Letters: UNCERTAIN tier. Best current guess, kept for future verification but
@@ -85,7 +97,28 @@ SUNUWAR_LETTERS_UNCERTAIN: dict[str, str] = {
 
 # Punctuation / danda-like bytes: passed through unchanged (not Sunuwar letters).
 SUNUWAR_PASSTHROUGH: frozenset[str] = frozenset(
-    {",", ":", "-", "(", ")", "\\", ".", "=", "/", "_", "<", "+", "]", "[", ";", "'", '"', "!", "?", "%"}
+    {
+        ",",
+        ":",
+        "-",
+        "(",
+        ")",
+        "\\",
+        ".",
+        "=",
+        "/",
+        "_",
+        "<",
+        "+",
+        "]",
+        "[",
+        ";",
+        "'",
+        '"',
+        "!",
+        "?",
+        "%",
+    }
 )
 
 _SUNUWAR_BLOCK_LO = 0x11BC0

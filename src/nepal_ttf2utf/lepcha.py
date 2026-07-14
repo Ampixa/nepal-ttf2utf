@@ -46,9 +46,9 @@ _LEPCHA_CODEPOINT_RE = re.compile(r"[ᰀ-ᱏ]")
 PRE_BASE_VOWELS = frozenset({0x1C27, 0x1C28, 0x1C29})
 
 # Codepoint classes for canonical ordering within a cluster.
-_SUBJOINED = frozenset({0x1C24, 0x1C25})            # subjoined YA, RA
-_VOWEL_SIGNS = frozenset(range(0x1C26, 0x1C2D))      # AA, I, O, OO, U, UU, E
-_FINAL_SIGNS = frozenset(range(0x1C2D, 0x1C36))      # K, M, L, N, P, R, T, NYIN-DO, KANG
+_SUBJOINED = frozenset({0x1C24, 0x1C25})  # subjoined YA, RA
+_VOWEL_SIGNS = frozenset(range(0x1C26, 0x1C2D))  # AA, I, O, OO, U, UU, E
+_FINAL_SIGNS = frozenset(range(0x1C2D, 0x1C36))  # K, M, L, N, P, R, T, NYIN-DO, KANG
 _RAN = 0x1C36
 _NUKTA = 0x1C37
 _BASES = frozenset(

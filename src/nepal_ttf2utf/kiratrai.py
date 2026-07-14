@@ -56,7 +56,9 @@ def _expand_byte_tokens(body: str) -> tuple[int, ...]:
             start = int(token, 16)
             end = int(tokens[index + 2], 16)
             if end < start:
-                raise ValueError(f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}")
+                raise ValueError(
+                    f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             values.extend(range(start, end + 1))
             index += 3
             continue
@@ -79,11 +81,15 @@ def _expand_uni_tokens(body: str) -> tuple[int, ...]:
             start_match = _UNI_TOKEN_RE.match(token)
             end_match = _UNI_TOKEN_RE.match(tokens[index + 2])
             if start_match is None or end_match is None:
-                raise ValueError(f"unparseable unicode range in Kirat Rai map: {token}..{tokens[index + 2]}")
+                raise ValueError(
+                    f"unparseable unicode range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             start = int(start_match.group(1), 16)
             end = int(end_match.group(1), 16)
             if end < start:
-                raise ValueError(f"invalid unicode range in Kirat Rai map: {token}..{tokens[index + 2]}")
+                raise ValueError(
+                    f"invalid unicode range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             values.extend(range(start, end + 1))
             index += 3
             continue
@@ -165,9 +171,13 @@ class KiratRaiConverter:
                 left = byte_classes.get(left_name)
                 right = uni_classes.get(right_name)
                 if left is None:
-                    raise ValueError(f"Kirat Rai class rule references unknown byte class: {left_name!r}")
+                    raise ValueError(
+                        f"Kirat Rai class rule references unknown byte class: {left_name!r}"
+                    )
                 if right is None:
-                    raise ValueError(f"Kirat Rai class rule references unknown unicode class: {right_name!r}")
+                    raise ValueError(
+                        f"Kirat Rai class rule references unknown unicode class: {right_name!r}"
+                    )
                 if len(left) != len(right):
                     raise ValueError(
                         f"Kirat Rai class rule length mismatch for [{left_name}]>[{right_name}]: "
@@ -191,9 +201,7 @@ class KiratRaiConverter:
 
     @classmethod
     def default(cls) -> "KiratRaiConverter":
-        with resources.as_file(
-            resources.files("nepal_ttf2utf.maps") / "kiratraifontnew.map"
-        ) as p:
+        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "kiratraifontnew.map") as p:
             return cls.from_map_file(p)
 
     def convert(self, text: str) -> KiratRaiConversion:

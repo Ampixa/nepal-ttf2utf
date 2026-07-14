@@ -26,9 +26,7 @@ _TIRHUTA_VIRAMA = 0x114C2
 _TIRHUTA_NUKTA = 0x114C3
 _TIRHUTA_DEPENDENTS = frozenset(range(0x114B0, 0x114C2)) | {_TIRHUTA_NUKTA}
 
-_PASSTHROUGH = frozenset(
-    " \t\r\n0123456789,.;:!?()[]{}<>/\\'\"-–—+_=%&@#|~\u00a0‘’“”"
-)
+_PASSTHROUGH = frozenset(" \t\r\n0123456789,.;:!?()[]{}<>/\\'\"-–—+_=%&@#|~\u00a0‘’“”")
 
 
 def _build_map() -> dict[int, tuple[int, ...]]:
@@ -128,10 +126,7 @@ def _move_prebase_i(chars: list[int]) -> tuple[list[int], int]:
             # Logical Unicode already stores I after its base. The Janaki PDF
             # artifact is distinguishable because I appears at a text/run or
             # word boundary before the consonant.
-            and (
-                index == 0
-                or not (TIRHUTA_LO <= chars[index - 1] <= TIRHUTA_HI)
-            )
+            and (index == 0 or not (TIRHUTA_LO <= chars[index - 1] <= TIRHUTA_HI))
         ):
             end = index + 2
             if end < len(chars) and chars[end] == _TIRHUTA_NUKTA:
@@ -171,10 +166,7 @@ def _move_trailing_reph(chars: list[int]) -> tuple[list[int], int]:
                 and chars[end + 1] == _TIRHUTA_VIRAMA
                 # A logical RA+VIRAMA precedes the consonant it joins. Janaki's
                 # extracted reph is the trailing form at a word/run boundary.
-                and (
-                    end + 2 == len(chars)
-                    or not (TIRHUTA_LO <= chars[end + 2] <= TIRHUTA_HI)
-                )
+                and (end + 2 == len(chars) or not (TIRHUTA_LO <= chars[end + 2] <= TIRHUTA_HI))
             ):
                 output.extend((_TIRHUTA_RA, _TIRHUTA_VIRAMA))
                 output.extend(chars[index:end])
