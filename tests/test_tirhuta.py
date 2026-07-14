@@ -52,3 +52,13 @@ def test_tirhuta_genuine_unicode_and_punctuation_pass_through():
 
 def test_convert_dispatches_to_tirhuta():
     assert convert("मैथिली", font="janaki") == "𑒧𑒻𑒟𑒱𑒪𑒲"
+
+
+def test_devanagari_lla_maps_to_la_plus_nukta():
+    # Pandey L2/11-175R section 4.12: /l./ (Devanagari LLA) = TIRHUTA LA + NUKTA,
+    # not NNA + NUKTA (regression for the 2026-07-14 audit finding).
+    from nepal_ttf2utf.tirhuta import convert_tirhuta
+
+    result = convert_tirhuta("ळ")
+    assert "\U000114aa\U000114c3" in result.unicode_text
+    assert "\U0001149d" not in result.unicode_text

@@ -102,3 +102,15 @@ def test_lepcha_genuine_unicode_passes_through():
 def test_lepcha_empty_map_rejected():
     with pytest.raises(ValueError):
         LepchaConverter({})
+
+
+def test_nukta_precedes_subjoined_in_canonical_order():
+    # The Unicode Standard ch.13 Table 13-9: encoding order is consonant,
+    # nukta, subjoined consonant, vowel sign, final, ran. The spec's worked
+    # example: retroflex t = <KA, NUKTA, SUBJOINED RA>. Regression for the
+    # 2026-07-14 audit finding (nukta was emitted after subjoined marks).
+    from nepal_ttf2utf.lepcha import convert_lepcha
+
+    for raw in ("A\\&", "A&\\"):  # KA+NUKTA+SUBJ-YA in both input orders
+        out = convert_lepcha(raw).unicode_text
+        assert "ᰀ᰷ᰤ" in out, (raw, out.encode("unicode_escape"))

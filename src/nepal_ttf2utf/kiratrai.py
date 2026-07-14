@@ -1,11 +1,11 @@
-"""Kirat Rai legacy ``kiratraifont`` (AKRS) -> Unicode Kirat Rai (U+16D40-U+16D7F).
+"""Legacy Kirat Rai fonts -> Unicode Kirat Rai (U+16D40-U+16D7F).
 
-The Sikkim Herald Kirat Rai edition is typeset in a legacy TrueType font named
-``kiratraifont`` with a WinAnsi (byte) encoding and no ToUnicode CMap: each glyph
-is addressed by a single Latin byte, so the extractable PDF text is the raw AKRS
-byte sequence, not Unicode. SIL publishes a TECkit mapping (``kiratraifontnew.map``)
-from those legacy bytes to the Kirat Rai Unicode block (U+16D40-U+16D7F, Unicode
-16.0); the vendored copy lives at ``maps/kiratraifontnew.map``.
+SIL publishes a TECkit map for the canonical 2021 ``kirat rai font new`` encoding;
+the vendored copy lives at ``maps/kiratraifontnew.map``. Sikkim Herald PDFs use a
+different, older layout hidden behind per-PDF CID subsets and ASCII ToUnicode values.
+Four independently subset Herald PDFs share one stable old->new remap: exact glyph
+outline plus advance-width identity covers 43,037 of 43,148 extracted characters.
+The Herald converter applies that complete premap before the SIL rules.
 
 That map is expressed with TECkit ``ByteClass`` / ``UniClass`` declarations plus a
 handful of explicit multi-byte ligature rules. A ``[class] > [class]`` rule maps the
@@ -14,9 +14,10 @@ Unicode class. This module reads the map natively (no ``teckit_compile`` depende
 and applies the forward Legacy->Unicode pass, longest-match-first so the multi-byte
 ligature rules win over the single-byte class rules.
 
-Coverage is partial: 7 observed legacy bytes (``f R x F I L \\``) are not in SIL's
-published class table, so they pass through unchanged and are surfaced in
-``unmapped_codepoints`` (or raised in ``strict`` mode) — never silently dropped.
+The two layouts must not be auto-detected from text: even old-layout strings without
+the formerly conspicuous ``f R x F I L`` bytes are globally permuted. Callers must
+select the canonical-new or Herald alias explicitly. In the audited Herald corpus,
+only one occurrence of extracted ``Z`` remains semantically unresolved.
 """
 
 from __future__ import annotations
@@ -36,10 +37,57 @@ _CLASS_RULE_RE = re.compile(r"^\[([^\]]+)\]\s*<?>\s*\[([^\]]+)\]\s*$")
 
 _KIRATRAI_LO, _KIRATRAI_HI = 0x16D40, 0x16D7F
 
-# Observed AKRS bytes absent from SIL's map. Six render distinct script glyphs;
-# backslash has no glyph in the source font. These are evidence-backed gaps, not
-# candidates for speculative shape matching.
+# Bytes absent from SIL's canonical-new map. Kept as a public compatibility constant;
+# in Herald PDFs these ASCII values belong to the separate permuted layout below.
 KIRATRAI_UNMAPPED_BYTES: frozenset[str] = frozenset("fRxFIL\\")
+
+# Sikkim Herald extracted ASCII -> canonical ``kiratraifontnew`` byte. Derived by exact
+# RecordingPen outline-command and advance-width identity against the font embedded in
+# Unicode proposal L2/22-043R. Shared by four PDF subsets and 43,037 exact-match chars.
+KIRATRAI_HERALD_PREMAP: dict[str, str] = {
+    "D": "q",
+    "F": "g",
+    "G": "P",
+    "H": "j",
+    "I": "W",
+    "J": "J",
+    "K": "Q",
+    "L": "$",
+    "O": "O",
+    "R": "w",
+    "S": "G",
+    "U": "o",
+    "a": "k",
+    "b": "A",
+    "c": "D",
+    "d": "K",
+    "e": "m",
+    "f": "N",
+    "g": "s",
+    "h": "a",
+    "i": "v",
+    "j": "b",
+    "k": "r",
+    "l": "i",
+    "m": "c",
+    "n": "p",
+    "o": "n",
+    "p": "t",
+    "q": "d",
+    "r": "e",
+    "s": "C",
+    "t": "h",
+    "u": "u",
+    "v": "B",
+    "w": "l",
+    "x": "T",
+    "y": "y",
+    "z": "z",
+}
+
+# Values confirmed as identity/literal in the audited Herald PDFs. Backslash is a
+# separate blank glyph and is normalized to an ordinary space before conversion.
+KIRATRAI_HERALD_PASSTHROUGH: frozenset[str] = frozenset(" \t\r\n0123456789(),-/.;")
 
 
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
@@ -56,7 +104,9 @@ def _expand_byte_tokens(body: str) -> tuple[int, ...]:
             start = int(token, 16)
             end = int(tokens[index + 2], 16)
             if end < start:
-                raise ValueError(f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}")
+                raise ValueError(
+                    f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             values.extend(range(start, end + 1))
             index += 3
             continue
@@ -79,11 +129,15 @@ def _expand_uni_tokens(body: str) -> tuple[int, ...]:
             start_match = _UNI_TOKEN_RE.match(token)
             end_match = _UNI_TOKEN_RE.match(tokens[index + 2])
             if start_match is None or end_match is None:
-                raise ValueError(f"unparseable unicode range in Kirat Rai map: {token}..{tokens[index + 2]}")
+                raise ValueError(
+                    f"unparseable unicode range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             start = int(start_match.group(1), 16)
             end = int(end_match.group(1), 16)
             if end < start:
-                raise ValueError(f"invalid unicode range in Kirat Rai map: {token}..{tokens[index + 2]}")
+                raise ValueError(
+                    f"invalid unicode range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             values.extend(range(start, end + 1))
             index += 3
             continue
@@ -165,9 +219,13 @@ class KiratRaiConverter:
                 left = byte_classes.get(left_name)
                 right = uni_classes.get(right_name)
                 if left is None:
-                    raise ValueError(f"Kirat Rai class rule references unknown byte class: {left_name!r}")
+                    raise ValueError(
+                        f"Kirat Rai class rule references unknown byte class: {left_name!r}"
+                    )
                 if right is None:
-                    raise ValueError(f"Kirat Rai class rule references unknown unicode class: {right_name!r}")
+                    raise ValueError(
+                        f"Kirat Rai class rule references unknown unicode class: {right_name!r}"
+                    )
                 if len(left) != len(right):
                     raise ValueError(
                         f"Kirat Rai class rule length mismatch for [{left_name}]>[{right_name}]: "
@@ -191,9 +249,7 @@ class KiratRaiConverter:
 
     @classmethod
     def default(cls) -> "KiratRaiConverter":
-        with resources.as_file(
-            resources.files("nepal_ttf2utf.maps") / "kiratraifontnew.map"
-        ) as p:
+        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "kiratraifontnew.map") as p:
             return cls.from_map_file(p)
 
     def convert(self, text: str) -> KiratRaiConversion:
@@ -235,15 +291,71 @@ class KiratRaiConverter:
         return all(ord(text[index + offset]) == code for offset, code in enumerate(source))
 
 
+class KiratRaiHeraldConverter:
+    """Convert the permuted Sikkim Herald PDF layout through the canonical SIL map."""
+
+    def __init__(self, canonical: KiratRaiConverter) -> None:
+        self._canonical = canonical
+
+    @classmethod
+    def default(cls) -> "KiratRaiHeraldConverter":
+        return cls(KiratRaiConverter.default())
+
+    def convert(self, text: str) -> KiratRaiConversion:
+        output: list[str] = []
+        canonical_run: list[str] = []
+        unmapped: set[str] = set()
+        replacements = 0
+
+        def flush() -> None:
+            nonlocal replacements
+            if not canonical_run:
+                return
+            result = self._canonical.convert("".join(canonical_run))
+            output.append(result.unicode_text)
+            replacements += result.replacement_count
+            unmapped.update(result.unmapped_codepoints)
+            canonical_run.clear()
+
+        for char in text:
+            remapped = KIRATRAI_HERALD_PREMAP.get(char)
+            if remapped is not None:
+                canonical_run.append(remapped)
+                continue
+            if char == "\\":
+                canonical_run.append(" ")
+                continue
+            if char in KIRATRAI_HERALD_PASSTHROUGH:
+                canonical_run.append(char)
+                continue
+            if _KIRATRAI_LO <= ord(char) <= _KIRATRAI_HI:
+                flush()
+                output.append(char)
+                continue
+            flush()
+            output.append(char)
+            unmapped.add(f"U+{ord(char):04X}")
+        flush()
+
+        converted = unicodedata.normalize("NFC", "".join(output))
+        return KiratRaiConversion(
+            legacy_text=text,
+            unicode_text=converted,
+            kiratrai_char_count=len(_KIRATRAI_CODEPOINT_RE.findall(converted)),
+            replacement_count=replacements,
+            unmapped_codepoints=sorted(unmapped),
+        )
+
+
 _DEFAULT: KiratRaiConverter | None = None
+_HERALD_DEFAULT: KiratRaiHeraldConverter | None = None
 
 
 def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
-    """Convert ``kiratraifont``-legacy Kirat Rai text to Unicode Kirat Rai (NFC).
+    """Convert canonical ``kiratraifontnew`` text to Unicode Kirat Rai (NFC).
 
-    Returns a :class:`KiratRaiConversion`. Bytes outside SIL's class table (the 7
-    known-pending bytes) are passed through and surfaced in ``unmapped_codepoints``.
-    With ``strict=True`` any such leftover raises ``ValueError`` instead.
+    This function applies SIL's map directly. Use :func:`convert_kiratrai_herald` for
+    text extracted from the older/permuted Sikkim Herald PDF font.
     """
     global _DEFAULT
     if _DEFAULT is None:
@@ -252,6 +364,20 @@ def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
     if strict and result.unmapped_codepoints:
         raise ValueError(
             "unmapped/leftover characters after Kirat Rai conversion: "
+            + " ".join(result.unmapped_codepoints)
+        )
+    return result
+
+
+def convert_kiratrai_herald(text: str, *, strict: bool = False) -> KiratRaiConversion:
+    """Convert Sikkim Herald's permuted Kirat Rai PDF text to Unicode (NFC)."""
+    global _HERALD_DEFAULT
+    if _HERALD_DEFAULT is None:
+        _HERALD_DEFAULT = KiratRaiHeraldConverter.default()
+    result = _HERALD_DEFAULT.convert(text)
+    if strict and result.unmapped_codepoints:
+        raise ValueError(
+            "unmapped/leftover characters after Herald Kirat Rai conversion: "
             + " ".join(result.unmapped_codepoints)
         )
     return result

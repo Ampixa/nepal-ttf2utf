@@ -77,9 +77,7 @@ def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
     return confirmed, uncertain
 
 
-def _parse_map_section(
-    entries: object, section_name: str, map_path: Path
-) -> dict[int, int]:
+def _parse_map_section(entries: object, section_name: str, map_path: Path) -> dict[int, int]:
     if not isinstance(entries, dict):
         raise ValueError(f"Ol Chiki map missing '{section_name}' object: {map_path}")
     table: dict[int, int] = {}
@@ -141,15 +139,15 @@ class OLChikiConverter:
         self._table = table
 
     @classmethod
-    def from_map_file(cls, path: str | Path, *, apply_uncertain: bool = False) -> "OLChikiConverter":
+    def from_map_file(
+        cls, path: str | Path, *, apply_uncertain: bool = False
+    ) -> "OLChikiConverter":
         confirmed, uncertain = _load_map_file(path)
         return cls(confirmed, uncertain, apply_uncertain=apply_uncertain)
 
     @classmethod
     def default(cls, *, apply_uncertain: bool = False) -> "OLChikiConverter":
-        with resources.as_file(
-            resources.files("nepal_ttf2utf.maps") / "olck_optimum.json"
-        ) as p:
+        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
             return cls.from_map_file(p, apply_uncertain=apply_uncertain)
 
     def convert(self, text: str) -> OLChikiConversion:

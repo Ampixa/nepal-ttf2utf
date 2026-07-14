@@ -1,8 +1,8 @@
 """Sunuwar / Jenticha (Koĩts) legacy display-font conversion tests.
 
 Anchors are the printed-crop / round-trip-verified assignments from the source
-derivation (``outputs/sunuwar-map-derivation``). The single uncertain byte (``|``)
-is left flagged, never guessed, unless the caller opts in.
+derivation (``outputs/sunuwar-map-derivation``). The formerly uncertain ``|`` byte
+is confirmed as the Sikkim regional form of U+11BC5 UTTHI.
 """
 
 import unicodedata
@@ -69,26 +69,26 @@ def test_sunuwar_second_pass_resolved_letters_applied_by_default():
         assert res.uncertain_bytes == []
 
 
-def test_sunuwar_only_pipe_byte_remains_uncertain():
-    assert set(SUNUWAR_LETTERS_UNCERTAIN) == {"|"}
+def test_sunuwar_no_uncertain_bytes_remain():
+    assert SUNUWAR_LETTERS_UNCERTAIN == {}
 
 
-def test_sunuwar_uncertain_byte_not_applied_by_default():
+def test_sunuwar_pipe_is_confirmed_utthi_by_default():
     res = convert_sunuwar("|")
-    assert res.unicode_text == "|"
-    assert "|" in res.uncertain_bytes
-    assert res.sunuwar_char_count == 0
+    assert res.unicode_text == chr(0x11BC5)
+    assert res.uncertain_bytes == []
+    assert res.sunuwar_char_count == 1
+    assert res.confirmed_byte_count == 1
 
 
-def test_sunuwar_uncertain_applied_when_opted_in():
-    res = convert_sunuwar("|", apply_uncertain=True)
-    assert 0x11BC0 <= ord(res.unicode_text) <= 0x11BFF
+def test_sunuwar_apply_uncertain_is_compatibility_noop():
+    assert (
+        convert_sunuwar("|").unicode_text == convert_sunuwar("|", apply_uncertain=True).unicode_text
+    )
 
 
-def test_sunuwar_strict_mode_surfaces_uncertain_byte():
-    # The uncertain byte must be surfaced (raised) in strict mode, not silently kept.
-    with pytest.raises(ValueError):
-        convert_sunuwar("|", strict=True)
+def test_sunuwar_strict_mode_accepts_confirmed_utthi():
+    assert convert_sunuwar("|", strict=True).unicode_text == chr(0x11BC5)
 
 
 def test_sunuwar_output_is_nfc_and_block_constrained_for_confirmed():

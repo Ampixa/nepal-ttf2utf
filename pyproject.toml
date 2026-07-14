@@ -1,23 +1,88 @@
 [project]
 name = "nepal-ttf2utf"
-version = "0.1.0"
-description = "Legacy ASCII-font to Unicode converter for the scripts of Nepal and its diaspora (Devanagari incl. nayanepal/Gorkhapatra, Limbu/Sirijonga, Kirat Rai, Sunuwar, and Lepcha)."
+version = "0.2.0"
+description = "Legacy-font to Unicode conversion for Devanagari, Limbu, Kirat Rai, Sunuwar, Lepcha, Ol Chiki, Tirhuta, and Tibetan."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Ampixa" }]
-keywords = ["nepali", "devanagari", "limbu", "sirijonga", "kirat-rai", "sunuwar", "lepcha", "preeti", "unicode", "legacy-font", "ocr", "nepal", "sikkim"]
-dependencies = ["npttf2utf>=0.3"]
+keywords = [
+  "nepali",
+  "devanagari",
+  "limbu",
+  "sirijonga",
+  "kirat-rai",
+  "sunuwar",
+  "lepcha",
+  "ol-chiki",
+  "tirhuta",
+  "tibetan",
+  "preeti",
+  "unicode",
+  "legacy-font",
+  "ocr",
+  "nepal",
+  "sikkim",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Text Processing :: Linguistic",
+]
+dependencies = ["npttf2utf>=0.3,<0.4"]
+
+[project.scripts]
+nepal-ttf2utf = "nepal_ttf2utf.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
+[dependency-groups]
+dev = ["pytest>=7"]
+
 [project.urls]
 Homepage = "https://github.com/Ampixa/nepal-ttf2utf"
+Repository = "https://github.com/Ampixa/nepal-ttf2utf"
+Issues = "https://github.com/Ampixa/nepal-ttf2utf/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+exclude = ["**/._*", "/BLOG_DRAFT.md", "/.pytest_cache", "/.ruff_cache"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/nepal_ttf2utf"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/LICENSE",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/docs",
+  "/THIRD_PARTY_NOTICES.md",
+  "/pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I"]

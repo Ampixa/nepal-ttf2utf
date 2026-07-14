@@ -1,81 +1,125 @@
 # nepal-ttf2utf
 
-**Legacy ASCII-font → Unicode for the scripts of Nepal and its diaspora.**
+Convert text stored with legacy fonts into real Unicode for scripts used in
+Nepal, Sikkim, and adjacent language communities.
 
-Nepal's languages still live in pre-Unicode, ASCII-mapped fonts (newspapers,
-government docs, textbooks). Existing converters such as
-[`npttf2utf`](https://github.com/casualsnek/npttf2utf) cover a handful of **Nepali
-Devanagari** fonts and silently drop the special characters that minority languages
-depend on. `nepal-ttf2utf` aims to cover **every script our Nepal-language corpus
-actually touches**, correctly — and it builds on `npttf2utf` rather than replacing it.
+The package handles eight Unicode scripts and keeps unresolved input visible.
+It does not infer a mapping where the source font or corpus does not provide
+enough evidence.
 
 ```python
 from nepal_ttf2utf import convert
 
-convert("g]kfn", font="preeti")               # 'नेपाल'
-convert("k|sflzt", font="nayanepal")          # 'प्रकाशित'  (Gorkhapatra newspaper font)
-convert(namdhinggo_bytes, font="namdhinggo")  # Unicode Limbu/Sirijonga (U+1900–194F)
-convert(kiratrai_bytes, font="kiratrai")      # Unicode Kirat Rai   (U+16D40–16D7F)
-convert(koits_bytes, font="sunuwar")          # Unicode Sunuwar     (U+11BC0–11BFF)
-convert(herald_bytes, font="lepcha-sikkimherald")  # Unicode Lepcha (U+1C00–1C4F)
+convert("g]kfn", font="preeti")              # नेपाल
+convert("k|sflzt", font="nayanepal")        # प्रकाशित
+convert("kfMG g'", font="namdhinggo")       # Unicode Limbu
+convert("k", font="jg-lepcha")              # ᰀ
+convert("मैथिली", font="janaki")            # 𑒧𑒻𑒟𑒱𑒪𑒲
+convert('!"#$', font="tibetanmachine")      # ཀཁགང
 ```
-
-## Why it exists
-
-- **Newspaper fonts**: `nayanepal`/`Gorkhapatra` aren't in any open converter. We
-  derived + validated the extensions against real Gorkhapatra pages (97–99% clean
-  Devanagari; anchors गोरखापत्रद्वारा / प्रकाशित / नेपाल / मगर correct).
-- **A different script entirely**: Limbu/Sirijonga (its own Unicode block) — `npttf2utf`
-  can't touch it. We bundle the SIL Namdhinggo map + the vowel/subjoined reordering.
-- **Sikkim Herald minority fonts**: Kirat Rai, Sunuwar and Lepcha each ship in a legacy
-  byte-encoded font with no (or only a partial) public byte→Unicode table. The maps here
-  were derived from SIL's TECkit table and/or by glyph-shape identity + round-trip
-  rendering against real Sikkim Herald pages. Coverage is **partial and honest** (see the
-  matrix); the few unresolved bytes are surfaced, never guessed.
-- **No silent drops**: `strict=True` surfaces leftover bytes (reph, conjuncts, nukta,
-  the Kiranti glottal stop, and the still-unresolved Sikkim Herald bytes) instead of
-  dropping them.
 
 ## Coverage
 
-| Script | Fonts | Status |
+| Output script | Legacy font keys | Evidence and current limits |
 |---|---|---|
-| **Devanagari** | preeti, kantipur, sagarmatha, pcs-nepali, fontasy-himali | via tested `npttf2utf` maps |
-| **Devanagari** | **nayanepal, gorkhapatra** | ✅ added + validated on real pages |
-| **Limbu / Sirijonga** | **namdhinggo, sirijonga** (Namdhinggo SIL encoding) | ✅ bundled SIL map + reordering |
-| **Kirat Rai** (U+16D40) | **kiratrai** (`kiratraifont` / AKRS) | ⚠️ ~93% — SIL TECkit map; 6 bytes pending |
-| **Sunuwar / Jenticha** (U+11BC0) | **sunuwar** (`koits` / `kirat1`) | ⚠️ ~89% — shape-derived; 1 byte (`\|`) pending a native reader |
-| **Lepcha / Róng** (U+1C00) | **lepcha-sikkimherald** (Sikkim Herald live-text font) | ⚠️ partial — shape-derived + pre-base reorder; 2 bytes (`]`, `%`) pending |
-| Newa / Prachalit (U+11400) | 8-bit hack fonts | 🔜 greenfield — no public converter exists |
-| Tirhuta / Mithilakshar (U+11480) | legacy fonts | 🔜 planned (small corpus) |
-| Tibetan / Tamyig | — | ↪ wrap existing tools (pyewts, etc.) |
-| Gurung Khema, Ol Onal | — | Unicode-native (2024) — no legacy conversion needed |
-| Ranjana, Magar Akkha | — | not yet in Unicode — cannot convert |
+| Devanagari | `preeti`, `kantipur`, `sagarmatha`, `pcs-nepali`, `fontasy-himali` | Delegates to the tested `npttf2utf` maps. |
+| Devanagari | `nayanepal`, `gorkhapatra` | Preeti-family map plus the two observed newspaper extension glyphs. |
+| Limbu / Sirijonga | `namdhinggo`, `namdhinggosill`, `sirijonga`, `limbu` | Native reader for SIL's bundled [`Limbu.map`](src/nepal_ttf2utf/maps/Limbu.map), including Unicode-order repair. The source map leaves `#` undefined. |
+| Kirat Rai | `kiratrai`, `kiratrai-new`, `kiratraifontnew`, `akrs`, `akrs-new` | Native reader for SIL's canonical 2021 [`kiratraifontnew.map`](src/nepal_ttf2utf/maps/kiratraifontnew.map). |
+| Kirat Rai | `kiratrai-herald`, `kiratraifont`, `sikkimherald-kiratrai` | Complete premap for the older, globally permuted Sikkim Herald PDF layout, then the SIL rules. Exact outline-and-width identity covers 43,037 of 43,148 audited characters; one extracted `Z` remains unresolved. |
+| Sunuwar / Jenticha | `sunuwar`, `jenticha`, `koits`, `kirat1` | All observed script bytes are confirmed. The final `\|` byte is the Sikkim regional form of U+11BC5 UTTHI, verified against a labeled Sikkim glyph and a 600-dpi corpus crop. |
+| Lepcha / Róng | `jg-lepcha`, `jglepcha`, `lepcha-jg` | Complete native forward reader for SIL's two-pass [`JGLepcha.map`](src/nepal_ttf2utf/maps/JGLepcha.map). |
+| Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Corpus-derived Sikkim Herald layout. `]`, `%`, and six rare punctuation bytes remain unresolved. |
+| Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka` | All observed letter, mark, digit, and `\|` punctuation bytes in the Optimum layout are confirmed. `OLCKLatic-*` is a different, unsupported layout. |
+| Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. In the validation corpus, 4,467 of 6,391 spans converted without leftovers; broken PDF replacement characters remain unrecoverable. |
+| Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's Apache-2.0 TibetanMachine table. One recovered sample produced 12,801 Tibetan-block characters and no U+FFFD replacements; mixed-font segmentation and human/render validation remain required. |
 
-The Kirat Rai / Sunuwar / Lepcha converters came out of real Sikkim Herald OCR work:
-their legacy fonts have no published byte→Unicode table (Sunuwar, Lepcha) or only a
-partial one (Kirat Rai), so the maps were derived from SIL's TECkit table and/or by
-glyph-shape identity against the Unicode reference glyphs and round-trip rendering. The
-coverage is honestly partial — the still-unresolved bytes are **surfaced**, not guessed:
-`convert(..., strict=True)` raises on them, and `convert_kiratrai` / `convert_sunuwar` /
-`convert_lepcha` return them flagged (`unmapped_codepoints` / `uncertain_bytes` /
-`unmapped_bytes`). The single uncertain Sunuwar byte (`|`) needs a native-reader
-transcription to settle; it is never applied by default.
+The result of `supported_fonts()` is the authoritative list of accepted keys.
+Font names are case-insensitive.
+The measurements and source links behind the non-public mappings are recorded
+in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
-## Special-character notes
+### Formats not mapped
 
-- **Kiranti/Rai glottal stop** `ॽ` (U+097D): no legacy ASCII Devanagari font predating
-  2005 can encode it; texts used approximations. `convert_devanagari(...,
-  normalize_glottal_stop=True)` maps the common approximation to U+097D (opt-in).
-- **Limbu glottal** in native script is `᤹` (U+1939 MUKPHRENG), handled by the Limbu map.
+- The Newa material examined for this project already contains true Unicode
+  Newa; it does not establish a legacy-byte mapping.
+- Monlam Unicode, Microsoft Himalaya, Qomolangma, and Jomolhari spans examined
+  here already contain Unicode Tibetan; do not pass them through TibetanMachine.
+- Some Bhote and Sherpa pages use Devanagari despite Tibetan-looking font or
+  language labels. Route conversion by the actual font span and text block.
+- Ranjana and Magar Akkha do not yet have standardized Unicode encodings, so a
+  Unicode converter cannot be provided.
 
-## Install / test
+These are evidence gaps, not placeholder mappings. A short native-reader
+transcription containing the single unresolved Herald Kirat Rai `Z` or the Herald Lepcha
+bytes would be enough to continue those derivations.
 
-```bash
-pip install -e .
-pytest
+## Python API
+
+The common API returns only the converted string:
+
+```python
+from nepal_ttf2utf import convert, supported_fonts
+
+unicode_text = convert(legacy_text, font="kiratrai")
+unicode_text = convert(legacy_text, font="kiratrai", strict=True)
+fonts_by_script = supported_fonts()
 ```
 
-## License
+Lenient mode preserves unresolved input. `strict=True` raises `ValueError` if
+anything remains unresolved, making it suitable as a corpus-cleanliness gate.
 
-MIT. Bundled `Limbu.map` is SIL's (see `maps/Limbu.map.README.txt`).
+Detailed converters expose counts and unresolved values:
+
+```python
+from nepal_ttf2utf import convert_kiratrai, convert_tirhuta
+
+result = convert_kiratrai(legacy_text)
+print(result.unicode_text, result.unmapped_codepoints)
+
+result = convert_tirhuta(janaki_text)
+print(result.prebase_i_moves, result.reph_moves, result.unmapped_codepoints)
+```
+
+Available detailed entry points are `convert_devanagari`, `convert_limbu`,
+`convert_kiratrai`, `convert_kiratrai_herald`, `convert_sunuwar`, `convert_lepcha`,
+`convert_jg_lepcha`, `convert_olchiki`, `convert_tirhuta`, and
+`convert_tibetanmachine`. `convert_limbu` retains its original string return
+type; use `LimbuConverter.convert()` for its detailed result.
+
+## Command line
+
+```console
+$ nepal-ttf2utf --font preeti 'g]kfn'
+नेपाल
+$ nepal-ttf2utf --list-fonts
+akrs    Kirat Rai
+...
+$ nepal-ttf2utf --font jg-lepcha --input-file legacy.txt --input-encoding cp1252 --output-file unicode.txt --strict
+```
+
+With neither a positional string nor `--input-file`, the command reads standard
+input. Output goes to standard output unless `--output-file` is supplied.
+Use `python -m nepal_ttf2utf` if the console script is not on `PATH`.
+
+## Development
+
+```bash
+uv sync --all-extras --dev
+uv run pytest
+uvx ruff check .
+uvx ruff format --check .
+uv build
+uvx twine check dist/*
+```
+
+The test suite checks known mappings, multi-byte rules, visual-to-logical
+reordering, strict-mode failures, already-Unicode passthrough, CLI behavior, and
+mapping-resource validation.
+
+## Licenses
+
+The original package source is MIT licensed; see [`LICENSE`](LICENSE). The SIL
+mapping resources are MIT licensed and retain their notices. Devanagari support
+depends on GPL-3.0-licensed `npttf2utf`. See
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the distribution details.

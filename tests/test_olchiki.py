@@ -16,9 +16,7 @@ from nepal_ttf2utf.olchiki import OLCHIKI_PASSTHROUGH, OLChikiConverter
 
 
 def _load_raw_map() -> dict:
-    with resources.as_file(
-        resources.files("nepal_ttf2utf.maps") / "olck_optimum.json"
-    ) as p:
+    with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
         return json.loads(p.read_text(encoding="utf-8"))
 
 
@@ -96,9 +94,9 @@ def test_olchiki_confirmed_map_collisions_are_only_intentional_case_pairs():
             continue
         assert len(bytes_) == 2, f"U+{cp} has {len(bytes_)} bytes mapped to it: {bytes_}"
         chars = {chr(b) for b in bytes_}
-        assert len(chars) == 2 and {c.lower() for c in chars} == {
-            next(iter(chars)).lower()
-        }, f"U+{cp} collision is not a same-letter case pair: {chars}"
+        assert len(chars) == 2 and {c.lower() for c in chars} == {next(iter(chars)).lower()}, (
+            f"U+{cp} collision is not a same-letter case pair: {chars}"
+        )
 
 
 def test_olchiki_confirmed_and_uncertain_maps_dont_overlap_bytes():
@@ -121,9 +119,10 @@ def test_olchiki_resolved_n_and_uppercase_t_are_confirmed():
 
 
 def test_olchiki_apply_uncertain_is_noop_when_no_uncertain_entries_remain():
-    assert convert_olchiki("nT").unicode_text == convert_olchiki(
-        "nT", apply_uncertain=True
-    ).unicode_text
+    assert (
+        convert_olchiki("nT").unicode_text
+        == convert_olchiki("nT", apply_uncertain=True).unicode_text
+    )
 
 
 def test_olchiki_strict_mode_accepts_resolved_n_and_t():

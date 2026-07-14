@@ -77,7 +77,9 @@ def convert_devanagari(
         base_font = _NPTTF2UTF_FONTS[key]
         ext = {}
     else:
-        raise ValueError(f"unsupported Devanagari font {font!r}; supported: {supported_devanagari_fonts()}")
+        raise ValueError(
+            f"unsupported Devanagari font {font!r}; supported: {supported_devanagari_fonts()}"
+        )
 
     out = _font_mapper().map_to_unicode(_CTRL.sub("", text), from_font=base_font)
     for src, dst in ext.items():
@@ -94,8 +96,7 @@ def convert_devanagari(
         {
             c
             for c in out
-            if not (0x0900 <= ord(c) <= 0x097F)
-            and c not in " \n\t।॥,.?!:;'\"()[]-/0123456789"
+            if not (0x0900 <= ord(c) <= 0x097F) and c not in " \n\t।॥,.?!:;'\"()[]-/0123456789"
         }
     )
     clean = not leftover

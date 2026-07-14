@@ -46,9 +46,9 @@ _LEPCHA_CODEPOINT_RE = re.compile(r"[ᰀ-ᱏ]")
 PRE_BASE_VOWELS = frozenset({0x1C27, 0x1C28, 0x1C29})
 
 # Codepoint classes for canonical ordering within a cluster.
-_SUBJOINED = frozenset({0x1C24, 0x1C25})            # subjoined YA, RA
-_VOWEL_SIGNS = frozenset(range(0x1C26, 0x1C2D))      # AA, I, O, OO, U, UU, E
-_FINAL_SIGNS = frozenset(range(0x1C2D, 0x1C36))      # K, M, L, N, P, R, T, NYIN-DO, KANG
+_SUBJOINED = frozenset({0x1C24, 0x1C25})  # subjoined YA, RA
+_VOWEL_SIGNS = frozenset(range(0x1C26, 0x1C2D))  # AA, I, O, OO, U, UU, E
+_FINAL_SIGNS = frozenset(range(0x1C2D, 0x1C36))  # K, M, L, N, P, R, T, NYIN-DO, KANG
 _RAN = 0x1C36
 _NUKTA = 0x1C37
 _BASES = frozenset(
@@ -149,7 +149,8 @@ class LepchaConverter:
     def _canonical_cluster(base: int, signs: list[int]) -> list[int]:
         """Order a base + its dependent signs into canonical Lepcha storage order.
 
-        Order: base, subjoined (YA/RA), nukta, vowel sign, final consonant sign, RAN.
+        Order per The Unicode Standard ch.13 Table 13-9: base, nukta,
+        subjoined (RA before YA), vowel sign, final consonant sign, RAN.
         """
         subjoined = [s for s in signs if s in _SUBJOINED]
         nukta = [s for s in signs if s == _NUKTA]
@@ -165,7 +166,10 @@ class LepchaConverter:
             and s not in _FINAL_SIGNS
             and s != _RAN
         ]
-        return [base] + subjoined + nukta + vowels + finals + ran + other
+        # Table 13-9 medial order is RA then YA (RA=1C25, YA=1C24), i.e.
+        # descending codepoint order for the two subjoined marks.
+        subjoined.sort(reverse=True)
+        return [base] + nukta + subjoined + vowels + finals + ran + other
 
     def _reorder(self, tokens: list[int | str]) -> list[int | str]:
         """Reorder visual-order codepoint runs into logical Lepcha clusters.
