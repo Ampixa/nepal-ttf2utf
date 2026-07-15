@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Make `OLChikiLaticConverter.from_map_file()` apply the same evidenced Latic
+  `v`/`w` and punctuation layer as default construction, with fixed Latic
+  assignments taking precedence over base-map uncertainty; both Ol Chiki map
+  factories now reject malformed JSON shapes with contextual `ValueError`s.
 - Restore SIL's exact pinned JG Lepcha map and report its three explicitly
   uncertain U+25CC placeholder mappings without changing lenient output or
   replacement counts; strict conversion now rejects those source glyphs.

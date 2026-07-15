@@ -88,6 +88,8 @@ def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
     if not map_path.is_file():
         raise FileNotFoundError(f"Ol Chiki legacy map does not exist: {map_path}")
     raw = json.loads(map_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"Ol Chiki map must be a JSON object: {map_path}")
     confirmed = _parse_map_section(raw.get("map"), "map", map_path)
     uncertain = _parse_map_section(raw.get("uncertain_map"), "uncertain_map", map_path)
     return confirmed, uncertain
@@ -104,11 +106,17 @@ def _parse_map_section(entries: object, section_name: str, map_path: Path) -> di
             raise ValueError(f"invalid byte key in Ol Chiki map: {byte_hex!r}") from exc
         if not (0 <= byte <= 0x7F):
             raise ValueError(f"byte key out of ASCII range in Ol Chiki map: {byte_hex!r}")
-        if not isinstance(target, list) or len(target) != 1:
+        if not isinstance(target, list) or len(target) != 1 or not isinstance(target[0], str):
             raise ValueError(
-                f"Ol Chiki map target for byte {byte_hex} must be a single-codepoint list"
+                f"Ol Chiki map target for byte {byte_hex} must be a single hexadecimal-codepoint "
+                "list"
             )
-        cp = int(target[0], 16)
+        try:
+            cp = int(target[0], 16)
+        except ValueError as exc:
+            raise ValueError(
+                f"invalid Ol Chiki codepoint target for byte {byte_hex}: {target[0]!r}"
+            ) from exc
         if not (OLCHIKI_LO <= cp <= OLCHIKI_HI):
             raise ValueError(
                 f"Ol Chiki map target U+{cp:04X} outside Ol Chiki block for byte {byte_hex}"
@@ -216,19 +224,36 @@ class OLChikiConverter:
 
 
 class OLChikiLaticConverter(OLChikiConverter):
-    """Converter for the OLCKLatic display family and its punctuation map."""
+    """Converter for the OLCKLatic display family and its punctuation map.
+
+    :meth:`from_map_file` accepts the same two-section Optimum base-map schema
+    as :class:`OLChikiConverter`. The evidenced Latic assignments are
+    authoritative and promoted to confirmed mappings even if the base map
+    marks one as uncertain. ``apply_uncertain`` therefore affects only the
+    remaining base-map bytes.
+    """
 
     @classmethod
-    def default(cls, *, apply_uncertain: bool = False) -> "OLChikiLaticConverter":
-        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
-            confirmed, uncertain = _load_map_file(p)
-        confirmed.update(OLCHIKI_LATIC_OVERRIDES)
+    def from_map_file(
+        cls, path: str | Path, *, apply_uncertain: bool = False
+    ) -> "OLChikiLaticConverter":
+        confirmed, uncertain = _load_map_file(path)
+        if not confirmed:
+            raise ValueError("OLChikiConverter requires a non-empty confirmed map")
+        for byte, target in OLCHIKI_LATIC_OVERRIDES.items():
+            uncertain.pop(byte, None)
+            confirmed[byte] = target
         return cls(
             confirmed,
             uncertain,
             apply_uncertain=apply_uncertain,
             passthrough=OLCHIKI_LATIC_PASSTHROUGH,
         )
+
+    @classmethod
+    def default(cls, *, apply_uncertain: bool = False) -> "OLChikiLaticConverter":
+        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
+            return cls.from_map_file(p, apply_uncertain=apply_uncertain)
 
 
 _DEFAULT: OLChikiConverter | None = None

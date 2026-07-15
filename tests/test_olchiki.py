@@ -198,6 +198,106 @@ def test_latic_letters_and_digits_share_optimum_semantics_except_v_w_swap():
     assert latic.convert("vVwW").unicode_text == "ᱶᱶᱣᱣ"
 
 
+@pytest.mark.parametrize("apply_uncertain", [False, True])
+def test_latic_from_map_file_matches_default_semantics(apply_uncertain):
+    with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
+        loaded = OLChikiLaticConverter.from_map_file(p, apply_uncertain=apply_uncertain)
+
+    printable_ascii = "".join(chr(codepoint) for codepoint in range(0x20, 0x7F))
+    assert type(loaded) is OLChikiLaticConverter
+    assert loaded.convert(printable_ascii) == OLChikiLaticConverter.default(
+        apply_uncertain=apply_uncertain
+    ).convert(printable_ascii)
+
+    result = loaded.convert("vVwW.-:~|")
+    assert result.unicode_text == "ᱶᱶᱣᱣᱹᱼᱺᱻ᱾"
+    assert result.replacement_count == 9
+    assert result.confirmed_byte_count == 9
+    assert result.uncertain_bytes == []
+    assert result.unmapped_bytes == []
+
+
+def test_latic_fixed_overrides_win_over_custom_base_map_uncertainty(tmp_path):
+    map_path = tmp_path / "custom-olchiki.json"
+    map_path.write_text(
+        json.dumps(
+            {
+                "map": {
+                    "61": ["1C5F"],
+                    "76": ["1C63"],
+                    "2E": ["1C60"],
+                },
+                "uncertain_map": {
+                    "56": ["1C63"],
+                    "7C": ["1C60"],
+                    "40": ["1C60"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    base_lenient_result = OLChikiConverter.from_map_file(map_path).convert("vV.|@")
+    assert base_lenient_result.unicode_text == "ᱣVᱠ|@"
+    assert base_lenient_result.replacement_count == 2
+    assert base_lenient_result.confirmed_byte_count == 2
+    assert base_lenient_result.uncertain_bytes == ["@", "V", "|"]
+    assert base_lenient_result.unmapped_bytes == []
+
+    base_opted_in_result = OLChikiConverter.from_map_file(map_path, apply_uncertain=True).convert(
+        "vV.|@"
+    )
+    assert base_opted_in_result.unicode_text == "ᱣᱣᱠᱠᱠ"
+    assert base_opted_in_result.replacement_count == 5
+    assert base_opted_in_result.confirmed_byte_count == 2
+    assert base_opted_in_result.uncertain_bytes == []
+    assert base_opted_in_result.unmapped_bytes == []
+
+    lenient = OLChikiLaticConverter.from_map_file(map_path)
+    lenient_result = lenient.convert("vV.|@")
+    assert lenient_result.unicode_text == "ᱶᱶᱹ᱾@"
+    assert lenient_result.replacement_count == 4
+    assert lenient_result.confirmed_byte_count == 4
+    assert lenient_result.uncertain_bytes == ["@"]
+    assert lenient_result.unmapped_bytes == []
+
+    opted_in = OLChikiLaticConverter.from_map_file(map_path, apply_uncertain=True)
+    opted_in_result = opted_in.convert("vV.|@")
+    assert opted_in_result.unicode_text == "ᱶᱶᱹ᱾ᱠ"
+    assert opted_in_result.replacement_count == 5
+    assert opted_in_result.confirmed_byte_count == 4
+    assert opted_in_result.uncertain_bytes == []
+    assert opted_in_result.unmapped_bytes == []
+
+
+def test_olchiki_map_factories_reject_empty_confirmed_map(tmp_path):
+    map_path = tmp_path / "empty-olchiki.json"
+    map_path.write_text(json.dumps({"map": {}, "uncertain_map": {}}), encoding="utf-8")
+
+    for converter_type in (OLChikiConverter, OLChikiLaticConverter):
+        with pytest.raises(ValueError, match="requires a non-empty confirmed map"):
+            converter_type.from_map_file(map_path)
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ([], "must be a JSON object"),
+        ({"map": {"61": [123]}, "uncertain_map": {}}, "single hexadecimal-codepoint list"),
+        ({"map": {"61": ["not-hex"]}, "uncertain_map": {}}, "invalid Ol Chiki codepoint"),
+    ],
+)
+def test_olchiki_map_factories_reject_malformed_json_shapes(
+    converter_type, payload, message, tmp_path
+):
+    map_path = tmp_path / "malformed-olchiki.json"
+    map_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        converter_type.from_map_file(map_path)
+
+
 def test_latic_punctuation_uses_exact_unicode_cmap_matches():
     source = ".-:~|"
     expected = "".join(chr(OLCHIKI_LATIC_OVERRIDES[ord(byte)]) for byte in source)
