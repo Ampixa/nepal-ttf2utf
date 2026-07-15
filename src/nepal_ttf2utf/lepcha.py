@@ -1,26 +1,22 @@
 """Sikkim Herald live-text Lepcha (Róng) font -> Unicode Lepcha (U+1C00-U+1C4F).
 
-A cluster of 2021-2022 Sikkim Herald editions typeset the Lepcha body as live text
-using an anonymised CFF-subset font family (PDF FontName ``TT<hex>O00``). The named
-body layout (``TT21B1O00`` / ``TT106DO00`` / ``TTDA7O00`` / ``TT70AO00`` — verified
-outline-identical across the four editions) shares ONE byte->glyph layout. The byte->
-glyph code is the *identity Latin* encoding (byte 0x56 'V' draws the glyph named "V"),
-but the glyph OUTLINE is a Lepcha letter, not a Latin V — so the recoverable PDF "text"
-is Latin garbage and the real content lives in the glyph shapes. (This is a DIFFERENT
-font from Jason Glavy's JG Lepcha; SIL's JG map decodes a different layout and yields
-unfaithful output here.)
+Four 2021-2022 Sikkim Herald editions contain an anonymized CFF-subset body-font
+family with one shared ASCII-keyed glyph layout. The recoverable text layer stores
+Latin character codes, while the embedded glyph outlines represent Lepcha. This
+layout differs from Jason Glavy's JG Lepcha encoding and requires a separate map.
 
-The map (``maps/sikkim_herald_lepcha.json``) was derived by GLYPH-SHAPE IDENTITY: each
-body-font glyph was rendered and shape-matched (NCC/IoU) against the assigned Lepcha
-codepoints in Noto Sans Lepcha + Mingzat, anchored on the alphabetic consonant series
-(uppercase Latin A.. -> the Lepcha base consonants in Unicode order) and confirmed by
-positional statistics + round-trip rendering against the printed crops.
+The project-derived map (``maps/sikkim_herald_lepcha.json``) aligns rendered glyph
+shapes with assigned Lepcha codepoints in Noto Sans Lepcha and Mingzat, anchored by
+the alphabetic consonant series and checked against positional statistics and
+round-trip renderings of the source material. Its evidence boundary and limitations
+are documented in ``docs/EVIDENCE.md``.
 
-Structure handled: base consonants, LA-conjuncts, the independent vowel A, PRE-BASE
-dependent vowel signs (I/O/OO — keyed to the LEFT of their base in the legacy stream,
-reordered after the base for Unicode storage), post-base vowel signs, final consonant
-signs, RAN/NUKTA, and digits. Output is NFC in canonical Lepcha storage order
-``C (subjoined) (vowel) (final) (ran)``.
+Structure handled: base consonants, LA-conjuncts, the independent vowel A, pre-base
+dependent vowel signs (I/O/OO, keyed to the left of their base in the legacy stream),
+post-base vowel signs, final consonant signs, RAN, nukta, and digits. Fully
+legacy-derived clusters are repaired to the Unicode storage order
+``C (nukta) (subjoined) (vowel) (final) (ran)``. Native and mixed-provenance input
+is preserved apart from whole-output NFC.
 
 The legacy ``]`` glyph is final K stored visually before the following base; it is
 reordered with the pre-base vowels. ``%`` is subjoined RA, including the documented
@@ -40,6 +36,7 @@ from dataclasses import dataclass
 from importlib import resources
 from itertools import islice
 from pathlib import Path
+from types import MappingProxyType
 
 from .unicode_span import _is_assigned_script_codepoint
 
@@ -48,6 +45,8 @@ _LEPCHA_CODEPOINT_RE = re.compile(r"[ᰀ-ᱏ]")
 _BYTE_KEY_RE = re.compile(r"[0-9A-F]{2}")
 _TARGET_KEY_RE = re.compile(r"[0-9A-F]{4}")
 _FORBIDDEN_SOURCE_BYTES = frozenset(range(0x21)) | {0x7F}
+_MAX_MAP_ENTRIES = 256
+_MAX_MAP_FILE_BYTES = 1_000_000
 _MAX_TARGET_CODEPOINTS = 256
 
 # Pre-base dependent vowel signs (keyed before the base in the legacy visual stream;
@@ -62,9 +61,11 @@ _VOWEL_SIGNS = frozenset(range(0x1C26, 0x1C2D))  # AA, I, O, OO, U, UU, E
 _FINAL_SIGNS = frozenset(range(0x1C2D, 0x1C36))  # K, M, L, N, P, R, T, NYIN-DO, KANG
 _RAN = 0x1C36
 _NUKTA = 0x1C37
+_DEPENDENT_SIGNS = _SUBJOINED | _VOWEL_SIGNS | _FINAL_SIGNS | {_RAN, _NUKTA}
 _BASES = frozenset(
     list(range(0x1C00, 0x1C24)) + [0x1C4D, 0x1C4E, 0x1C4F]
 )  # consonants + independent vowel A + TTA/TTHA/DDA
+_CLUSTER_BOUNDARIES = frozenset(range(0x1C3B, 0x1C4A))  # punctuation and digits
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,43 @@ class LepchaConversion:
     lepcha_char_count: int
     replacement_count: int
     unmapped_bytes: list[str]
+
+
+@dataclass(frozen=True)
+class _LepchaReorderContract:
+    bases: frozenset[int]
+    dependent_signs: frozenset[int]
+    pre_base_vowels: frozenset[int]
+    visual_leading_finals: frozenset[int]
+    subjoined: frozenset[int]
+    vowel_signs: frozenset[int]
+    final_signs: frozenset[int]
+    ran: int
+    nukta: int
+    cluster_boundaries: frozenset[int]
+    provenance: str
+
+
+_DEFAULT_REORDER_CONTRACT = _LepchaReorderContract(
+    bases=_BASES,
+    dependent_signs=_DEPENDENT_SIGNS,
+    pre_base_vowels=PRE_BASE_VOWELS,
+    visual_leading_finals=VISUAL_LEADING_FINALS,
+    subjoined=_SUBJOINED,
+    vowel_signs=_VOWEL_SIGNS,
+    final_signs=_FINAL_SIGNS,
+    ran=_RAN,
+    nukta=_NUKTA,
+    cluster_boundaries=_CLUSTER_BOUNDARIES,
+    provenance="legacy-byte-derived-only",
+)
+
+
+@dataclass(frozen=True)
+class _LepchaContract:
+    byte_map: Mapping[int, tuple[int, ...]]
+    passthrough: frozenset[str]
+    reorder: _LepchaReorderContract
 
 
 def _validate_source_byte(source: object) -> int:
@@ -120,8 +158,11 @@ class LepchaConverter:
     def __init__(self, byte_map: Mapping[int, Iterable[int]]) -> None:
         if not isinstance(byte_map, Mapping) or not byte_map:
             raise ValueError("LepchaConverter requires a non-empty map")
+        map_items = tuple(islice(byte_map.items(), _MAX_MAP_ENTRIES + 1))
+        if len(map_items) > _MAX_MAP_ENTRIES:
+            raise ValueError(f"Lepcha source map exceeds {_MAX_MAP_ENTRIES} entries")
         normalized: dict[int, tuple[int, ...]] = {}
-        for raw_source, raw_target in byte_map.items():
+        for raw_source, raw_target in map_items:
             source = _validate_source_byte(raw_source)
             if isinstance(raw_target, (str, bytes, Mapping, Set)):
                 raise ValueError(f"invalid Lepcha target sequence for source 0x{source:02X}")
@@ -141,15 +182,27 @@ class LepchaConverter:
             normalized[source] = tuple(
                 _validate_target_codepoint(codepoint, source) for codepoint in target
             )
-        self._byte_map = normalized
+        self._contract = _LepchaContract(
+            byte_map=MappingProxyType(dict(normalized)),
+            passthrough=LEPCHA_PASSTHROUGH,
+            reorder=_DEFAULT_REORDER_CONTRACT,
+        )
+
+    @property
+    def _byte_map(self) -> Mapping[int, tuple[int, ...]]:
+        return self._contract.byte_map
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "LepchaConverter":
         map_path = Path(path)
         if not map_path.is_file():
             raise FileNotFoundError(f"Lepcha legacy map does not exist: {map_path}")
+        with map_path.open("rb") as map_file:
+            map_bytes = map_file.read(_MAX_MAP_FILE_BYTES + 1)
+        if len(map_bytes) > _MAX_MAP_FILE_BYTES:
+            raise ValueError(f"Lepcha legacy map exceeds {_MAX_MAP_FILE_BYTES} bytes: {map_path}")
         try:
-            map_text = map_path.read_text(encoding="utf-8")
+            map_text = map_bytes.decode("utf-8")
         except UnicodeDecodeError as error:
             raise ValueError(f"invalid UTF-8 in Lepcha legacy map {map_path}") from error
         try:
@@ -223,101 +276,107 @@ class LepchaConverter:
 
     # ----- byte pass -----------------------------------------------------------
 
-    def _byte_pass(self, text: str) -> tuple[list[int | str], int, list[str]]:
-        """Map each input char (legacy byte) to codepoints; pass spaces through.
-
-        Returns a token list where ints are Lepcha codepoints and str tokens are
-        verbatim pass-through characters (spaces, untouched ASCII).
-        """
-        out: list[int | str] = []
+    def _byte_pass_with_provenance(self, text: str) -> tuple[str, tuple[bool, ...], int, list[str]]:
+        """Map input and mark every scalar emitted by a legacy rule."""
+        out: list[str] = []
+        derived: list[bool] = []
         unmapped: list[str] = []
         replacements = 0
         for ch in text:
             code = ord(ch)
             if ch in " \t\r\n":
                 out.append(ch)
+                derived.append(False)
                 continue
             target = self._byte_map.get(code)
             if target is not None:
-                out.extend(target)
+                out.extend(chr(codepoint) for codepoint in target)
+                derived.extend([True] * len(target))
                 replacements += 1
             elif _is_assigned_script_codepoint(code, "Lepcha"):
-                # Preserve genuine Unicode Lepcha mixed into a legacy run. Keeping
-                # this as a string token also prevents the legacy visual-order pass
-                # from reinterpreting already-logical Unicode input.
                 out.append(ch)
-            elif ch in LEPCHA_PASSTHROUGH:
+                derived.append(False)
+            elif ch in self._contract.passthrough:
                 out.append(ch)
+                derived.append(False)
             else:
                 # Unmapped legacy byte (layout/punctuation glyph not in the map).
                 out.append(ch)
+                derived.append(False)
                 unmapped.append(f"0x{code:02X}" if code <= 0xFF else f"U+{code:04X}")
-        return out, replacements, unmapped
+        return "".join(out), tuple(derived), replacements, unmapped
+
+    def _byte_pass(self, text: str) -> tuple[list[int | str], int, list[str]]:
+        """Return the original int/string token view for private compatibility."""
+        mapped, derived, replacements, unmapped = self._byte_pass_with_provenance(text)
+        tokens = [ord(char) if is_derived else char for char, is_derived in zip(mapped, derived)]
+        return tokens, replacements, unmapped
 
     # ----- reorder pass --------------------------------------------------------
 
     @staticmethod
-    def _canonical_cluster(base: int, signs: list[int]) -> list[int]:
+    def _canonical_cluster(
+        base: int, signs: list[int], contract: _LepchaReorderContract
+    ) -> list[int]:
         """Order a base + its dependent signs into canonical Lepcha storage order.
 
         Order per The Unicode Standard ch.13 Table 13-9: base, nukta,
         subjoined (RA before YA), vowel sign, final consonant sign, RAN.
         """
-        subjoined = [s for s in signs if s in _SUBJOINED]
-        nukta = [s for s in signs if s == _NUKTA]
-        vowels = [s for s in signs if s in _VOWEL_SIGNS]
-        finals = [s for s in signs if s in _FINAL_SIGNS]
-        ran = [s for s in signs if s == _RAN]
+        subjoined = [s for s in signs if s in contract.subjoined]
+        nukta = [s for s in signs if s == contract.nukta]
+        vowels = [s for s in signs if s in contract.vowel_signs]
+        finals = [s for s in signs if s in contract.final_signs]
+        ran = [s for s in signs if s == contract.ran]
         other = [
             s
             for s in signs
-            if s not in _SUBJOINED
-            and s != _NUKTA
-            and s not in _VOWEL_SIGNS
-            and s not in _FINAL_SIGNS
-            and s != _RAN
+            if s not in contract.subjoined
+            and s != contract.nukta
+            and s not in contract.vowel_signs
+            and s not in contract.final_signs
+            and s != contract.ran
         ]
         # Table 13-9 medial order is RA then YA (RA=1C25, YA=1C24), i.e.
         # descending codepoint order for the two subjoined marks.
         subjoined.sort(reverse=True)
         return [base] + nukta + subjoined + vowels + finals + ran + other
 
-    def _reorder(self, tokens: list[int | str]) -> list[int | str]:
-        """Reorder visual-order codepoint runs into logical Lepcha clusters.
+    @classmethod
+    def _reorder_derived_run(
+        cls, codepoints: list[int], contract: _LepchaReorderContract
+    ) -> list[int]:
+        """Reorder one all-derived run that contains no cluster boundary.
 
         A syllable begins with optional visually leading signs: I/O/OO and final K,
         all keyed left of the base in the legacy stream. Each syllable is emitted in
         canonical storage order. A trailing sign-run stops at the next visually
         leading sign, which begins the next syllable.
         """
-        out: list[int | str] = []
+        out: list[int] = []
         i = 0
-        n = len(tokens)
+        n = len(codepoints)
         while i < n:
-            tok = tokens[i]
-            if isinstance(tok, str):
-                out.append(tok)
-                i += 1
-                continue
-
             # Collect visually leading vowel/final signs for the upcoming base.
             pre: list[int] = []
             while (
                 i < n
-                and isinstance(tokens[i], int)
-                and (tokens[i] in PRE_BASE_VOWELS or tokens[i] in VISUAL_LEADING_FINALS)
-                and tokens[i] not in _BASES
+                and (
+                    codepoints[i] in contract.pre_base_vowels
+                    or codepoints[i] in contract.visual_leading_finals
+                )
+                and codepoints[i] not in contract.bases
             ):
-                pre.append(tokens[i])  # type: ignore[arg-type]
+                pre.append(codepoints[i])
                 i += 1
 
-            if i >= n or not isinstance(tokens[i], int):
+            if i >= n:
                 # No base follows the pre-vowel(s); emit them verbatim (degenerate).
                 out.extend(pre)
                 continue
 
-            cur = tokens[i]
-            if cur not in _BASES:
+            cur = codepoints[i]
+            if cur not in contract.bases:
                 # A stray dependent sign with no base (and not a pre-vowel).
                 out.extend(pre)
                 out.append(cur)
@@ -331,25 +390,45 @@ class LepchaConverter:
             post: list[int] = []
             while (
                 i < n
-                and isinstance(tokens[i], int)
-                and tokens[i] not in _BASES
-                and tokens[i] not in PRE_BASE_VOWELS
-                and tokens[i] not in VISUAL_LEADING_FINALS
+                and codepoints[i] in contract.dependent_signs
+                and codepoints[i] not in contract.pre_base_vowels
+                and codepoints[i] not in contract.visual_leading_finals
             ):
-                post.append(tokens[i])  # type: ignore[arg-type]
+                post.append(codepoints[i])
                 i += 1
-            out.extend(self._canonical_cluster(base, pre + post))
+            out.extend(cls._canonical_cluster(base, pre + post, contract))
         return out
+
+    def _reorder_pass(self, text: str, derived: tuple[bool, ...] | None = None) -> str:
+        """Apply the Herald visual-order repair only to legacy-derived runs."""
+        if derived is None:
+            derived = (True,) * len(text)
+        if (
+            type(derived) is not tuple
+            or len(derived) != len(text)
+            or any(type(value) is not bool for value in derived)
+        ):
+            raise ValueError("invalid Lepcha reorder provenance")
+
+        contract = self._contract.reorder
+        output: list[str] = []
+        run: list[int] = []
+        for char, is_derived in zip(text, derived):
+            codepoint = ord(char)
+            if not is_derived or codepoint in contract.cluster_boundaries:
+                output.extend(chr(value) for value in self._reorder_derived_run(run, contract))
+                run.clear()
+                output.append(char)
+            else:
+                run.append(codepoint)
+        output.extend(chr(value) for value in self._reorder_derived_run(run, contract))
+        return "".join(output)
 
     # ----- public --------------------------------------------------------------
 
     def convert(self, text: str) -> LepchaConversion:
-        tokens, replacements, unmapped = self._byte_pass(text)
-        reordered = self._reorder(tokens)
-        chars = []
-        for t in reordered:
-            chars.append(chr(t) if isinstance(t, int) else t)
-        converted = unicodedata.normalize("NFC", "".join(chars))
+        mapped, derived, replacements, unmapped = self._byte_pass_with_provenance(text)
+        converted = unicodedata.normalize("NFC", self._reorder_pass(mapped, derived))
         return LepchaConversion(
             legacy_text=text,
             unicode_text=converted,

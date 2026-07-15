@@ -248,6 +248,15 @@ mapping constants and converter snapshots are immutable, and the retained
 
 ## Sikkim Herald Lepcha
 
+The bundled Sikkim Herald layout is a project-derived contract, not a published
+encoding standard. It is scoped to the outline-identical `TT21B1O00`,
+`TT106DO00`, `TTDA7O00`, and `TT70AO00` subset layouts in the 2021-11-19,
+2022-03-24, 2022-04-07, and 2022-06-01 editions. The source PDFs, embedded font
+binaries, rendered crops, and comparison artifacts used during derivation are
+not distributed in this repository; the bundled JSON is the reproducible
+functional converter contract. The evidence does not establish complete
+coverage of every Sikkim Herald edition or a general Lepcha legacy encoding.
+
 Three formerly unresolved values now have font-specific structural evidence:
 
 - `]`, seen 544 times, is U+1C2D LEPCHA CONSONANT SIGN K. The legacy layout
@@ -282,6 +291,33 @@ The functional-digest payload is an outer JSON array of
 with separators `(",", ":")`, and encoded as ASCII. The resulting 796-byte
 payload has SHA-256
 `ae61a37f712694d6e1b8541c0e9854ab3e1d2b8a5ffb4213f231bca86e029d60`.
+
+The immutable runtime snapshot combines that byte map, the literal-passthrough
+set, and the reorder contract. The assigned Lepcha repertoire is partitioned
+into 39 bases, 20 dependent signs, and 15 hard cluster boundaries at
+U+1C3B-U+1C49. The boundary set comprises five punctuation characters and ten
+digits. Visual-order repair applies only within legacy-byte-derived runs;
+native Lepcha, preserved input, structural whitespace, passthrough text, and
+the 15 assigned boundaries stop a run.
+
+The snapshot is serialized as compact sorted-key ASCII JSON. It stores the
+sorted byte map and passthrough values plus the bases, dependent signs,
+pre-base vowels, visually leading final, subjoined/vowel/final classes, RAN,
+NUKTA, cluster boundaries, and `legacy-byte-derived-only` policy. The resulting
+1,530-byte payload has SHA-256
+`71679f0b524f9c82acdc68ec02db96ab0096a53c4efab895964aaedf3c875d08`.
+
+Tests exhaust all 11,700 base/boundary/sign products in the assigned partition
+and all 6,840 default-map combinations of 36 mapped bases, ten mapped digits,
+and 19 mapped dependent signs, including parity with native Unicode digits.
+They also cover signs on both sides of every digit, all leading-sign/digit/base
+paths, every provenance mask for the four visually leading signs and 36 mapped
+bases, and the ordered 256-byte aggregate. The corrected aggregate remains 256
+characters with 65 Lepcha characters, 65 replacements, and 186 distinct
+diagnostics; its UTF-8 output has SHA-256
+`bd7cd93d6e0a683440b903a80c159fa8c036880d2e5f8da92b3ae62220115ee1`.
+Custom maps are limited to 256 source entries, 256 target codepoints per source,
+and 1,000,000 map-file bytes.
 
 ## JG Lepcha placeholders
 

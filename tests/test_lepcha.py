@@ -8,12 +8,38 @@ import hashlib
 import json
 import unicodedata
 from collections import Counter
+from collections.abc import Mapping
+from dataclasses import FrozenInstanceError
 from importlib import resources
+from itertools import product, repeat
+from types import MappingProxyType
 
 import pytest
 
+import nepal_ttf2utf as package_module
+import nepal_ttf2utf.lepcha as lepcha_module
 from nepal_ttf2utf import convert, convert_lepcha
 from nepal_ttf2utf.lepcha import LEPCHA_PASSTHROUGH, LepchaConverter
+from nepal_ttf2utf.unicode_span import _is_assigned_script_codepoint
+
+
+def _singleton_legacy_source_by_target(converter: LepchaConverter) -> dict[int, str]:
+    result: dict[int, str] = {}
+    for source, target in converter._byte_map.items():
+        if len(target) == 1:
+            assert target[0] not in result
+            result[target[0]] = chr(source)
+    return result
+
+
+def _provenance_input(
+    legacy_source: dict[int, str], codepoints: tuple[int, ...], mask: tuple[bool, ...]
+) -> str:
+    assert len(codepoints) == len(mask)
+    return "".join(
+        legacy_source[codepoint] if is_derived else chr(codepoint)
+        for codepoint, is_derived in zip(codepoints, mask)
+    )
 
 
 def test_lepcha_map_matches_the_pinned_derived_resource_and_inventory():
@@ -60,6 +86,54 @@ def test_lepcha_map_matches_the_pinned_derived_resource_and_inventory():
         "ae61a37f712694d6e1b8541c0e9854ab3e1d2b8a5ffb4213f231bca86e029d60"
     )
 
+    reorder = converter._contract.reorder
+    runtime_payload = json.dumps(
+        {
+            "byte_map": [
+                [source, list(target)]
+                for source, target in sorted(converter._contract.byte_map.items())
+            ],
+            "passthrough": sorted(converter._contract.passthrough),
+            "reorder": {
+                "bases": sorted(reorder.bases),
+                "cluster_boundaries": sorted(reorder.cluster_boundaries),
+                "dependent_signs": sorted(reorder.dependent_signs),
+                "final_signs": sorted(reorder.final_signs),
+                "nukta": reorder.nukta,
+                "pre_base_vowels": sorted(reorder.pre_base_vowels),
+                "provenance": reorder.provenance,
+                "ran": reorder.ran,
+                "subjoined": sorted(reorder.subjoined),
+                "visual_leading_finals": sorted(reorder.visual_leading_finals),
+                "vowel_signs": sorted(reorder.vowel_signs),
+            },
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(runtime_payload) == 1530
+    assert hashlib.sha256(runtime_payload).hexdigest() == (
+        "71679f0b524f9c82acdc68ec02db96ab0096a53c4efab895964aaedf3c875d08"
+    )
+
+    assigned = {
+        codepoint
+        for codepoint in range(0x1C00, 0x1C50)
+        if _is_assigned_script_codepoint(codepoint, "Lepcha")
+    }
+    assert (len(reorder.bases), len(reorder.dependent_signs), len(reorder.cluster_boundaries)) == (
+        39,
+        20,
+        15,
+    )
+    assert not reorder.bases & reorder.dependent_signs
+    assert not reorder.bases & reorder.cluster_boundaries
+    assert not reorder.dependent_signs & reorder.cluster_boundaries
+    assert reorder.bases | reorder.dependent_signs | reorder.cluster_boundaries == assigned
+    assert reorder.pre_base_vowels == frozenset({0x1C27, 0x1C28, 0x1C29})
+    assert reorder.visual_leading_finals == frozenset({0x1C2D})
+    assert reorder.provenance == "legacy-byte-derived-only"
+
 
 def test_every_lepcha_map_entry_has_exact_isolated_behavior():
     raw = json.loads(
@@ -72,7 +146,12 @@ def test_every_lepcha_map_entry_has_exact_isolated_behavior():
             "NFC", "".join(chr(int(value, 16)) for value in target_hex)
         )
         result = converter.convert(source)
+        mapped, derived, replacements, unmapped = converter._byte_pass_with_provenance(source)
 
+        assert mapped == expected, source_hex
+        assert derived == (True,) * len(expected), source_hex
+        assert replacements == 1, source_hex
+        assert unmapped == [], source_hex
         assert result.unicode_text == expected, source_hex
         assert result.lepcha_char_count == len(expected), source_hex
         assert result.replacement_count == 1, source_hex
@@ -92,22 +171,30 @@ def test_every_single_byte_has_an_explicit_default_conversion_classification():
     structural = {0x09, 0x0A, 0x0D, 0x20}
     passthrough = {ord(character) for character in LEPCHA_PASSTHROUGH}
     converter = LepchaConverter.default()
+    classification_counts: Counter[str] = Counter()
 
     for source in range(0x100):
         character = chr(source)
         result = converter.convert(character)
+        _mapped, derived, _replacements, _unmapped = converter._byte_pass_with_provenance(character)
         if source in expected_map:
+            classification = "mapped"
             expected = expected_map[source]
+            assert derived == (True,) * len(expected), f"0x{source:02X}"
             assert result.unicode_text == expected, f"0x{source:02X}"
             assert result.lepcha_char_count == len(expected), f"0x{source:02X}"
             assert result.replacement_count == 1, f"0x{source:02X}"
             assert result.unmapped_bytes == [], f"0x{source:02X}"
         elif source in structural | passthrough:
+            classification = "structural" if source in structural else "passthrough"
+            assert derived == (False,), f"0x{source:02X}"
             assert result.unicode_text == character, f"0x{source:02X}"
             assert result.lepcha_char_count == 0, f"0x{source:02X}"
             assert result.replacement_count == 0, f"0x{source:02X}"
             assert result.unmapped_bytes == [], f"0x{source:02X}"
         else:
+            classification = "diagnosed"
+            assert derived == (False,), f"0x{source:02X}"
             label = f"0x{source:02X}"
             assert result.unicode_text == character, label
             assert result.lepcha_char_count == 0, label
@@ -115,6 +202,14 @@ def test_every_single_byte_has_an_explicit_default_conversion_classification():
             assert result.unmapped_bytes == [label], label
             with pytest.raises(ValueError, match=label):
                 convert_lepcha(character, strict=True)
+        classification_counts[classification] += 1
+
+    assert classification_counts == {
+        "mapped": 65,
+        "structural": 4,
+        "passthrough": 1,
+        "diagnosed": 186,
+    }
 
 
 @pytest.mark.parametrize(
@@ -225,6 +320,14 @@ def test_lepcha_map_parser_rejects_invalid_utf8_with_context(tmp_path):
         LepchaConverter.from_map_file(map_path)
 
 
+def test_lepcha_map_parser_rejects_oversized_files_before_decoding(tmp_path):
+    map_path = tmp_path / "oversized.json"
+    map_path.write_bytes(b" " * 1_000_001)
+
+    with pytest.raises(ValueError, match="exceeds 1000000 bytes"):
+        LepchaConverter.from_map_file(map_path)
+
+
 @pytest.mark.parametrize(
     "byte_map",
     [
@@ -299,6 +402,34 @@ def test_lepcha_constructor_rejects_an_unbounded_target_without_hanging():
         LepchaConverter({0x41: forever()})
 
 
+def test_lepcha_constructor_rejects_an_unbounded_mapping_without_hanging():
+    class EndlessMapping(Mapping):
+        def __getitem__(self, _key):
+            return (0x1C00,)
+
+        def __iter__(self):
+            return repeat(0x41)
+
+        def __len__(self):
+            return 1
+
+    with pytest.raises(ValueError, match="source map exceeds 256 entries"):
+        LepchaConverter(EndlessMapping())
+
+
+def test_complete_byte_aggregate_retains_the_corrected_pinned_output():
+    source = "".join(chr(codepoint) for codepoint in range(0x100))
+    result = LepchaConverter.default().convert(source)
+
+    assert len(result.unicode_text) == 256
+    assert result.lepcha_char_count == 65
+    assert result.replacement_count == 65
+    assert len(result.unmapped_bytes) == 186
+    assert hashlib.sha256(result.unicode_text.encode("utf-8")).hexdigest() == (
+        "bd7cd93d6e0a683440b903a80c159fa8c036880d2e5f8da92b3ae62220115ee1"
+    )
+
+
 @pytest.mark.parametrize(
     ("source", "label"),
     [("(", "0x28"), (")", "0x29"), ("*", "0x2A"), ("+", "0x2B"), ("/", "0x2F")],
@@ -332,6 +463,114 @@ def test_lepcha_digits_map_to_lepcha_digits():
     conv = LepchaConverter.default()
     assert conv.convert("0").unicode_text == "᱀"  # DIGIT ZERO
     assert conv.convert("539").unicode_text == "᱅᱃᱉"  # 5 3 9
+
+
+def test_every_assigned_lepcha_punctuation_and_digit_is_a_cluster_boundary():
+    converter = LepchaConverter.default()
+    reorder = converter._contract.reorder
+    exercised = 0
+
+    for base, boundary, sign in product(
+        sorted(reorder.bases),
+        sorted(reorder.cluster_boundaries),
+        sorted(reorder.dependent_signs),
+    ):
+        source = "".join(chr(codepoint) for codepoint in (base, boundary, sign))
+        assert converter._reorder_pass(source) == source, (base, boundary, sign)
+        exercised += 1
+
+    assert exercised == 11_700
+
+
+def test_every_legacy_digit_blocks_every_mapped_sign_after_every_mapped_base():
+    converter = LepchaConverter.default()
+    legacy_source = _singleton_legacy_source_by_target(converter)
+    reorder = converter._contract.reorder
+    bases = sorted(set(legacy_source) & reorder.bases)
+    digits = sorted(set(legacy_source) & set(range(0x1C40, 0x1C4A)))
+    signs = sorted(set(legacy_source) & reorder.dependent_signs)
+    exercised = 0
+
+    assert (len(bases), len(digits), len(signs)) == (36, 10, 19)
+    for base, digit, sign in product(bases, digits, signs):
+        expected = "".join(chr(codepoint) for codepoint in (base, digit, sign))
+        legacy_result = converter.convert(
+            legacy_source[base] + legacy_source[digit] + legacy_source[sign]
+        )
+        native_digit_result = converter.convert(
+            legacy_source[base] + chr(digit) + legacy_source[sign]
+        )
+
+        assert legacy_result.unicode_text == expected, (base, digit, sign)
+        assert legacy_result.replacement_count == 3, (base, digit, sign)
+        assert native_digit_result.unicode_text == expected, (base, digit, sign)
+        assert native_digit_result.replacement_count == 2, (base, digit, sign)
+        assert legacy_result.unmapped_bytes == native_digit_result.unmapped_bytes == []
+        exercised += 1
+
+    assert exercised == 6_840
+
+
+def test_every_legacy_digit_stops_signs_on_both_sides():
+    converter = LepchaConverter.default()
+    legacy_source = _singleton_legacy_source_by_target(converter)
+    reorder = converter._contract.reorder
+    base = 0x1C00
+    digits = sorted(set(legacy_source) & set(range(0x1C40, 0x1C4A)))
+    signs = sorted(set(legacy_source) & reorder.dependent_signs)
+    left_clusters = {
+        sign: converter.convert(legacy_source[base] + legacy_source[sign]).unicode_text
+        for sign in signs
+    }
+    exercised = 0
+
+    for left_sign, digit, right_sign in product(signs, digits, signs):
+        source = (
+            legacy_source[base]
+            + legacy_source[left_sign]
+            + legacy_source[digit]
+            + legacy_source[right_sign]
+        )
+        expected = left_clusters[left_sign] + chr(digit) + chr(right_sign)
+        result = converter.convert(source)
+
+        assert result.unicode_text == expected, (left_sign, digit, right_sign)
+        assert result.replacement_count == 4, (left_sign, digit, right_sign)
+        assert result.unmapped_bytes == [], (left_sign, digit, right_sign)
+        exercised += 1
+
+    assert exercised == 3_610
+
+
+def test_digits_block_leading_signs_but_do_not_disable_the_next_cluster():
+    converter = LepchaConverter.default()
+    legacy_source = _singleton_legacy_source_by_target(converter)
+    reorder = converter._contract.reorder
+    leaders = sorted(reorder.pre_base_vowels | reorder.visual_leading_finals)
+    digits = sorted(set(legacy_source) & set(range(0x1C40, 0x1C4A)))
+    bases = sorted(set(legacy_source) & reorder.bases)
+    exercised = 0
+
+    for leader, digit, base in product(leaders, digits, bases):
+        before_digit = converter.convert(
+            legacy_source[leader] + legacy_source[digit] + legacy_source[base]
+        )
+        after_digit = converter.convert(
+            legacy_source[base] + legacy_source[digit] + legacy_source[leader] + legacy_source[base]
+        )
+
+        assert before_digit.unicode_text == "".join(
+            chr(codepoint) for codepoint in (leader, digit, base)
+        ), (leader, digit, base)
+        assert after_digit.unicode_text == "".join(
+            chr(codepoint) for codepoint in (base, digit, base, leader)
+        ), (leader, digit, base)
+        assert before_digit.replacement_count == 3
+        assert after_digit.replacement_count == 4
+        assert before_digit.unmapped_bytes == after_digit.unmapped_bytes == []
+        exercised += 1
+
+    assert exercised == 1_440
 
 
 @pytest.mark.parametrize(
@@ -374,6 +613,99 @@ def test_lepcha_two_syllable_word_keeps_pre_vowel_with_its_base():
     ]
 
 
+def test_every_visual_leader_and_mapped_base_provenance_mask_is_exact():
+    converter = LepchaConverter.default()
+    legacy_source = _singleton_legacy_source_by_target(converter)
+    reorder = converter._contract.reorder
+    leaders = sorted(reorder.pre_base_vowels | reorder.visual_leading_finals)
+    bases = sorted(set(legacy_source) & reorder.bases)
+    derived_cases = preserved_cases = 0
+
+    for leader, base in product(leaders, bases):
+        codepoints = (leader, base)
+        for mask in product((False, True), repeat=2):
+            result = converter.convert(_provenance_input(legacy_source, codepoints, mask))
+            expected_codepoints = (base, leader) if all(mask) else codepoints
+
+            assert result.unicode_text == "".join(map(chr, expected_codepoints)), (
+                codepoints,
+                mask,
+            )
+            assert result.replacement_count == sum(mask), (codepoints, mask)
+            assert result.unmapped_bytes == [], (codepoints, mask)
+            derived_cases += all(mask)
+            preserved_cases += not all(mask)
+
+    assert derived_cases == 144
+    assert preserved_cases == 432
+
+
+def test_representative_cluster_sort_requires_complete_legacy_provenance():
+    converter = LepchaConverter.default()
+    legacy_source = _singleton_legacy_source_by_target(converter)
+    source_order = (0x1C00, 0x1C2E, 0x1C37)  # base, final M, nukta
+    canonical_order = (0x1C00, 0x1C37, 0x1C2E)
+
+    for mask in product((False, True), repeat=3):
+        result = converter.convert(_provenance_input(legacy_source, source_order, mask))
+        expected = canonical_order if all(mask) else source_order
+
+        assert result.unicode_text == "".join(map(chr, expected)), mask
+        assert result.replacement_count == sum(mask), mask
+        assert result.unmapped_bytes == [], mask
+
+
+@pytest.mark.parametrize(
+    "derived",
+    [
+        (True,),
+        (True, 1),
+        [True, True],
+    ],
+)
+def test_lepcha_reorder_rejects_invalid_internal_provenance(derived):
+    with pytest.raises(ValueError, match="invalid Lepcha reorder provenance"):
+        LepchaConverter.default()._reorder_pass("\u1c27\u1c00", derived)
+
+
+def test_lepcha_reorder_accepts_empty_and_retains_private_default_behavior():
+    converter = LepchaConverter.default()
+    assert converter._reorder_pass("", ()) == ""
+    assert converter._reorder_pass("\u1c27\u1c00") == "\u1c00\u1c27"
+
+
+def test_lepcha_runtime_contract_is_transitively_immutable(monkeypatch):
+    converter = LepchaConverter.default()
+    reorder = converter._contract.reorder
+
+    assert isinstance(converter._byte_map, MappingProxyType)
+    assert isinstance(converter._contract.byte_map, MappingProxyType)
+    assert type(converter._contract.passthrough) is frozenset
+    assert type(reorder.bases) is frozenset
+    assert type(reorder.dependent_signs) is frozenset
+    assert type(reorder.cluster_boundaries) is frozenset
+
+    with pytest.raises(TypeError):
+        converter._byte_map[0x41] = (0x1C01,)
+    with pytest.raises(FrozenInstanceError):
+        converter._contract.byte_map = MappingProxyType({})
+    with pytest.raises(FrozenInstanceError):
+        reorder.nukta = 0x1C00
+    with pytest.raises(AttributeError):
+        reorder.bases.add(0x1C38)
+
+    monkeypatch.setattr(lepcha_module, "_DEFAULT_REORDER_CONTRACT", None)
+    monkeypatch.setattr(lepcha_module, "_BASES", frozenset())
+    monkeypatch.setattr(lepcha_module, "_DEPENDENT_SIGNS", frozenset())
+    monkeypatch.setattr(lepcha_module, "PRE_BASE_VOWELS", frozenset())
+    monkeypatch.setattr(lepcha_module, "VISUAL_LEADING_FINALS", frozenset())
+    monkeypatch.setattr(lepcha_module, "LEPCHA_PASSTHROUGH", frozenset())
+
+    assert converter.convert("dA").unicode_text == "\u1c00\u1c27"
+    assert converter.convert("A0g").unicode_text == "\u1c00\u1c40\u1c2a"
+    assert converter.convert("-").unmapped_bytes == []
+
+
 def test_lepcha_output_is_nfc_and_in_block():
     res = convert_lepcha("AgC: cA dC")
     non_space = [ch for ch in res.unicode_text if ch != " "]
@@ -387,6 +719,30 @@ def test_lepcha_remaining_unmapped_bytes_are_flagged_not_silently_dropped():
     assert res.unmapped_bytes == ["0x28", "0x29", "0x2A", "0x2B", "0x2F"]
     with pytest.raises(ValueError):
         convert_lepcha("A*()+/", strict=True)
+
+
+def test_lepcha_combined_diagnostics_are_preserved_deduplicated_and_sorted():
+    leftovers = "((\x00\x7f\x80\ud800\ue000\ufdd0\U0001f600"
+    result = convert_lepcha("A" + leftovers)
+    expected_labels = [
+        "0x00",
+        "0x28",
+        "0x7F",
+        "0x80",
+        "U+1F600",
+        "U+D800",
+        "U+E000",
+        "U+FDD0",
+    ]
+
+    assert result.unicode_text == "\u1c00" + leftovers
+    assert result.lepcha_char_count == 1
+    assert result.replacement_count == 1
+    assert result.unmapped_bytes == expected_labels
+
+    with pytest.raises(ValueError) as error:
+        convert_lepcha("A" + leftovers, strict=True)
+    assert all(label in str(error.value) for label in expected_labels)
 
 
 def test_lepcha_visual_leading_final_k_moves_to_following_base():
@@ -416,8 +772,48 @@ def test_lepcha_structural_whitespace_is_not_reported_as_unmapped():
 @pytest.mark.parametrize("font", ["lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"])
 def test_every_dispatcher_alias_routes_to_lepcha(font):
     assert convert("A-", font=font, strict=True) == "ᰀ-"
+    assert convert("A0g", font=font, strict=True) == "\u1c00\u1c40\u1c2a"
+    assert convert("\u1c27\u1c00", font=font, strict=True) == "\u1c27\u1c00"
+    assert convert("d\u1c00", font=font, strict=True) == "\u1c27\u1c00"
+    assert convert("\u1c27A", font=font, strict=True) == "\u1c27\u1c00"
     with pytest.raises(ValueError, match="0x2A"):
         convert("*", font=font, strict=True)
+
+
+def test_lepcha_dispatcher_alias_inventories_are_frozen_disjoint_and_exact():
+    herald = frozenset({"lepcha", "lepcha-sikkimherald", "sikkimherald-lepcha"})
+    jg = frozenset({"jg-lepcha", "jglepcha", "lepcha-jg"})
+    unicode_fonts = frozenset(
+        {
+            "lepcha-unicode",
+            "mingzat",
+            "mingzat-regular",
+            "noto sans lepcha",
+            "noto-sans-lepcha",
+            "notosanslepcha",
+            "notosanslepcha-regular",
+            "unicode-lepcha",
+        }
+    )
+
+    assert package_module._LEPCHA_FONTS == herald
+    assert package_module._JG_LEPCHA_FONTS == jg
+    assert package_module._LEPCHA_UNICODE_FONTS == unicode_fonts
+    assert not herald & jg
+    assert not herald & unicode_fonts
+    assert not jg & unicode_fonts
+    with pytest.raises(AttributeError):
+        package_module._LEPCHA_FONTS.add("forged")
+    with pytest.raises(AttributeError):
+        package_module._JG_LEPCHA_FONTS.add("forged")
+    with pytest.raises(AttributeError):
+        package_module._LEPCHA_UNICODE_FONTS.add("forged")
+
+    for font in unicode_fonts:
+        assert convert("A", font=font) == "A"
+        assert convert("\u1c27\u1c00", font=font, strict=True) == "\u1c27\u1c00"
+
+    assert convert("A0g", font="ABCDEF+SikkimHerald_Lepcha", strict=True) == ("\u1c00\u1c40\u1c2a")
 
 
 def test_lepcha_genuine_unicode_passes_through():

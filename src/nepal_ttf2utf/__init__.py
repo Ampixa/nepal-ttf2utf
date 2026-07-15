@@ -229,19 +229,27 @@ _BRAHMI_UNICODE_FONTS = {
     "unicode-brahmi",
 }
 # Sikkim Herald live-text Lepcha body font (TT*O00 named layout).
-_LEPCHA_FONTS = {"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"}
+_LEPCHA_FONTS = frozenset({"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"})
 # Jason Glavy's public legacy Lepcha encoding (different from the Herald layout).
 _JG_LEPCHA_FONTS = frozenset({"jg-lepcha", "jglepcha", "lepcha-jg"})
-_LEPCHA_UNICODE_FONTS = {
-    "lepcha-unicode",
-    "mingzat",
-    "mingzat-regular",
-    "noto sans lepcha",
-    "noto-sans-lepcha",
-    "notosanslepcha",
-    "notosanslepcha-regular",
-    "unicode-lepcha",
-}
+_LEPCHA_UNICODE_FONTS = frozenset(
+    {
+        "lepcha-unicode",
+        "mingzat",
+        "mingzat-regular",
+        "noto sans lepcha",
+        "noto-sans-lepcha",
+        "notosanslepcha",
+        "notosanslepcha-regular",
+        "unicode-lepcha",
+    }
+)
+if (
+    _LEPCHA_FONTS & _JG_LEPCHA_FONTS
+    or _LEPCHA_FONTS & _LEPCHA_UNICODE_FONTS
+    or _JG_LEPCHA_FONTS & _LEPCHA_UNICODE_FONTS
+):
+    raise ValueError("Lepcha legacy and Unicode font aliases overlap")
 # Santali Ol Chiki Optimum legacy display fonts evidenced by embedded outlines.
 _OLCHIKI_FONTS = {
     "aale-chhatka",

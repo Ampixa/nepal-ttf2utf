@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Make the Sikkim Herald Lepcha reorder contract immutable and
+  provenance-safe. Assigned Lepcha punctuation and digits now end legacy
+  clusters, preventing dependent signs from moving across digit boundaries;
+  exhaustive interaction tests cover the unchanged 65-entry map.
 - Complete the Unicode-16 NFC fallback for Gurung Khema and Kirat Rai: pin
   U+1612F's canonical combining class and the eleven immediate canonical
   decompositions, apply canonical ordering and blocked composition closure, and

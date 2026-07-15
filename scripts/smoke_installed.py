@@ -168,6 +168,25 @@ def main() -> int:
     )
     assert videha_april.devanagari_text == "फ्रे"
     assert convert_lepcha("A", strict=True).unicode_text == "ᰀ"
+    herald_boundary = convert_lepcha("A0g", strict=True)
+    assert herald_boundary.unicode_text == "\u1c00\u1c40\u1c2a"
+    assert herald_boundary.replacement_count == 3
+    assert herald_boundary.unmapped_bytes == []
+    assert nepal_ttf2utf.convert("A0g", font="lepcha-sikkimherald", strict=True) == (
+        "\u1c00\u1c40\u1c2a"
+    )
+    assert convert_lepcha("A0dC", strict=True).unicode_text == "\u1c00\u1c40\u1c03\u1c27"
+    native_herald = convert_lepcha("\u1c27\u1c00", strict=True)
+    assert native_herald.unicode_text == "\u1c27\u1c00"
+    assert native_herald.replacement_count == 0
+    assert convert_lepcha("d\u1c00", strict=True).unicode_text == "\u1c27\u1c00"
+    assert convert_lepcha("\u1c27A", strict=True).unicode_text == "\u1c27\u1c00"
+    try:
+        convert_lepcha("*", strict=True)
+    except ValueError as error:
+        assert "0x2A" in str(error)
+    else:
+        raise AssertionError("strict Herald Lepcha conversion accepted unresolved input")
     assert convert_devanagari("g]kfn", strict=True).unicode_text == "नेपाल"
     assigned_devanagari = "\u0903\U00011b00"
     assert convert_devanagari(assigned_devanagari, strict=True).unicode_text == (
