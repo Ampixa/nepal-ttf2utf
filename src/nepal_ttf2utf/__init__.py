@@ -40,6 +40,7 @@ from .kiratrai import (
 )
 from .lepcha import LepchaConversion, LepchaConverter, convert_lepcha
 from .limbu import LimbuConversion, LimbuConverter, convert_limbu
+from .magar_akkha import MagarAkkhaTransliteration, transliterate_magar_akkha
 from .olchiki import (
     OLChikiConversion,
     OLChikiConverter,
@@ -68,6 +69,7 @@ __all__ = [
     "convert_limbu",
     "convert_kiratrai",
     "convert_kiratrai_herald",
+    "transliterate_magar_akkha",
     "convert_jg_lepcha",
     "convert_sunuwar",
     "convert_tibetanmachine",
@@ -81,6 +83,7 @@ __all__ = [
     "DevanagariConversion",
     "LimbuConversion",
     "LimbuConverter",
+    "MagarAkkhaTransliteration",
     "KiratRaiConversion",
     "KiratRaiConverter",
     "KiratRaiHeraldConverter",
@@ -157,6 +160,7 @@ _NEWA_UNICODE_FONTS = {
     "nithyaranjananu-regular",
     "prachalit-unicode",
 }
+_MAGAR_AKKHA_BRAHMI_FONTS = {"akkha-brahmi", "magar-akkha-brahmi"}
 # Sikkim Herald live-text Lepcha body font (TT*O00 named layout).
 _LEPCHA_FONTS = {"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"}
 # Jason Glavy's public legacy Lepcha encoding (different from the Herald layout).
@@ -190,6 +194,7 @@ def supported_fonts() -> dict[str, str]:
     fonts.update({f: "Tibetan" for f in sorted(_TIBETAN_MACHINE_FONTS)})
     fonts.update({f: "Tibetan" for f in sorted(_TIBETAN_UNICODE_FONTS)})
     fonts.update({f: "Newa" for f in sorted(_NEWA_UNICODE_FONTS)})
+    fonts.update({f: "Brahmi" for f in sorted(_MAGAR_AKKHA_BRAHMI_FONTS)})
     fonts.update({f: "Lepcha" for f in sorted(_LEPCHA_FONTS)})
     fonts.update({f: "Lepcha" for f in sorted(_JG_LEPCHA_FONTS)})
     fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_FONTS)})
@@ -235,6 +240,8 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
         return validate_unicode_span(text, script="Tibetan", strict=strict).unicode_text
     if key in _NEWA_UNICODE_FONTS:
         return validate_unicode_span(text, script="Newa", strict=strict).unicode_text
+    if key in _MAGAR_AKKHA_BRAHMI_FONTS:
+        return validate_unicode_span(text, script="Brahmi", strict=strict).unicode_text
     if key in _LEPCHA_FONTS:
         return convert_lepcha(text, strict=strict).unicode_text
     if key in _JG_LEPCHA_FONTS:

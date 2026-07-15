@@ -23,6 +23,7 @@ class UnicodeSpanConversion:
 
 
 _SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
+    "Brahmi": ((0x11000, 0x1107F),),
     "Devanagari": (
         (0x0900, 0x097F),
         (0x1CD0, 0x1CFF),
