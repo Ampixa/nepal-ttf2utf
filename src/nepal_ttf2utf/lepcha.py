@@ -37,6 +37,8 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from .unicode_span import _is_assigned_script_codepoint
+
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
 _LEPCHA_CODEPOINT_RE = re.compile(r"[ᰀ-ᱏ]")
 
@@ -133,7 +135,7 @@ class LepchaConverter:
             if target is not None:
                 out.extend(target)
                 replacements += 1
-            elif LEPCHA_LO <= code <= LEPCHA_HI:
+            elif _is_assigned_script_codepoint(code, "Lepcha"):
                 # Preserve genuine Unicode Lepcha mixed into a legacy run. Keeping
                 # this as a string token also prevents the legacy visual-order pass
                 # from reinterpreting already-logical Unicode input.
@@ -258,9 +260,10 @@ def convert_lepcha(text: str, *, strict: bool = False) -> LepchaConversion:
     """Convert Sikkim Herald live-text Lepcha to Unicode Lepcha (NFC).
 
     Returns a :class:`LepchaConversion`. Bytes outside the derived map (the small set
-    of deliberately-unresolved rare bytes) pass through and are
-    surfaced in ``unmapped_bytes``. With ``strict=True`` any such leftover raises
-    ``ValueError`` instead of passing silently.
+    of deliberately-unresolved rare bytes) and Unicode values outside the pinned
+    assigned Lepcha repertoire pass through and are surfaced in ``unmapped_bytes``.
+    With ``strict=True`` any such leftover raises ``ValueError`` instead of passing
+    silently.
     """
     global _DEFAULT
     if _DEFAULT is None:

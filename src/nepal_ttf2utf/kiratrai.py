@@ -29,6 +29,7 @@ from importlib import resources
 from pathlib import Path
 
 from ._controls import diagnostic_c0_codepoints
+from .unicode_span import _is_assigned_script_codepoint
 
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
@@ -276,7 +277,7 @@ class KiratRaiConverter:
             char = text[index]
             output.append(char)
             code = ord(char)
-            if not (_KIRATRAI_LO <= code <= _KIRATRAI_HI):
+            if not _is_assigned_script_codepoint(code, "Kirat Rai"):
                 unmapped.append(f"U+{code:04X}")
             index += 1
         converted = unicodedata.normalize("NFC", "".join(output))
@@ -335,7 +336,7 @@ class KiratRaiHeraldConverter:
             if char in KIRATRAI_HERALD_PASSTHROUGH:
                 canonical_run.append(char)
                 continue
-            if _KIRATRAI_LO <= ord(char) <= _KIRATRAI_HI:
+            if _is_assigned_script_codepoint(ord(char), "Kirat Rai"):
                 flush()
                 output.append(char)
                 continue

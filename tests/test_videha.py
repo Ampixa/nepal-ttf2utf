@@ -122,6 +122,15 @@ def test_strict_gate_reports_the_full_known_issue_001_residual_set():
         recover_videha_janaki_trace(chars, strict=True, **ISSUE_001)
 
 
+def test_strict_gate_rejects_a_reserved_tirhuta_position():
+    chars = ((0x114C8, 1),)
+    result = recover_videha_janaki_trace(chars, **ISSUE_001)
+    assert result.unicode_text == "\U000114c8"
+    assert result.unmapped_codepoints == ["U+114C8"]
+    with pytest.raises(ValueError, match=r"Tirhuta conversion: U\+114C8$"):
+        recover_videha_janaki_trace(chars, strict=True, **ISSUE_001)
+
+
 def test_strict_recovery_accepts_shared_punctuation_and_structural_whitespace():
     text = "क।॥,!? 123\t\r\n"
     result = recover_videha_janaki_trace(

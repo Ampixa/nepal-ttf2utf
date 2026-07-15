@@ -68,6 +68,13 @@ def test_cli_strict_mode_has_clean_error(capsys):
     assert "U+007E" in capsys.readouterr().err
 
 
+def test_cli_strict_mode_rejects_a_pinned_reserved_output_position(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["--font", "kiratraifontnew", "--strict", "\U00016d7a"])
+    assert error.value.code == 2
+    assert "U+16D7A" in capsys.readouterr().err
+
+
 def test_cli_requires_font(capsys):
     with pytest.raises(SystemExit) as error:
         main(["g]kfn"])

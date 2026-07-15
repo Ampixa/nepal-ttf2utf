@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from .unicode_span import _is_assigned_script_codepoint
+
 TIBETAN_LO, TIBETAN_HI = 0x0F00, 0x0FFF
 
 # Corpus-observed Type0 ToUnicode values that resolve to GID 0 (the embedded
@@ -118,7 +120,7 @@ class TibetanMachineConverter:
             if codepoint in TIBETANMACHINE_NOTDEF_PUA:
                 missing.add(f"U+{codepoint:04X}")
                 continue
-            if char in " \t\r\n" or TIBETAN_LO <= codepoint <= TIBETAN_HI:
+            if char in " \t\r\n" or _is_assigned_script_codepoint(codepoint, "Tibetan"):
                 continue
             unmapped.add(f"U+{codepoint:04X}")
 

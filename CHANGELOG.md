@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Apply the pinned Unicode 17 assigned repertoire to native-script passthrough
+  in legacy converters, diagnosing 103 reserved positions across six output
+  scripts without changing lenient text or existing count fields.
 - Diagnose all 29 C0 values outside the structural allowlist across every
   legacy route and reject them in strict mode without changing lenient output.
 - Add an opt-in strict residual gate to hash-pinned Videha Janaki trace

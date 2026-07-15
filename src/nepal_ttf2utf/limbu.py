@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from .unicode_span import _is_assigned_script_codepoint
+
 _BYTE_RULE_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
 _UNICODE_RULE_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
 _LIMBU_CODEPOINT_RE = re.compile(r"[ᤀ-᥏]")
@@ -92,7 +94,7 @@ class LimbuConverter:
             if matched:
                 continue
             output.append(text[index])
-            if not (0x1900 <= code <= 0x194F):
+            if not _is_assigned_script_codepoint(code, "Limbu"):
                 unmapped.append(f"U+{code:04X}")
             index += 1
         converted = _reorder_limbu(("".join(output)))
@@ -145,7 +147,8 @@ def convert_limbu(text: str, *, strict: bool = False) -> str:
 
     The string return type is retained for compatibility. Use
     :meth:`LimbuConverter.convert` for counts and the unmapped-codepoint list.
-    With ``strict=True``, any byte absent from the SIL map raises ``ValueError``.
+    With ``strict=True``, input absent from the SIL map or the pinned assigned
+    Limbu repertoire raises ``ValueError``.
     """
     global _DEFAULT
     if _DEFAULT is None:

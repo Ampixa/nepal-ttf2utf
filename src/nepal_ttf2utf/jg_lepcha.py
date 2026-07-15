@@ -15,6 +15,7 @@ from importlib import resources
 from pathlib import Path
 
 from ._controls import diagnostic_c0_codepoints
+from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
 
@@ -271,7 +272,7 @@ class JGLepchaConverter:
                 char = text[index]
                 output.append(char)
                 codepoint = ord(char)
-                if not (LEPCHA_LO <= codepoint <= LEPCHA_HI):
+                if not _is_assigned_script_codepoint(codepoint, "Lepcha"):
                     unmapped.add(f"U+{codepoint:04X}")
                 index += 1
         return "".join(output), replacements, sorted(unmapped)

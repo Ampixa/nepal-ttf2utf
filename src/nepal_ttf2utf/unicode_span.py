@@ -176,6 +176,14 @@ def _assigned_in_supported_block(codepoint: int) -> bool:
     return any(_in_ranges(codepoint, ranges) for ranges in _ASSIGNED_BLOCK_RANGES.values())
 
 
+def _is_assigned_script_codepoint(codepoint: int, script: str) -> bool:
+    """Return pinned Unicode-17 assignment for one supported script repertoire."""
+    canonical_script = (
+        script if script in _ASSIGNED_BLOCK_RANGES else _canonical_script_name(script)
+    )
+    return _in_ranges(codepoint, _ASSIGNED_BLOCK_RANGES[canonical_script])
+
+
 def _inside_supported_block(codepoint: int) -> bool:
     return any(_in_ranges(codepoint, ranges) for ranges in _SCRIPT_BLOCK_RANGES.values())
 

@@ -34,6 +34,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from ._controls import codepoint_labels
+from .unicode_span import _is_assigned_script_codepoint
 
 # --- Digits: validated, byte '0'..'9' -> U+11BF0..U+11BF9 in order. ---
 SUNUWAR_DIGITS: dict[str, str] = {str(i): chr(0x11BF0 + i) for i in range(10)}
@@ -181,7 +182,7 @@ class SunuwarConverter:
                 out.append(ch)
                 continue
             out.append(ch)
-            if not (_SUNUWAR_BLOCK_LO <= ord(ch) <= _SUNUWAR_BLOCK_HI):
+            if not _is_assigned_script_codepoint(ord(ch), "Sunuwar"):
                 unmapped.add(ch)
         converted = unicodedata.normalize("NFC", "".join(out))
         sun_count = sum(1 for c in converted if _SUNUWAR_BLOCK_LO <= ord(c) <= _SUNUWAR_BLOCK_HI)
@@ -203,8 +204,9 @@ def convert_sunuwar(
 
     Returns a :class:`SunuwarConversion`. All observed script bytes are confirmed;
     ``apply_uncertain`` is retained for API compatibility and is currently a no-op.
-    Bytes that are neither letters, digits, nor known punctuation are surfaced in
-    ``unmapped_bytes``. With ``strict=True`` any unmapped byte raises ``ValueError``.
+    Input values that are neither mapped bytes, known punctuation, nor assigned
+    Unicode Sunuwar are surfaced in ``unmapped_bytes``. With ``strict=True`` any
+    such value raises ``ValueError``.
     """
     result = SunuwarConverter(apply_uncertain=apply_uncertain).convert(text)
     if strict and (result.uncertain_bytes or result.unmapped_bytes):

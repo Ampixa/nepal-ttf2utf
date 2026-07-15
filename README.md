@@ -55,6 +55,12 @@ reporting reserved positions, private-use values, and characters assigned to a
 different supported script. `supported_unicode_scripts()` lists all eleven
 accepted validator names.
 
+The Limbu, Kirat Rai, Sunuwar, Lepcha, Tirhuta, and Tibetan legacy converters
+use the same pinned repertoire when native-script Unicode is mixed into a
+legacy span. Assigned characters remain valid passthrough text. The 103
+reserved positions in those output blocks are preserved in lenient output but
+reported and rejected in strict mode.
+
 ### Encoding boundaries
 
 - Ranjana does not have a standardized Unicode block. Nithya Ranjana DU and NU
@@ -184,8 +190,8 @@ uvx twine check dist/*
 The test suite checks known mappings, multi-byte rules, visual-to-logical
 reordering, strict-mode failures, already-Unicode routing, hash-pinned glyph-ID
 recovery, version-stable assigned-repertoire validation, cross-script routing,
-exact structural-whitespace preservation, exhaustive diagnostic C0 rejection,
-CLI behavior, and mapping-resource validation.
+exact structural-whitespace preservation, exhaustive diagnostic C0 and
+reserved-position rejection, CLI behavior, and mapping-resource validation.
 
 ## Licenses
 

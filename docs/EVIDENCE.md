@@ -279,6 +279,32 @@ database: Python 3.9 predates the Unicode 16 encoding of Gurung Khema, Sunuwar,
 and Kirat Rai, but it can still validate their assigned codepoints without
 treating reserved positions as characters.
 
+For the six output scripts listed below, the same pinned membership determines
+whether native-script Unicode can pass through a legacy converter without a
+diagnostic. This check is deliberately narrower than full Unicode-span
+validation: it does not impose a native-script anchor or reclassify mixed text
+after conversion. It only reports a codepoint inside the declared output block
+when that position is not assigned in Unicode 17. Lenient output, replacement
+counts, movement counts, and block-character counts remain unchanged.
+
+| Output script | Unicode 17 reserved positions | Legacy route variants |
+|---|---|---|
+| Limbu | U+191F, U+192C–U+192F, U+193C–U+193F, U+1941–U+1943 | Namdhinggo |
+| Kirat Rai | U+16D7A–U+16D7F | canonical and Sikkim Herald |
+| Sunuwar | U+11BE2–U+11BEF, U+11BFA–U+11BFF | Koĩts/Kirat1 |
+| Lepcha | U+1C38–U+1C3A, U+1C4A–U+1C4C | Sikkim Herald and JG Lepcha |
+| Tirhuta | U+114C8–U+114CF, U+114DA–U+114DF | Janaki, including strict Videha recovery |
+| Tibetan | U+0F48, U+0F6D–U+0F70, U+0F98, U+0FBD, U+0FCD, U+0FDB–U+0FFF | TibetanMachine |
+
+These ranges contain 103 distinct reserved positions and produce 115
+route/codepoint combinations across the eight route variants. Exhaustive tests
+require each reserved value to remain codepoint-for-codepoint identical in
+lenient output, appear in the established detailed diagnostic field, and fail
+direct and dispatcher strict gates with a visible `U+XXXX` label. A
+representative CLI test requires the same visible diagnostic. Every assigned
+position in the same six repertoires is also exhaustively tested as valid
+passthrough, including assigned Common or Inherited block values.
+
 Eleven canonical compositions introduced with Gurung Khema and Kirat Rai are
 also pinned so NFC output is stable on older Python releases. Outside the
 eleven pinned script blocks, unassigned-codepoint detection continues to use

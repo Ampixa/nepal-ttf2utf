@@ -17,6 +17,8 @@ from __future__ import annotations
 import unicodedata
 from dataclasses import dataclass
 
+from .unicode_span import _is_assigned_script_codepoint
+
 TIRHUTA_LO, TIRHUTA_HI = 0x11480, 0x114DF
 
 _TIRHUTA_CONSONANTS = frozenset(range(0x1148F, 0x114B0))
@@ -194,7 +196,7 @@ class TirhutaConverter:
                 replacements += 1
                 continue
             mapped.append(codepoint)
-            if TIRHUTA_LO <= codepoint <= TIRHUTA_HI or char in _PASSTHROUGH:
+            if _is_assigned_script_codepoint(codepoint, "Tirhuta") or char in _PASSTHROUGH:
                 continue
             unmapped.add(f"U+{codepoint:04X}")
 
