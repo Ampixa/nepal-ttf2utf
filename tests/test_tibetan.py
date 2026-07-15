@@ -59,6 +59,17 @@ def test_tibetanmachine_unknown_and_unicode_passthrough():
     assert not result.unmapped_codepoints
 
 
+@pytest.mark.parametrize("codepoint", [0xE010, 0xE013])
+def test_tibetanmachine_notdef_pua_is_reported_as_missing_glyph(codepoint):
+    source = chr(codepoint)
+    result = convert_tibetanmachine(source)
+    assert result.unicode_text == source
+    assert result.missing_glyph_codepoints == [f"U+{codepoint:04X}"]
+    assert result.unmapped_codepoints == []
+    with pytest.raises(ValueError, match="missing"):
+        convert_tibetanmachine(source, strict=True)
+
+
 def test_tibetanmachine_map_targets_are_tibetan_and_output_is_nfc():
     converter = TibetanMachineConverter.default()
     result = converter.convert("!@A€¾")
