@@ -383,7 +383,80 @@ characters: 30 UltraBlack, 129 Normal, and 821 Bold. The separate Latic converte
 accepts that observed set without an unmapped value. Evidence currently
 establishes only the UltraBlack, Normal, and Bold weight names.
 
-## Videha Janaki Tirhuta
+## Janaki Tirhuta core crosswalk
+
+`convert_tirhuta()` distributes a project-defined crosswalk for Devanagari-coded
+text from the audited Janaki/Videha material. It is not a published Janaki
+encoding table or a claim that every font labeled Janaki, Tirhuta, or
+Mithilakshar uses the same character assignments.
+
+The corrected crosswalk has 90 assigned Devanagari sources and 90 unique target
+sequences: 81 singleton targets and nine two-codepoint targets, containing 99
+target positions in total. The singleton pairs have the same official character
+identity after the Devanagari/Tirhuta script prefix is removed. Eight
+two-codepoint rules, U+0958–U+095F, follow the source characters' canonical
+base-plus-nukta decompositions and substitute the corresponding Tirhuta base
+plus Tirhuta nukta. The remaining two-codepoint rule maps U+0933 DEVANAGARI
+LETTER LLA to Tirhuta LA plus nukta, as documented in section 4.12 of Unicode
+proposal
+[`L2/11-175R`](https://www.unicode.org/L2/L2011/11175r-tirhuta.pdf).
+Tirhuta uses the shared U+0964 danda and U+0965 double danda, so those two
+identity outputs remain in the table. The resulting targets cover 79 of the 82
+assigned Tirhuta characters plus the two shared dandas; ANJI, GVANG, and
+ABBREVIATION SIGN have no project crosswalk source.
+
+No mapping is defined for U+090E DEVANAGARI LETTER SHORT E or U+0912
+DEVANAGARI LETTER SHORT O. The Unicode 17
+[Tirhuta specification](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-15/)
+and `L2/11-175R` state that Tirhuta short E and short O have dependent signs but
+no independent forms because those sounds do not occur word-initially. Lenient
+conversion therefore preserves U+090E and U+0912 with diagnostics; strict
+conversion rejects them instead of synthesizing unattested independent vowels.
+
+The source-sorted compact ASCII JSON mapping payload consists of integer
+`[source, [targets...]]` rows. Its 1,403 bytes have SHA-256
+`0a740647420fdddac4221bfedfa50b46082f1a6f640a172df3f4bc4e94ebb12a`.
+The unchanged 49-character literal/structural allowlist is a project
+passthrough policy, not a Janaki glyph mapping. Its sorted codepoint array is
+164 bytes with SHA-256
+`d6422caf7cf326bcd10a5c318e07e4dbf4b5e7ae55120785c7e6f2ddf141a7c4`.
+
+The reorder contract records 33 consonants, 19 dependents, pre-base I, RA,
+VIRAMA, NUKTA, and the `devanagari-derived-only` provenance policy. Its compact
+sorted-key ASCII JSON is 440 bytes with SHA-256
+`050b1b75760b9ac030bb247d83019ea28ccb4a829667a1d35040a7ad8e738a20`.
+Combining those fields with `mapping` and `passthrough` produces a 2,033-byte
+payload with SHA-256
+`85ac0769069141339bf23824b9cb435deb5b3f2068d946881c62dd0514bce29f`.
+The sorted 90-source aggregate converts to 99 characters with SHA-256
+`4c78fd1cfeb017e1b94d01903e51c9860795e94f4886e4a26976c6ae4f2213ec`
+over its UTF-8 output.
+
+Every scalar emitted from a mapped Devanagari source retains private provenance
+through both visual-order passes. Pre-base-I and trailing-reph repair consumes
+only wholly Devanagari-derived match windows. Native Tirhuta, literal
+passthrough, and residual input cannot be consumed or relocated by those custom
+passes; NFC normalization still applies afterward. Tests exhaust the corrected
+map, all Devanagari and Tirhuta block positions, all byte values and passthrough
+characters, bounded pre-base and reph state matrices with representative repeated
+paths, native mirrors, mixed provenance, and Tirhuta-block boundary suppression.
+
+The complete Devanagari block classification is 90 mapped and 38
+preserved-but-diagnosed values. The Tirhuta block contains 82 assigned native
+passthrough positions and 14 reserved positions that remain diagnostics. The
+byte domain contains 43 allowlisted values and 213 diagnostics; six additional
+allowlist characters are above U+00FF.
+
+The two distributed Videha GID tables contain 595 Devanagari codepoint slots
+drawn from 39 of the corrected 90 sources. The other 51 core sources do not
+occur in those functional table values, and neither removed short-vowel source
+occurs there. These are table-slot counts, not PDF corpus occurrence counts.
+The repository can reproduce the crosswalk, allowlist, reorder state, tests,
+and GID-table overlap. It does not distribute Janaki cmap, glyph, GSUB, outline,
+or shaping derivation artifacts, nor the ordinary non-U+FFFD trace-text
+inventory needed to establish whole-corpus coverage.
+
+## Videha Janaki glyph-ID recovery
 
 The first audited source is the 152-page Videha issue
 [`videha_01_01_08_tirhuta.pdf`](https://archive.org/download/videha_15_04_2008_tirhuta/videha_01_01_08_tirhuta.pdf)
@@ -407,7 +480,8 @@ recovering a glyph. The profile recovered all 3,306 U+FFFD occurrences across
   sequence that HarfBuzz shaped to the glyph in Janaki 1.000;
 - the remaining 13 occurrences were the two explicit half forms `dN.half`
   and `dNn.half`, resolved by the font's GSUB evidence to `न्` and `ण्`;
-- the existing semantic remap then produced 64,896 Tirhuta-block characters;
+- the project's distributed `convert_tirhuta()` crosswalk then produced 64,896
+  Tirhuta-block characters;
 - 30,396 of 30,581 PyMuPDF trace fragments converted without residuals
   (99.395049%); the remainder comprises 183 fragments containing U+25CC, one
   containing literal `*`, and one containing literal `^`. These are affected

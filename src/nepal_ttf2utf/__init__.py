@@ -265,16 +265,21 @@ _OLCHIKI_UNICODE_FONTS = {
     "ol-chiki-unicode",
     "unicode-ol-chiki",
 }
-# Janaki stores Tirhuta glyphs under semantically corresponding Devanagari codepoints.
-_TIRHUTA_FONTS = {"janaki", "tirhuta", "mithilakshar"}
-_TIRHUTA_UNICODE_FONTS = {
-    "noto sans tirhuta",
-    "noto-sans-tirhuta",
-    "notosanstirhuta",
-    "notosanstirhuta-regular",
-    "tirhuta-unicode",
-    "unicode-tirhuta",
-}
+# The audited Videha Janaki spans use the project Devanagari-to-Tirhuta crosswalk.
+# Generic Tirhuta/Mithilakshar keys are compatibility aliases for that legacy route.
+_TIRHUTA_FONTS = frozenset({"janaki", "tirhuta", "mithilakshar"})
+_TIRHUTA_UNICODE_FONTS = frozenset(
+    {
+        "noto sans tirhuta",
+        "noto-sans-tirhuta",
+        "notosanstirhuta",
+        "notosanstirhuta-regular",
+        "tirhuta-unicode",
+        "unicode-tirhuta",
+    }
+)
+if _TIRHUTA_FONTS & _TIRHUTA_UNICODE_FONTS:
+    raise ValueError("Tirhuta legacy and Unicode font aliases overlap")
 _GURUNG_KHEMA_UNICODE_FONTS = {
     "gurung-khema-unicode",
     "noto sans gurung khema",

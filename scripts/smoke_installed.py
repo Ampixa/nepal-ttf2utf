@@ -11,6 +11,7 @@ import nepal_ttf2utf
 from nepal_ttf2utf import (
     VIDEHA_2008_04_15,
     VIDEHA_ISSUE_001,
+    TirhutaConverter,
     convert_devanagari,
     convert_jg_lepcha,
     convert_kiratrai,
@@ -21,6 +22,7 @@ from nepal_ttf2utf import (
     convert_olchiki_latic,
     convert_sunuwar,
     convert_tibetanmachine,
+    convert_tirhuta,
     janaki_gid_map_sha256,
     recover_videha_janaki_trace,
     transliterate_magar_akkha,
@@ -82,6 +84,18 @@ def main() -> int:
     assert convert_olchiki_latic(".", strict=True).unicode_text == "ᱹ"
     assert convert_sunuwar("A", strict=True).unicode_text == "𑯖"
     assert nepal_ttf2utf.convert("A", font="kirat1", strict=True) == "𑯖"
+    assert convert_tirhuta("िव", strict=True).unicode_text == "𑒫𑒱"
+    native_tirhuta = "\U000114b1\U000114ab"
+    native_result = TirhutaConverter().convert(native_tirhuta)
+    assert native_result.unicode_text == native_tirhuta
+    assert native_result.prebase_i_moves == native_result.reph_moves == 0
+    assert nepal_ttf2utf.convert("क", font="janaki", strict=True) == "𑒏"
+    try:
+        convert_tirhuta("\u090e", strict=True)
+    except ValueError as error:
+        assert "U+090E" in str(error)
+    else:
+        raise AssertionError("strict Janaki conversion accepted independent SHORT E")
     magar_akkha = transliterate_magar_akkha("कि", strict=True).unicode_text
     assert magar_akkha == "\U00011013\U0001103a"
     assert nepal_ttf2utf.convert(magar_akkha, font="akkha-brahmi", strict=True) == magar_akkha

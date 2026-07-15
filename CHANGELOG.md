@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Correct and pin the project-defined Janaki core crosswalk: reject Devanagari
+  independent SHORT E/O because Tirhuta has no corresponding independent forms,
+  freeze the remaining 90 mappings and 49 passthrough values, and restrict visual-order
+  repair to Devanagari-derived output so genuine Unicode Tirhuta is not reordered.
+  This adds no Janaki glyph assignment, recovery profile, or corpus-completeness claim.
 - Freeze and pin the four-PDF Sikkim Herald Kirat Rai routing contract;
   exhaust all byte values, supported pairs, and premap triples, isolate converter
   state from public-name and canonical-rule mutation, and state the external

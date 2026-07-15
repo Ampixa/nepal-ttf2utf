@@ -35,7 +35,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka`, and the evidenced `olckoptimum-` names `extrablack` and `medium` | Hash-pinned Optimum letter, modifier, digit, and punctuation map with a fail-closed custom-map schema. |
 | Ol Chiki | `olck-latic`, `olcklatic`, `olchiki-latic`, and the evidenced `olcklatic-` names `bold`, `normal`, and `ultrablack` | Separate OLCKLatic mapping, including its swapped `v`/`w` assignments and distinct punctuation. The [public 2023 source](docs/EVIDENCE.md#olckoptimum-ol-chiki), whose Public Domain Mark status is documented with the evidence, contributes 980 strictly converted characters across 111 spans. |
 | Ol Chiki | Noto Sans Ol Chiki and `ol-chiki-unicode` | Unicode Ol Chiki validation without a legacy-byte pass. |
-| Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. Two hash-pinned Videha profiles use immutable 164-entry base and 34-entry extension maps to recover broken U+FFFD text from caller-supplied PyMuPDF glyph IDs. |
+| Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Project-defined 90-source crosswalk for Devanagari-coded text from audited Janaki/Videha spans, plus a 49-character literal/structural allowlist. Pre-base-I and trailing-reph repair is limited to Devanagari-derived output. This is not a published Janaki encoding table; U+FFFD recovery requires one of the two fingerprint-gated Videha profiles. |
 | Tirhuta / Mithilakshar | Noto Sans Tirhuta and `tirhuta-unicode` | Unicode Tirhuta validation, kept separate from Janaki's Devanagari-coded layout. |
 | Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's hash-pinned 217-row Apache-2.0 TibetanMachine table expands to a pinned 244-entry post-alias lookup snapshot. Custom tables are bounded to a 250-value project-permitted raw-byte and CP1252 source domain and assigned Tibetan targets. Every byte class and ordered two-entry NFC boundary is checked; thirteen effective empty inputs and two corpus-observed source PUA `.notdef` selectors fail strict conversion. |
 | Tibetan | Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, CTRC-HT and aliases | NFC normalization and assigned Tibetan-repertoire validation for already-Unicode spans. |
@@ -83,15 +83,18 @@ older supported Python releases.
   their actual encoding.
 - Raw U+FFFD text extracted from a broken Janaki PDF cannot be reconstructed by
   `convert_tirhuta()`. Recovery requires PyMuPDF glyph IDs and an exact built-in
-  Videha PDF/font fingerprint profile.
+  Videha PDF/font fingerprint profile. Devanagari independent SHORT E and SHORT
+  O have no corresponding independent Tirhuta forms, so U+090E and U+0912 are
+  preserved and diagnosed rather than approximated.
 - The Gurung Khema Unicode route validates encoded characters only. The
   inventoried legacy `khema 2019` layout still lacks the completed semantic font
   audit and independent page review required for a byte converter.
 
 The deliberately unresolved inputs are the legacy Limbu `#`, JG Lepcha `<`,
-`=`, and `>` placeholders, five observed Sikkim Herald Lepcha glyph bytes, unknown legacy
-Ranjana or Magar Akkha fonts, unknown Janaki glyph IDs, the Gurung Khema legacy
-layout, and two TibetanMachine `.notdef` selectors. Existing legacy converters
+`=`, and `>` placeholders, five observed Sikkim Herald Lepcha glyph bytes,
+Janaki U+090E/U+0912 and unknown glyph IDs, unknown legacy Ranjana or Magar
+Akkha fonts, the Gurung Khema legacy layout, and two TibetanMachine `.notdef`
+selectors. Existing legacy converters
 preserve unresolved input or emit the documented placeholder in lenient mode,
 then reject the case in strict mode. TibetanMachine also has thirteen effective
 defined-empty inputs: lenient mode records their deletion, while strict mode

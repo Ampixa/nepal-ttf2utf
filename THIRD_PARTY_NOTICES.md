@@ -60,9 +60,10 @@ magar-toolkit contributors. The complete MIT license text is bundled as
 
 ## Unicode Character Database
 
-The assigned ranges, Script-property ranges, block boundaries, and canonical
-compositions are derived from Unicode 17.0 `DerivedAge.txt`, `Scripts.txt`,
-`Blocks.txt`, and `UnicodeData.txt`. The Script_Extensions policy documented in
+The assigned ranges, Script-property ranges, block boundaries, character
+identities, canonical decompositions, and canonical compositions are derived
+from Unicode 17.0 `DerivedAge.txt`, `Scripts.txt`, `Blocks.txt`, and
+`UnicodeData.txt`. The Script_Extensions policy documented in
 `docs/EVIDENCE.md` was reviewed against Unicode 17.0 `ScriptExtensions.txt` and
 UAX #24. Copyright © 1991-2026 Unicode, Inc. The complete Unicode License V3 is
 bundled as `src/nepal_ttf2utf/maps/LICENSE.unicode-data.txt`.
