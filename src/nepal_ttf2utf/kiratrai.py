@@ -4,8 +4,8 @@ SIL publishes a TECkit map for the canonical 2021 ``kirat rai font new`` encodin
 the vendored copy lives at ``maps/kiratraifontnew.map``. Sikkim Herald PDFs use a
 different, older layout hidden behind per-PDF CID subsets and ASCII ToUnicode values.
 Four independently subset Herald PDFs share one stable old->new remap: exact glyph
-outline plus advance-width identity covers 43,037 of 43,148 extracted characters.
-The Herald converter applies that complete premap before the SIL rules.
+outline plus advance-width identity covers the observed script characters. The
+Herald converter applies that complete premap before the SIL rules.
 
 That map is expressed with TECkit ``ByteClass`` / ``UniClass`` declarations plus a
 handful of explicit multi-byte ligature rules. A ``[class] > [class]`` rule maps the
@@ -16,8 +16,8 @@ ligature rules win over the single-byte class rules.
 
 The two layouts must not be auto-detected from text: even old-layout strings without
 the formerly conspicuous ``f R x F I L`` bytes are globally permuted. Callers must
-select the canonical-new or Herald alias explicitly. In the audited Herald corpus,
-only one occurrence of extracted ``Z`` remains semantically unresolved.
+select the canonical-new or Herald alias explicitly. The sole extracted Herald ``Z``
+is a blank spacing glyph and is normalized to an ordinary space.
 """
 
 from __future__ import annotations
@@ -85,9 +85,11 @@ KIRATRAI_HERALD_PREMAP: dict[str, str] = {
     "z": "z",
 }
 
-# Values confirmed as identity/literal in the audited Herald PDFs. Backslash is a
-# separate blank glyph and is normalized to an ordinary space before conversion.
+# Values confirmed as identity/literal in the audited Herald PDFs. Backslash and
+# Herald ``Z`` are separate blank glyphs normalized to ordinary spaces. Canonical
+# ``kiratraifontnew`` Z remains U+16D6C and is unaffected.
 KIRATRAI_HERALD_PASSTHROUGH: frozenset[str] = frozenset(" \t\r\n0123456789(),-/.;")
+KIRATRAI_HERALD_BLANKS: frozenset[str] = frozenset("\\Z")
 
 
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
@@ -322,7 +324,7 @@ class KiratRaiHeraldConverter:
             if remapped is not None:
                 canonical_run.append(remapped)
                 continue
-            if char == "\\":
+            if char in KIRATRAI_HERALD_BLANKS:
                 canonical_run.append(" ")
                 continue
             if char in KIRATRAI_HERALD_PASSTHROUGH:

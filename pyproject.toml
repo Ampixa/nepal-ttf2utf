@@ -1,7 +1,7 @@
 [project]
 name = "nepal-ttf2utf"
-version = "0.2.0"
-description = "Legacy-font to Unicode conversion for Devanagari, Limbu, Kirat Rai, Sunuwar, Lepcha, Ol Chiki, Tirhuta, and Tibetan."
+version = "0.3.0"
+description = "Legacy-font conversion and Unicode span validation for scripts of Nepal and Sikkim."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
@@ -16,8 +16,12 @@ keywords = [
   "sunuwar",
   "lepcha",
   "ol-chiki",
+  "olcklatic",
   "tirhuta",
   "tibetan",
+  "newa",
+  "brahmi",
+  "magar-akkha",
   "preeti",
   "unicode",
   "legacy-font",

@@ -21,6 +21,10 @@ from pathlib import Path
 
 TIBETAN_LO, TIBETAN_HI = 0x0F00, 0x0FFF
 
+# Corpus-observed Type0 ToUnicode values that resolve to GID 0 (the embedded
+# TibetanMachine font's visible .notdef placeholder), not to recoverable text.
+TIBETANMACHINE_NOTDEF_PUA: frozenset[int] = frozenset({0xE010, 0xE013})
+
 
 @dataclass(frozen=True)
 class TibetanMachineConversion:
@@ -28,6 +32,7 @@ class TibetanMachineConversion:
     unicode_text: str
     tibetan_char_count: int
     replacement_count: int
+    missing_glyph_codepoints: list[str]
     empty_codepoints: list[str]
     unmapped_codepoints: list[str]
 
@@ -90,6 +95,7 @@ class TibetanMachineConverter:
     def convert(self, text: str) -> TibetanMachineConversion:
         output: list[str] = []
         empty: set[str] = set()
+        missing: set[str] = set()
         unmapped: set[str] = set()
         replacements = 0
 
@@ -109,6 +115,9 @@ class TibetanMachineConverter:
                     empty.add(f"U+{codepoint:04X}")
                 continue
             output.append(char)
+            if codepoint in TIBETANMACHINE_NOTDEF_PUA:
+                missing.add(f"U+{codepoint:04X}")
+                continue
             if char in " \t\r\n" or TIBETAN_LO <= codepoint <= TIBETAN_HI:
                 continue
             unmapped.add(f"U+{codepoint:04X}")
@@ -119,6 +128,7 @@ class TibetanMachineConverter:
             unicode_text=converted,
             tibetan_char_count=sum(TIBETAN_LO <= ord(char) <= TIBETAN_HI for char in converted),
             replacement_count=replacements,
+            missing_glyph_codepoints=sorted(missing),
             empty_codepoints=sorted(empty),
             unmapped_codepoints=sorted(unmapped),
         )
@@ -138,10 +148,14 @@ def convert_tibetanmachine(text: str, *, strict: bool = False) -> TibetanMachine
     if _DEFAULT is None:
         _DEFAULT = TibetanMachineConverter.default()
     result = _DEFAULT.convert(text)
-    if strict and (result.empty_codepoints or result.unmapped_codepoints):
-        flagged = result.empty_codepoints + result.unmapped_codepoints
+    if strict and (
+        result.missing_glyph_codepoints or result.empty_codepoints or result.unmapped_codepoints
+    ):
+        flagged = (
+            result.missing_glyph_codepoints + result.empty_codepoints + result.unmapped_codepoints
+        )
         raise ValueError(
-            "empty/unmapped characters after TibetanMachine conversion: "
+            "missing/empty/unmapped characters after TibetanMachine conversion: "
             + " ".join(sorted(set(flagged)))
         )
     return result

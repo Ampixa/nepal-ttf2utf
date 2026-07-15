@@ -1,4 +1,4 @@
-"""'Ol Chiki Optimum' legacy display font -> Unicode Ol Chiki / Santali (U+1C50-U+1C7F).
+"""Ol Chiki Optimum/Latic legacy fonts -> Unicode Ol Chiki (U+1C50-U+1C7F).
 
 The Aale Chhatka Santali e-magazine (self-published, archive.org) is typeset in the
 'Ol Chiki Optimum' font family (BaseFont ``OLCKOptimum-Medium`` / ``OLCKOptimum-
@@ -39,11 +39,12 @@ occur in the source corpus but their outline-identity with lowercase ``w``/``x``
 was confirmed directly from the font file, so they are mapped on that basis
 alone.
 
-Scope: this module covers ONLY the 'Ol Chiki Optimum' body/heading font family
-(Medium + ExtraBlack weights, verified outline-compatible with each other). The
-'Ol Chiki Latic' display font family used for some headlines in the same documents is
-a DIFFERENT, unverified glyph encoding (mean IoU only ~0.35-0.42 against Optimum on the
-same bytes) and is explicitly OUT OF SCOPE -- do not assume this map applies to it.
+The 'Ol Chiki Latic' display family mostly shares the semantic letter and digit
+assignments. Its different visual design made cross-family raster similarity a poor
+test, but within each Latic font its ASCII and Unicode cmaps establish the identity.
+Latic swaps Optimum's ``v/V`` and ``w/W`` assignments and has a distinct punctuation
+layer: ``. - : ~ |`` map to U+1C79, U+1C7C, U+1C7A, U+1C7B, and U+1C7E. It
+therefore has a separate converter.
 
 Provenance / evidence: ocr-tech data/external-language-resources/native-script-real-
 2026-07-06/ol-chiki/ (aale-chhatka-2023.pdf, aale-chhatka-september-2023.pdf).
@@ -65,6 +66,19 @@ OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
 OLCHIKI_PASSTHROUGH: frozenset[str] = frozenset(
     {",", ".", "-", "'", "(", ")", '"', ":", ";", "?", "!", "~", "“", "”", "+"}
 )
+
+OLCHIKI_LATIC_OVERRIDES: dict[int, int] = {
+    ord("v"): 0x1C76,
+    ord("V"): 0x1C76,
+    ord("w"): 0x1C63,
+    ord("W"): 0x1C63,
+    ord("."): 0x1C79,
+    ord("-"): 0x1C7C,
+    ord(":"): 0x1C7A,
+    ord("~"): 0x1C7B,
+    ord("|"): 0x1C7E,
+}
+OLCHIKI_LATIC_PASSTHROUGH: frozenset[str] = OLCHIKI_PASSTHROUGH - frozenset(".-:~")
 
 
 def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
@@ -127,12 +141,14 @@ class OLChikiConverter:
         uncertain_map: dict[int, int] | None = None,
         *,
         apply_uncertain: bool = False,
+        passthrough: frozenset[str] = OLCHIKI_PASSTHROUGH,
     ) -> None:
         if not confirmed_map:
             raise ValueError("OLChikiConverter requires a non-empty confirmed map")
         self._confirmed = dict(confirmed_map)
         self._uncertain = dict(uncertain_map or {})
         self._apply_uncertain = apply_uncertain
+        self._passthrough = passthrough
         table = dict(self._confirmed)
         if apply_uncertain:
             table.update(self._uncertain)
@@ -172,7 +188,7 @@ class OLChikiConverter:
                 uncertain_seen.add(ch)
                 out.append(ch)  # left untouched when not applying uncertain
                 continue
-            if ch in OLCHIKI_PASSTHROUGH:
+            if ch in self._passthrough:
                 out.append(ch)
                 continue
             out.append(ch)
@@ -197,7 +213,24 @@ class OLChikiConverter:
         )
 
 
+class OLChikiLaticConverter(OLChikiConverter):
+    """Converter for the OLCKLatic display family and its punctuation map."""
+
+    @classmethod
+    def default(cls, *, apply_uncertain: bool = False) -> "OLChikiLaticConverter":
+        with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
+            confirmed, uncertain = _load_map_file(p)
+        confirmed.update(OLCHIKI_LATIC_OVERRIDES)
+        return cls(
+            confirmed,
+            uncertain,
+            apply_uncertain=apply_uncertain,
+            passthrough=OLCHIKI_LATIC_PASSTHROUGH,
+        )
+
+
 _DEFAULT: OLChikiConverter | None = None
+_LATIC_DEFAULT: OLChikiLaticConverter | None = None
 
 
 def convert_olchiki(
@@ -223,5 +256,26 @@ def convert_olchiki(
         flagged = result.uncertain_bytes + result.unmapped_bytes
         raise ValueError(
             "unmapped/uncertain bytes after Ol Chiki conversion: " + " ".join(sorted(set(flagged)))
+        )
+    return result
+
+
+def convert_olchiki_latic(
+    text: str, *, apply_uncertain: bool = False, strict: bool = False
+) -> OLChikiConversion:
+    """Convert an OLCKLatic legacy span to Unicode Ol Chiki (NFC)."""
+    global _LATIC_DEFAULT
+    if _LATIC_DEFAULT is None or apply_uncertain:
+        converter = OLChikiLaticConverter.default(apply_uncertain=apply_uncertain)
+        if not apply_uncertain:
+            _LATIC_DEFAULT = converter
+    else:
+        converter = _LATIC_DEFAULT
+    result = converter.convert(text)
+    if strict and (result.uncertain_bytes or result.unmapped_bytes):
+        flagged = result.uncertain_bytes + result.unmapped_bytes
+        raise ValueError(
+            "unmapped/uncertain bytes after Ol Chiki Latic conversion: "
+            + " ".join(sorted(set(flagged)))
         )
     return result
