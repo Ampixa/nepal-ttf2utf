@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin the exact 217-row TibetanMachine resource and exhaustively verify every
+  source mapping, raw CP1252 alias, and defined-empty strict diagnostic; reject
+  invalid custom-map schemas, sources, and non-Tibetan or unassigned targets.
 - Preserve the pinned assigned Devanagari repertoire when Unicode characters
   are mixed into legacy spans, reject all 91 reserved extension positions, and
   make explicit empty mappings and fully consumed deleting-rule inputs visible

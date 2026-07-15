@@ -109,6 +109,13 @@ def test_cli_devanagari_uses_the_pinned_assigned_repertoire(capsys):
     assert "U+11B0A" in capsys.readouterr().err
 
 
+def test_cli_strict_tibetanmachine_reports_a_defined_empty_input(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["--font", "tibetanmachine", "--strict", "Ž"])
+    assert error.value.code == 2
+    assert "U+017D" in capsys.readouterr().err
+
+
 def test_cli_requires_font(capsys):
     with pytest.raises(SystemExit) as error:
         main(["g]kfn"])

@@ -286,8 +286,18 @@ uses BDRC's [`py-tiblegenc`](https://github.com/buda-base/py-tiblegenc) table.
 
 The package vendors only the 217-row TibetanMachine subset from BDRC revision
 [`0c6372e`](https://github.com/buda-base/py-tiblegenc/commit/0c6372e44be7238b611261d981355d80f68f85b8),
-under Apache-2.0. Every row is tested for exact output parity against that pinned
-upstream revision, followed by the package's NFC normalization.
+under Apache-2.0. The exact local subset is pinned to SHA-256
+`eabcdd119ee7fa81ca221e3879745d3886ec4293b1bca72801a18498972cbc24`.
+Tests verify the hash, unique 217-source inventory, every vendored source's NFC
+output, and all 27 non-conflicting raw CP1252 aliases added by the parser.
+
+Twelve vendored rows have empty targets. U+00A0 follows upstream preprocessing
+and becomes an ordinary space. The other eleven source values, plus raw-byte
+U+008E and U+009E aliases for U+017D and U+017E, produce empty output and are
+reported through `empty_codepoints`; all thirteen effective inputs fail strict
+conversion. Parser tests pin rejection of invalid or duplicate sources, missing
+targets, empty tables, structurally invalid CSV, and non-Tibetan or unassigned
+target values.
 
 This is text-span conversion, not a PDF routing heuristic:
 

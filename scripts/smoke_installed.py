@@ -62,6 +62,12 @@ def main() -> int:
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
     assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
     assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
+    try:
+        convert_tibetanmachine("Ž", strict=True)
+    except ValueError as error:
+        assert "U+017D" in str(error)
+    else:
+        raise AssertionError("strict TibetanMachine conversion accepted defined-empty input")
     assert convert_olchiki("a", strict=True).unicode_text == "ᱟ"
     assert convert_olchiki_latic(".", strict=True).unicode_text == "ᱹ"
     assert convert_lepcha("A", strict=True).unicode_text == "ᰀ"

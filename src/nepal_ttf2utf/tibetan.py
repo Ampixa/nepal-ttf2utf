@@ -56,19 +56,37 @@ class TibetanMachineConverter:
         table: dict[int, str] = {}
         with map_path.open(encoding="utf-8", newline="") as stream:
             rows = (line for line in stream if not line.startswith("#"))
-            for row in csv.DictReader(rows):
-                try:
-                    source = int(row["source_codepoint"])
-                except (KeyError, TypeError, ValueError) as error:
-                    raise ValueError(f"invalid TibetanMachine source row: {row!r}") from error
-                if not (0 <= source <= 0x10FFFF) or source in table:
-                    raise ValueError(f"invalid/duplicate TibetanMachine source: {source}")
-                target = row.get("target")
-                if target is None:
-                    raise ValueError(f"missing TibetanMachine target for source {source}")
-                if any(not (TIBETAN_LO <= ord(char) <= TIBETAN_HI) for char in target):
-                    raise ValueError(f"non-Tibetan target for TibetanMachine source {source}")
-                table[source] = target
+            try:
+                reader = csv.DictReader(rows, strict=True)
+                if reader.fieldnames != ["source_codepoint", "target"]:
+                    raise ValueError(
+                        "invalid TibetanMachine CSV header: expected "
+                        "['source_codepoint', 'target'], got "
+                        f"{reader.fieldnames!r}"
+                    )
+                for row in reader:
+                    if None in row:
+                        raise ValueError(
+                            f"invalid TibetanMachine CSV row with extra fields: {row!r}"
+                        )
+                    try:
+                        source = int(row["source_codepoint"])
+                    except (KeyError, TypeError, ValueError) as error:
+                        raise ValueError(f"invalid TibetanMachine source row: {row!r}") from error
+                    if not (0 <= source <= 0x10FFFF) or source in table:
+                        raise ValueError(f"invalid/duplicate TibetanMachine source: {source}")
+                    target = row.get("target")
+                    if target is None:
+                        raise ValueError(f"missing TibetanMachine target for source {source}")
+                    if any(
+                        not _is_assigned_script_codepoint(ord(char), "Tibetan") for char in target
+                    ):
+                        raise ValueError(
+                            f"non-Tibetan or unassigned target for TibetanMachine source {source}"
+                        )
+                    table[source] = target
+            except csv.Error as error:
+                raise ValueError(f"invalid TibetanMachine CSV: {error}") from error
 
         # PDF/text extractors may expose WinAnsi values either as their decoded
         # CP1252 character (for example U+20AC) or as the raw byte value. BDRC's

@@ -37,7 +37,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Ol Chiki | Noto Sans Ol Chiki and `ol-chiki-unicode` | Unicode Ol Chiki validation without a legacy-byte pass. |
 | Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. Hash-pinned Videha profiles can also recover broken U+FFFD text from PyMuPDF glyph IDs. |
 | Tirhuta / Mithilakshar | Noto Sans Tirhuta and `tirhuta-unicode` | Unicode Tirhuta validation, kept separate from Janaki's Devanagari-coded layout. |
-| Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's Apache-2.0 TibetanMachine table. The audited spans contain 86,206 extracted characters; two source PUA values select the font's visible `.notdef` glyph and fail strict conversion. |
+| Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's hash-pinned 217-row Apache-2.0 TibetanMachine table. Every source row and raw CP1252 alias is checked. Thirteen effective empty inputs and two source PUA `.notdef` selectors fail strict conversion. |
 | Tibetan | Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, CTRC-HT and aliases | NFC normalization and assigned Tibetan-repertoire validation for already-Unicode spans. |
 | Newa | `newa`, `newa-unicode`, `noto-sans-newa`, `nithyaranjananu` and aliases | NFC normalization and assigned Newa-repertoire validation. Nithya Ranjana NU displays Ranjana glyphs over Newa codepoints. |
 | Brahmi representation for Magar Akkha | `transliterate_magar_akkha()`; `magar-akkha-brahmi` and `akkha-brahmi` | Devanagari/Brahmi transliteration is lossless over its supported inventory, and already-Brahmi text can be validated. Optional minimal-inventory folding is explicit and lossy. This is not a legacy-font converter. |
@@ -89,9 +89,12 @@ older supported Python releases.
 The deliberately unresolved inputs are the legacy Limbu `#`, JG Lepcha `<`,
 `=`, and `>` placeholders, five rare Sikkim Herald Lepcha bytes, unknown legacy
 Ranjana or Magar Akkha fonts, unknown Janaki glyph IDs, the Gurung Khema legacy
-layout, and the two TibetanMachine `.notdef` selectors. Lenient conversion
-preserves or emits the documented placeholder for them; strict conversion
-reports them.
+layout, and two TibetanMachine `.notdef` selectors. Existing legacy converters
+preserve unresolved input or emit the documented placeholder in lenient mode,
+then reject the case in strict mode. TibetanMachine also has thirteen effective
+defined-empty inputs: lenient mode records their deletion, while strict mode
+rejects them. Unknown legacy formats have no conversion route; unknown Janaki
+glyph IDs fail profile-gated recovery in both modes.
 
 ## Python API
 
