@@ -28,8 +28,9 @@
   keeping similarly named legacy layouts separate.
 - Report private-use, reserved, and cross-script values in Unicode spans and
   reject them in strict mode.
-- Apply the Unicode 16 canonical compositions for Gurung Khema and Kirat Rai
-  on older Python releases, and return canonical script names in diagnostics.
+- Apply the Unicode 16 canonical compositions across Unicode validation and
+  both legacy Kirat Rai layouts on older Python releases, and return canonical
+  script names in diagnostics.
 
 ## 0.3.0 — 2026-07-15
 

@@ -23,13 +23,12 @@ is a blank spacing glyph and is normalized to an ordinary space.
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
 from ._controls import diagnostic_c0_codepoints
-from .unicode_span import _is_assigned_script_codepoint
+from .unicode_span import _is_assigned_script_codepoint, _normalize_nfc
 
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
@@ -280,7 +279,7 @@ class KiratRaiConverter:
             if not _is_assigned_script_codepoint(code, "Kirat Rai"):
                 unmapped.append(f"U+{code:04X}")
             index += 1
-        converted = unicodedata.normalize("NFC", "".join(output))
+        converted = _normalize_nfc("".join(output))
         # SIL's CTL class preserves every C0 value. Keep that exact lenient
         # mapping/count behavior but diagnose values outside the allowlist.
         unmapped.extend(diagnostic_c0_codepoints(converted))
@@ -345,7 +344,7 @@ class KiratRaiHeraldConverter:
             unmapped.add(f"U+{ord(char):04X}")
         flush()
 
-        converted = unicodedata.normalize("NFC", "".join(output))
+        converted = _normalize_nfc("".join(output))
         return KiratRaiConversion(
             legacy_text=text,
             unicode_text=converted,

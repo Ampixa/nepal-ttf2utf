@@ -59,7 +59,9 @@ The Limbu, Kirat Rai, Sunuwar, Lepcha, Tirhuta, and Tibetan legacy converters
 use the same pinned repertoire when native-script Unicode is mixed into a
 legacy span. Assigned characters remain valid passthrough text. The 103
 reserved positions in those output blocks are preserved in lenient output but
-reported and rejected in strict mode.
+reported and rejected in strict mode. Both legacy Kirat Rai layouts also apply
+the package's pinned Unicode 16 compositions, keeping NFC output stable on
+older supported Python releases.
 
 ### Encoding boundaries
 

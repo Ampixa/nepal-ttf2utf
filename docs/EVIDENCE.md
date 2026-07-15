@@ -337,9 +337,10 @@ position in the same six repertoires is also exhaustively tested as valid
 passthrough, including assigned Common or Inherited block values.
 
 Eleven canonical compositions introduced with Gurung Khema and Kirat Rai are
-also pinned so NFC output is stable on older Python releases. Outside the
-eleven pinned script blocks, unassigned-codepoint detection continues to use
-the host Python Unicode database.
+also pinned so validator output and both legacy Kirat Rai layouts have stable
+NFC output on older Python releases. Outside the eleven pinned script blocks,
+unassigned-codepoint detection continues to use the host Python Unicode
+database.
 
 The validator covers Brahmi, Devanagari, Gurung Khema, Kirat Rai, Lepcha,
 Limbu, Newa, Ol Chiki, Sunuwar, Tibetan, and Tirhuta. It normalizes NFC and

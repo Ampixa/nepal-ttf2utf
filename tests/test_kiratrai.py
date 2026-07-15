@@ -44,6 +44,61 @@ def test_kiratrai_mapped_bytes_are_in_block_and_nfc():
     assert res.unicode_text == unicodedata.normalize("NFC", res.unicode_text)
 
 
+@pytest.mark.parametrize("converter", [convert_kiratrai, convert_kiratrai_herald])
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("\U00016d67\U00016d67", "\U00016d68"),
+        ("\U00016d63\U00016d67", "\U00016d69"),
+        ("\U00016d69\U00016d67", "\U00016d6a"),
+        ("\U00016d63\U00016d67\U00016d67", "\U00016d6a"),
+    ],
+)
+def test_kiratrai_unicode16_nfc_is_version_stable(converter, source, expected, monkeypatch):
+    monkeypatch.setattr(
+        "nepal_ttf2utf.unicode_span.unicodedata.normalize", lambda _form, text: text
+    )
+
+    result = converter(source, strict=True)
+
+    assert result.unicode_text == expected
+    assert result.kiratrai_char_count == 1
+    assert result.replacement_count == 0
+    assert result.unmapped_codepoints == []
+
+
+@pytest.mark.parametrize(
+    ("converter", "source"),
+    [
+        (convert_kiratrai, "e\U00016d67"),
+        (convert_kiratrai_herald, "r\U00016d67"),
+    ],
+)
+def test_kiratrai_unicode16_nfc_composes_across_legacy_unicode_boundary(
+    converter, source, monkeypatch
+):
+    monkeypatch.setattr(
+        "nepal_ttf2utf.unicode_span.unicodedata.normalize", lambda _form, text: text
+    )
+
+    result = converter(source, strict=True)
+
+    assert result.unicode_text == "\U00016d68"
+    assert result.kiratrai_char_count == 1
+    assert result.replacement_count == 1
+    assert result.unmapped_codepoints == []
+
+
+def test_kiratrai_dispatchers_use_version_stable_unicode16_nfc(monkeypatch):
+    monkeypatch.setattr(
+        "nepal_ttf2utf.unicode_span.unicodedata.normalize", lambda _form, text: text
+    )
+    source = "\U00016d67\U00016d67"
+
+    assert convert(source, font="kiratraifontnew", strict=True) == "\U00016d68"
+    assert convert(source, font="kiratraifont", strict=True) == "\U00016d68"
+
+
 def test_convert_dispatches_to_kiratrai():
     assert _has_kiratrai(convert("a", font="kiratrai"))
     assert _has_kiratrai(convert("0", font="kiratrai"))
