@@ -260,7 +260,7 @@ def test_madan2_strict_route_rejects_unanchored_invalid_and_misrouted_text():
     ["madan", "madan.ttf", "madan2-regular", "Madan2 Regular", "ABCDE+Madan2"],
 )
 def test_madan2_route_does_not_infer_unsupported_names(font):
-    with pytest.raises(ValueError, match="unsupported Devanagari font"):
+    with pytest.raises(ValueError, match="unsupported font key"):
         convert("नेपाल", font=font, strict=True)
 
 

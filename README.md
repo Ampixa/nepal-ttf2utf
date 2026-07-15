@@ -33,7 +33,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Corpus-derived Sikkim Herald layout. Legacy `]`, `%`, and `-` are resolved; only `*`, `(`, `)`, `+`, and `/` remain unmapped. |
 | Lepcha / Róng | Mingzat, Noto Sans Lepcha and `lepcha-unicode` | Unicode Lepcha assigned-repertoire validation; it does not apply either legacy layout. |
 | Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka` | Complete observed Optimum letter, mark, digit, and punctuation map. |
-| Ol Chiki | `olck-latic`, `olcklatic-*`, `olchiki-latic` | Separate OLCKLatic mapping, including its swapped `v`/`w` assignments and distinct punctuation. All 2,089 audited characters converted without an unmapped value. |
+| Ol Chiki | `olck-latic`, `olcklatic`, `olchiki-latic`, and `olcklatic-` followed by `black`, `bold`, `extrablack`, `medium`, `normal`, or `ultrablack` | Separate OLCKLatic mapping, including its swapped `v`/`w` assignments and distinct punctuation. All 2,089 audited characters converted without an unmapped value. |
 | Ol Chiki | Noto Sans Ol Chiki and `ol-chiki-unicode` | Unicode Ol Chiki validation without a legacy-byte pass. |
 | Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. Hash-pinned Videha profiles can also recover broken U+FFFD text from PyMuPDF glyph IDs. |
 | Tirhuta / Mithilakshar | Noto Sans Tirhuta and `tirhuta-unicode` | Unicode Tirhuta validation, kept separate from Janaki's Devanagari-coded layout. |
@@ -43,10 +43,13 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Brahmi representation for Magar Akkha | `transliterate_magar_akkha()`; `magar-akkha-brahmi` and `akkha-brahmi` | Devanagari/Brahmi transliteration is lossless over its supported inventory, and already-Brahmi text can be validated. Optional minimal-inventory folding is explicit and lossy. This is not a legacy-font converter. |
 | Gurung Khema | Noto Sans Gurung Khema and `gurung-khema-unicode` | Validation covers the 58 characters assigned in Unicode 17.0, U+16100–U+16139. No legacy-font mapping or linguistic corpus claim is made. |
 
-The result of `supported_fonts()` is the authoritative list of accepted font
-keys. Font names are case-insensitive, and six-letter PDF subset prefixes such
-as `ABCDEF+` are ignored. The measurements and source links behind derived
-mappings are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+The result of `supported_fonts()` is the authoritative list of normalized
+routing keys. Input matching is case-insensitive, ignores surrounding
+whitespace, treats `_` as `-`, and removes a leading six-letter PDF subset tag
+such as `ABCDEF+`. No other family or weight names are inferred. Unknown keys
+raise `ValueError`; the command-line interface exits with status 2 and points
+to `--list-fonts`. The measurements and source links behind derived mappings
+are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
 Already-Unicode routes use an assigned repertoire pinned to Unicode 17.0
 rather than the host Python's Unicode database. This keeps Unicode 16 scripts

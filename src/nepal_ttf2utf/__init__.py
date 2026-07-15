@@ -310,6 +310,8 @@ def supported_fonts() -> dict[str, str]:
 
 def _normalize_font_key(font: str) -> str:
     """Normalize a user/PDF font name while preserving meaningful family text."""
+    if not isinstance(font, str):
+        raise TypeError("font must be a string")
     key = font.strip().lower().replace("_", "-")
     return re.sub(r"^[a-z]{6}\+", "", key)
 
@@ -372,4 +374,8 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
         return convert_tirhuta(text, strict=strict).unicode_text
     if key in _GURUNG_KHEMA_UNICODE_FONTS:
         return validate_unicode_span(text, script="Gurung Khema", strict=strict).unicode_text
-    return convert_devanagari(text, font=key, strict=strict).unicode_text
+    if key in supported_devanagari_fonts():
+        return convert_devanagari(text, font=key, strict=strict).unicode_text
+    raise ValueError(
+        f"unsupported font key {key!r}; use supported_fonts() or --list-fonts to list accepted keys"
+    )

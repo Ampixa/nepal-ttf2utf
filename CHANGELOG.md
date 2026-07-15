@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Reject unknown generic-dispatcher font keys with a package-level error that
+  reports the normalized key and directs discovery to `supported_fonts()` or
+  `--list-fonts`; document the exact font-key normalization rules.
 - Make `OLChikiLaticConverter.from_map_file()` apply the same evidenced Latic
   `v`/`w` and punctuation layer as default construction, with fixed Latic
   assignments taking precedence over base-map uncertainty; both Ol Chiki map

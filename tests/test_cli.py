@@ -97,6 +97,19 @@ def test_cli_requires_font(capsys):
     assert "--font is required" in capsys.readouterr().err
 
 
+def test_cli_unknown_font_reports_package_key_and_discovery_hint(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["--font", "ABCDEF+Does_Not_Exist", "text"])
+    assert error.value.code == 2
+
+    streams = capsys.readouterr()
+    assert streams.out == ""
+    message = streams.err
+    assert "unsupported font key 'does-not-exist'" in message
+    assert "--list-fonts" in message
+    assert "Devanagari" not in message
+
+
 def test_cli_rejects_two_input_sources(tmp_path, capsys):
     source = tmp_path / "legacy.txt"
     source.write_text("k", encoding="utf-8")
