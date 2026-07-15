@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin and exhaust SIL's complete JG Lepcha forward and reorder contract; reject
+  zero-progress, deleting, malformed, ambiguous, or unsupported custom rules
+  without changing the three upstream U+25CC placeholder assignments.
 - Pin the 65-entry Sikkim Herald Lepcha resource and its functional mapping,
   exhaustively classify every byte, and reject unsafe or ambiguous custom maps
   without assigning the five observed unresolved glyph values.

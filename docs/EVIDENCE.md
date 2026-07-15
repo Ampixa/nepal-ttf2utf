@@ -228,6 +228,35 @@ from `wsresources` revision
 It parses to 160 flattened byte-table rules, one contextual byte rule, 72
 Unicode reorder rules, and 11 Unicode reorder classes.
 
+All 160 byte sources are singletons. Their targets comprise 105 singleton, 47
+double, and eight triple sequences. The contextual rule selects U+1C26 for
+legacy `0x61` at the start of text or after any byte outside its seven-member
+dependent-vowel class; the ordinary rule otherwise selects U+1C28. The 72
+reorder rules contain 68 distinct patterns and four byte-identical upstream
+redundancies. Their input lengths are five two-slot, 20 three-slot, 28
+four-slot, 16 five-slot, and three six-slot rules.
+
+The parsed-structure contract is a compact ASCII JSON object with sorted
+keys `byte_rules`, `context_rule`, `reorder_rules`, `uncertain_sources`, and
+`unicode_classes`. Byte rules are `[source-byte-array,
+target-codepoint-array]` pairs in converter precedence order. The context value
+is `[trigger-byte, sorted-excluded-byte-array, target-codepoint]`. Each reorder
+entry contains its ordered `[class-name, variable-name]` slots and output
+variable order; classes are sorted `[name, sorted-codepoint-array]` pairs.
+Serialization uses sorted keys and separators `(",", ":")`. The resulting
+8,730-byte payload has SHA-256
+`18b020ec8f679ae35f00b0354610a8f41391e5da19d5fbcc6ab727c041bfc2a1`.
+
+Tests execute every flattened byte rule and every declared reorder rule, exhaust
+all 256 possible preceding bytes for the contextual rule, and classify every
+single-byte input. The classification is 128 mapped and strict-clean values,
+29 mapped C0 diagnostics, three mapped-but-uncertain placeholders, and 96
+preserved unmapped values. The public constructor freezes finite rule and
+class inputs and rejects empty, deleting, invalid-scalar, duplicate,
+prefix-conflicting, or ambiguous rules. The source reader accepts only the
+implemented forward and reorder grammar and fails closed on unsupported active
+syntax rather than silently discarding it.
+
 Three forward rules map legacy `0x3C`, `0x3D`, and `0x3E` to U+25CC DOTTED
 CIRCLE. SIL annotates their source glyphs as uncertain circled `v`, `c`, and
 `cv` forms. The generic placeholder does not establish semantic Unicode
