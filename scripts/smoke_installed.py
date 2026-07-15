@@ -8,9 +8,11 @@ import json
 import subprocess
 from importlib import metadata, resources
 from pathlib import Path
+from types import MappingProxyType
 
 import nepal_ttf2utf
 from nepal_ttf2utf import (
+    UNICODE_REPERTOIRE_VERSION,
     VIDEHA_2008_04_15,
     VIDEHA_ISSUE_001,
     LimbuConverter,
@@ -28,9 +30,12 @@ from nepal_ttf2utf import (
     convert_tirhuta,
     janaki_gid_map_sha256,
     recover_videha_janaki_trace,
+    supported_fonts,
+    supported_unicode_scripts,
     transliterate_magar_akkha,
     validate_unicode_span,
 )
+from nepal_ttf2utf import unicode_span as unicode_span_module
 
 EXPECTED_RESOURCES = {
     "JGLepcha.map",
@@ -64,6 +69,128 @@ def main() -> int:
         pass
     else:
         raise AssertionError(f"smoke imported the source checkout: {imported_from}")
+
+    route_groups = nepal_ttf2utf._FONT_ROUTE_GROUPS
+    assert isinstance(route_groups, MappingProxyType)
+    assert len(route_groups) == 22
+    assert all(isinstance(aliases, frozenset) for _, aliases, _ in route_groups.values())
+    route_aliases = set().union(*(aliases for _, aliases, _ in route_groups.values()))
+    assert sum(len(aliases) for _, aliases, _ in route_groups.values()) == 146
+    assert len(route_aliases) == 146
+
+    font_inventory = supported_fonts()
+    assert type(font_inventory) is dict
+    assert len(font_inventory) == 146
+    assert route_aliases == set(font_inventory)
+    assert all(nepal_ttf2utf._normalize_font_key(alias) == alias for alias in font_inventory)
+    assert isinstance(nepal_ttf2utf._SUPPORTED_FONT_SCRIPTS, MappingProxyType)
+    assert isinstance(nepal_ttf2utf._UNICODE_FONT_SCRIPTS, MappingProxyType)
+    assert isinstance(nepal_ttf2utf._FONT_ALIAS_ROUTES, MappingProxyType)
+    assert dict(nepal_ttf2utf._SUPPORTED_FONT_SCRIPTS) == font_inventory
+    assert set(nepal_ttf2utf._FONT_ALIAS_ROUTES) == set(font_inventory)
+
+    second_font_inventory = supported_fonts()
+    assert second_font_inventory is not font_inventory
+    assert second_font_inventory == font_inventory
+    second_font_inventory["installed-smoke-mutation"] = "Newa"
+    assert supported_fonts() == font_inventory
+
+    font_inventory_payload = json.dumps(
+        font_inventory, sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    assert len(font_inventory_payload) == 4_196
+    assert hashlib.sha256(font_inventory_payload).hexdigest() == (
+        "dd2adfacfed5310d843363fac313fe2e52f7c20a66a2fa788af953904c2221ca"
+    )
+
+    unicode_font_scripts = nepal_ttf2utf._UNICODE_FONT_SCRIPTS
+    assert len(unicode_font_scripts) == 100
+    assert set(unicode_font_scripts) < set(font_inventory)
+    assert all(font_inventory[alias] == script for alias, script in unicode_font_scripts.items())
+    expected_unicode_font_scripts = {
+        alias: script
+        for script, aliases, is_unicode in route_groups.values()
+        if is_unicode
+        for alias in aliases
+    }
+    assert dict(unicode_font_scripts) == expected_unicode_font_scripts
+    unicode_font_payload = json.dumps(
+        dict(unicode_font_scripts), sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    assert len(unicode_font_payload) == 3_044
+    assert hashlib.sha256(unicode_font_payload).hexdigest() == (
+        "a59cf6d6bff2cd2693bac77ea1fc50e74d7fa0d365528abcf5a460c178bad78f"
+    )
+
+    supported_scripts = supported_unicode_scripts()
+    assert len(supported_scripts) == 11
+    assert set(unicode_font_scripts.values()) == set(supported_scripts)
+    supported_scripts_payload = json.dumps(
+        supported_scripts, sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    assert len(supported_scripts_payload) == 115
+    assert hashlib.sha256(supported_scripts_payload).hexdigest() == (
+        "ea2615e345153f2500d29428d73dd02c20131a773ccc5f34076d6e3361da3aa3"
+    )
+
+    script_anchors = {
+        "Brahmi": 0x11013,
+        "Devanagari": 0x0915,
+        "Gurung Khema": 0x16100,
+        "Kirat Rai": 0x16D43,
+        "Lepcha": 0x1C00,
+        "Limbu": 0x1900,
+        "Newa": 0x11400,
+        "Ol Chiki": 0x1C5A,
+        "Sunuwar": 0x11BC0,
+        "Tibetan": 0x0F40,
+        "Tirhuta": 0x11480,
+    }
+    assert set(script_anchors) == set(supported_scripts)
+    for alias, script in unicode_font_scripts.items():
+        anchor = chr(script_anchors[script])
+        assert nepal_ttf2utf.convert(anchor, font=alias, strict=True) == anchor
+
+    repertoire_mappings = (
+        unicode_span_module._ASSIGNED_BLOCK_RANGES,
+        unicode_span_module._SCRIPT_RANGES,
+        unicode_span_module._SCRIPT_BLOCK_RANGES,
+    )
+    assert all(isinstance(mapping, MappingProxyType) for mapping in repertoire_mappings)
+    assert all(
+        isinstance(ranges, tuple) and all(isinstance(item, tuple) for item in ranges)
+        for mapping in repertoire_mappings
+        for ranges in mapping.values()
+    )
+    unicode_repertoire_contract = {
+        "version": UNICODE_REPERTOIRE_VERSION,
+        "assigned": {
+            script: [list(item) for item in ranges]
+            for script, ranges in unicode_span_module._ASSIGNED_BLOCK_RANGES.items()
+        },
+        "scripts": {
+            script: [list(item) for item in ranges]
+            for script, ranges in unicode_span_module._SCRIPT_RANGES.items()
+        },
+        "blocks": {
+            script: [list(item) for item in ranges]
+            for script, ranges in unicode_span_module._SCRIPT_BLOCK_RANGES.items()
+        },
+        "canonical_decompositions": [
+            [composed, list(decomposed)]
+            for composed, decomposed in unicode_span_module._PINNED_CANONICAL_DECOMPOSITIONS.items()
+        ],
+        "canonical_combining_classes": [
+            list(item) for item in unicode_span_module._PINNED_CANONICAL_COMBINING_CLASSES.items()
+        ],
+    }
+    unicode_repertoire_payload = json.dumps(
+        unicode_repertoire_contract, sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    assert len(unicode_repertoire_payload) == 1_757
+    assert hashlib.sha256(unicode_repertoire_payload).hexdigest() == (
+        "b34edb816eafd1b66ae5911d7e4120df1fd4a3d0a737a55e5a4e4f3077e7f469"
+    )
 
     map_package = resources.files("nepal_ttf2utf.maps")
     actual_resources = {entry.name for entry in map_package.iterdir() if entry.is_file()}

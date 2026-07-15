@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Freeze the Unicode repertoire and the dispatcher's 22 route groups; reject
+  non-normalized or overlapping aliases and pin all 146 supported keys, the 100
+  Unicode-validation aliases, and the eleven supported script names without
+  changing their contents or routing. `supported_fonts()` continues to return a
+  fresh mutable copy. The inventory fingerprints describe software routing
+  metadata, not font availability or independent font evidence.
 - Bound the SIL JG Lepcha source reader by file, physical-line, and continued
   logical-line size; require the byte-to-Unicode pass before a nonempty Unicode
   pass; and reject unreachable reorder classes. Record immutable context-first

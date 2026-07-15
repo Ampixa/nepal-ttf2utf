@@ -5,10 +5,12 @@ import json
 import unicodedata
 from collections import Counter
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
 from nepal_ttf2utf import (
+    _UNICODE_FONT_SCRIPTS,
     UNICODE_REPERTOIRE_VERSION,
     convert,
     supported_fonts,
@@ -103,6 +105,76 @@ def test_unicode_repertoire_is_version_pinned_and_discoverable():
         "Tibetan",
         "Tirhuta",
     )
+
+
+@pytest.mark.parametrize(
+    "table",
+    (_ASSIGNED_BLOCK_RANGES, _SCRIPT_RANGES, _SCRIPT_BLOCK_RANGES),
+)
+def test_unicode_repertoire_range_tables_are_deeply_immutable(table):
+    assert isinstance(table, MappingProxyType)
+    assert all(
+        isinstance(ranges, tuple)
+        and all(
+            isinstance(item, tuple)
+            and len(item) == 2
+            and all(isinstance(codepoint, int) for codepoint in item)
+            for item in ranges
+        )
+        for ranges in table.values()
+    )
+
+    key = next(iter(table))
+    original = table[key]
+    with pytest.raises(TypeError):
+        table[key] = ((0, 0),)
+    with pytest.raises(TypeError):
+        del table[key]
+    assert table[key] is original
+
+
+def test_unicode_font_alias_inventory_is_complete_and_hash_pinned():
+    assert isinstance(_UNICODE_FONT_SCRIPTS, MappingProxyType)
+    assert len(_UNICODE_FONT_SCRIPTS) == 100
+
+    alias_payload = json.dumps(
+        dict(_UNICODE_FONT_SCRIPTS), sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    assert len(alias_payload) == 3044
+    assert hashlib.sha256(alias_payload).hexdigest() == (
+        "a59cf6d6bff2cd2693bac77ea1fc50e74d7fa0d365528abcf5a460c178bad78f"
+    )
+
+    grouped = {
+        script: sorted(
+            alias
+            for alias, routed_script in _UNICODE_FONT_SCRIPTS.items()
+            if routed_script == script
+        )
+        for script in supported_unicode_scripts()
+    }
+    assert set(grouped) == set(_SCRIPT_ANCHORS)
+    assert all(grouped.values())
+    grouped_payload = json.dumps(grouped, sort_keys=True, separators=(",", ":")).encode("ascii")
+    assert len(grouped_payload) == 2150
+    assert hashlib.sha256(grouped_payload).hexdigest() == (
+        "64bd004c6a18b827a7d9bf7e2ffc5f9dcf5e8b1d539b4315efa45b2f371d7403"
+    )
+
+
+def test_every_unicode_font_alias_strictly_routes_only_its_declared_script():
+    checked = 0
+    for alias, script in _UNICODE_FONT_SCRIPTS.items():
+        source = chr(_SCRIPT_ANCHORS[script])
+        assert convert(source, font=alias, strict=True) == source, (alias, script)
+
+        other_script = next(candidate for candidate in _SCRIPT_ANCHORS if candidate != script)
+        misrouted = chr(_SCRIPT_ANCHORS[other_script])
+        with pytest.raises(ValueError, match="unexpected script characters"):
+            convert(misrouted, font=alias, strict=True)
+        checked += 1
+
+    assert checked == 100
 
 
 def test_unicode17_contract_digest_and_complete_inventory():

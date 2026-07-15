@@ -919,6 +919,33 @@ U+1612F GURUNG KHEMA SIGN THOLHOMA's canonical combining class 9.
 Serialization uses sorted keys, separators `(",", ":")`, and ASCII encoding.
 The resulting 1,757-byte payload has SHA-256
 `b34edb816eafd1b66ae5911d7e4120df1fd4a3d0a737a55e5a4e4f3077e7f469`.
+The three range registries and their nested range sequences are immutable at
+runtime. Freezing them does not change the payload, repertoire, normalization
+data, or digest.
+
+The dispatcher registry contains 22 immutable route groups and 146 normalized
+aliases. Construction requires every alias to be a fixed point under font-key
+normalization and rejects an alias owned by more than one group. Of the 146
+aliases, 100 select already-Unicode validation and 46 select legacy conversion.
+The public `supported_fonts()` function returns a fresh mutable dictionary
+rather than exposing the internal registry.
+
+Three compact ASCII JSON payloads pin the discovery and Unicode-routing
+metadata. The complete supported-font payload is the `supported_fonts()`
+alias-to-canonical-script object serialized with sorted keys and separators
+`(",", ":")`; its 146 entries occupy 4,196 bytes and have SHA-256
+`dd2adfacfed5310d843363fac313fe2e52f7c20a66a2fa788af953904c2221ca`.
+The Unicode-validation payload applies the same serialization to the 100-entry
+alias-to-canonical-script subregistry; its 3,044 bytes have SHA-256
+`a59cf6d6bff2cd2693bac77ea1fc50e74d7fa0d365528abcf5a460c178bad78f`.
+The supported-script payload is the tuple returned by
+`supported_unicode_scripts()` serialized as a compact JSON array in returned
+order and encoded as ASCII; its eleven entries occupy 115 bytes and have
+SHA-256
+`ea2615e345153f2500d29428d73dd02c20131a773ccc5f34076d6e3361da3aa3`.
+These fingerprints pin software routing metadata. They do not establish font
+availability, independently validate every alias against a font binary, or add
+mapping and corpus evidence.
 
 Invalid-value coverage includes all 29 nonstructural C0 controls, DEL, all 32
 C1 controls, all 2,048 surrogate values, all 66 Unicode noncharacters, and the
@@ -986,9 +1013,11 @@ reports four distinct routing failures:
 - Latin text, ordinary punctuation, whitespace, and ASCII digits may remain
   embedded in a valid native-script span.
 
-Modern font-family aliases are based on cmap inventory, not visual inference.
-Selected reference binaries are listed below; no font is distributed by this
-package:
+The reference font-family routes below are based on cmap inventory, not visual
+inference. The broader dispatcher registry also includes normalized spelling
+variants, compatibility keys, and explicit generic Unicode selectors; the
+reference binaries do not independently evidence every such alias. No font is
+distributed by this package:
 
 | Font reference | Script / assigned cmap | SHA-256 |
 |---|---|---|

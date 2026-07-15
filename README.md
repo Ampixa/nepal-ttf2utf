@@ -44,12 +44,18 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Gurung Khema | Noto Sans Gurung Khema and `gurung-khema-unicode` | Validation covers the 58 characters assigned in Unicode 17.0, U+16100–U+16139. No legacy-font mapping or linguistic corpus claim is made. |
 
 The result of `supported_fonts()` is the authoritative list of normalized
-routing keys. Input matching is case-insensitive, ignores surrounding
-whitespace, treats `_` as `-`, and removes a leading six-letter PDF subset tag
-such as `ABCDEF+`. No other family or weight names are inferred. Unknown keys
-raise `ValueError`; the command-line interface exits with status 2 and points
-to `--list-fonts`. The available measurements and source links behind derived
-mappings are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+routing keys. Internally, 22 immutable route groups contain 146 collision-free
+keys; 100 select Unicode validation and 46 select legacy conversion. Every key
+is already a fixed point under the normalization rules and belongs to exactly
+one group. `supported_fonts()` returns a fresh mutable dictionary, so caller
+changes cannot alter the internal registry. Input matching is case-insensitive,
+ignores surrounding whitespace, treats `_` as `-`, and removes a leading
+six-letter PDF subset tag such as `ABCDEF+`. No other family or weight names are
+inferred. Unknown keys raise `ValueError`; the command-line interface exits with
+status 2 and points to `--list-fonts`. These inventories describe software
+routing metadata; they do not assert that a font is installed or independently
+establish evidence for every alias. The available measurements and source links
+behind derived mappings are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
 Already-Unicode routes use an assigned repertoire pinned to Unicode 17.0
 rather than the host Python's Unicode database. This keeps Unicode 16 scripts

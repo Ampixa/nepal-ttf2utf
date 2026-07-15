@@ -33,77 +33,81 @@ class UnicodeSpanConversion:
 # named script blocks used by this package. Explicit ranges are necessary for
 # Unicode 16 scripts such as Gurung Khema, Sunuwar, and Kirat Rai: runtimes
 # predating Unicode 16 may otherwise report their assigned characters as ``Cn``.
-_ASSIGNED_BLOCK_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
-    "Brahmi": (
-        (0x11000, 0x1104D),
-        (0x11052, 0x11075),
-        (0x1107F, 0x1107F),
-    ),
-    "Devanagari": (
-        (0x0900, 0x097F),
-        (0x1CD0, 0x1CFA),
-        (0xA8E0, 0xA8FF),
-        (0x11B00, 0x11B09),
-    ),
-    "Gurung Khema": ((0x16100, 0x16139),),
-    "Kirat Rai": ((0x16D40, 0x16D79),),
-    "Lepcha": (
-        (0x1C00, 0x1C37),
-        (0x1C3B, 0x1C49),
-        (0x1C4D, 0x1C4F),
-    ),
-    "Limbu": (
-        (0x1900, 0x191E),
-        (0x1920, 0x192B),
-        (0x1930, 0x193B),
-        (0x1940, 0x1940),
-        (0x1944, 0x194F),
-    ),
-    "Newa": (
-        (0x11400, 0x1145B),
-        (0x1145D, 0x11461),
-    ),
-    "Ol Chiki": ((0x1C50, 0x1C7F),),
-    "Sunuwar": (
-        (0x11BC0, 0x11BE1),
-        (0x11BF0, 0x11BF9),
-    ),
-    "Tibetan": (
-        (0x0F00, 0x0F47),
-        (0x0F49, 0x0F6C),
-        (0x0F71, 0x0F97),
-        (0x0F99, 0x0FBC),
-        (0x0FBE, 0x0FCC),
-        (0x0FCE, 0x0FDA),
-    ),
-    "Tirhuta": (
-        (0x11480, 0x114C7),
-        (0x114D0, 0x114D9),
-    ),
-}
+_ASSIGNED_BLOCK_RANGES: Mapping[str, tuple[tuple[int, int], ...]] = MappingProxyType(
+    {
+        "Brahmi": (
+            (0x11000, 0x1104D),
+            (0x11052, 0x11075),
+            (0x1107F, 0x1107F),
+        ),
+        "Devanagari": (
+            (0x0900, 0x097F),
+            (0x1CD0, 0x1CFA),
+            (0xA8E0, 0xA8FF),
+            (0x11B00, 0x11B09),
+        ),
+        "Gurung Khema": ((0x16100, 0x16139),),
+        "Kirat Rai": ((0x16D40, 0x16D79),),
+        "Lepcha": (
+            (0x1C00, 0x1C37),
+            (0x1C3B, 0x1C49),
+            (0x1C4D, 0x1C4F),
+        ),
+        "Limbu": (
+            (0x1900, 0x191E),
+            (0x1920, 0x192B),
+            (0x1930, 0x193B),
+            (0x1940, 0x1940),
+            (0x1944, 0x194F),
+        ),
+        "Newa": (
+            (0x11400, 0x1145B),
+            (0x1145D, 0x11461),
+        ),
+        "Ol Chiki": ((0x1C50, 0x1C7F),),
+        "Sunuwar": (
+            (0x11BC0, 0x11BE1),
+            (0x11BF0, 0x11BF9),
+        ),
+        "Tibetan": (
+            (0x0F00, 0x0F47),
+            (0x0F49, 0x0F6C),
+            (0x0F71, 0x0F97),
+            (0x0F99, 0x0FBC),
+            (0x0FBE, 0x0FCC),
+            (0x0FCE, 0x0FDA),
+        ),
+        "Tirhuta": (
+            (0x11480, 0x114C7),
+            (0x114D0, 0x114D9),
+        ),
+    }
+)
 
 # Script-property ranges from Unicode 17.0 Scripts.txt. These are separate from
 # assigned block repertoire so Common/Inherited values such as the Indic danda
 # and Vedic marks are not attributed exclusively to Devanagari.
-_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
-    **_ASSIGNED_BLOCK_RANGES,
-    "Devanagari": (
-        (0x0900, 0x0950),
-        (0x0955, 0x0963),
-        (0x0966, 0x097F),
-        (0xA8E0, 0xA8FF),
-        (0x11B00, 0x11B09),
-    ),
-    "Tibetan": (
-        (0x0F00, 0x0F47),
-        (0x0F49, 0x0F6C),
-        (0x0F71, 0x0F97),
-        (0x0F99, 0x0FBC),
-        (0x0FBE, 0x0FCC),
-        (0x0FCE, 0x0FD4),
-        (0x0FD9, 0x0FDA),
-    ),
-}
+_SCRIPT_RANGES: Mapping[str, tuple[tuple[int, int], ...]] = MappingProxyType(
+    {
+        **_ASSIGNED_BLOCK_RANGES,
+        "Devanagari": (
+            (0x0900, 0x0950),
+            (0x0955, 0x0963),
+            (0x0966, 0x097F),
+            (0xA8E0, 0xA8FF),
+            (0x11B00, 0x11B09),
+        ),
+        "Tibetan": (
+            (0x0F00, 0x0F47),
+            (0x0F49, 0x0F6C),
+            (0x0F71, 0x0F97),
+            (0x0F99, 0x0FBC),
+            (0x0FBE, 0x0FCC),
+            (0x0FCE, 0x0FD4),
+            (0x0FD9, 0x0FDA),
+        ),
+    }
+)
 
 # Canonical normalization data added in Unicode 16.0. Older Python runtimes do
 # not know these immediate decompositions or U+1612F's nonzero combining class.
@@ -143,24 +147,26 @@ _PINNED_NORMALIZATION_PARTICIPANTS = frozenset(
 
 # Complete block boundaries are kept separately so reserved codepoints remain
 # invalid even if a future Python runtime assigns them after the pinned UCD.
-_SCRIPT_BLOCK_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
-    "Brahmi": ((0x11000, 0x1107F),),
-    "Devanagari": (
-        (0x0900, 0x097F),
-        (0x1CD0, 0x1CFF),
-        (0xA8E0, 0xA8FF),
-        (0x11B00, 0x11B5F),
-    ),
-    "Gurung Khema": ((0x16100, 0x1613F),),
-    "Kirat Rai": ((0x16D40, 0x16D7F),),
-    "Lepcha": ((0x1C00, 0x1C4F),),
-    "Limbu": ((0x1900, 0x194F),),
-    "Newa": ((0x11400, 0x1147F),),
-    "Ol Chiki": ((0x1C50, 0x1C7F),),
-    "Sunuwar": ((0x11BC0, 0x11BFF),),
-    "Tibetan": ((0x0F00, 0x0FFF),),
-    "Tirhuta": ((0x11480, 0x114DF),),
-}
+_SCRIPT_BLOCK_RANGES: Mapping[str, tuple[tuple[int, int], ...]] = MappingProxyType(
+    {
+        "Brahmi": ((0x11000, 0x1107F),),
+        "Devanagari": (
+            (0x0900, 0x097F),
+            (0x1CD0, 0x1CFF),
+            (0xA8E0, 0xA8FF),
+            (0x11B00, 0x11B5F),
+        ),
+        "Gurung Khema": ((0x16100, 0x1613F),),
+        "Kirat Rai": ((0x16D40, 0x16D7F),),
+        "Lepcha": ((0x1C00, 0x1C4F),),
+        "Limbu": ((0x1900, 0x194F),),
+        "Newa": ((0x11400, 0x1147F),),
+        "Ol Chiki": ((0x1C50, 0x1C7F),),
+        "Sunuwar": ((0x11BC0, 0x11BFF),),
+        "Tibetan": ((0x0F00, 0x0FFF),),
+        "Tirhuta": ((0x11480, 0x114DF),),
+    }
+)
 
 
 def _in_ranges(codepoint: int, ranges: tuple[tuple[int, int], ...]) -> bool:

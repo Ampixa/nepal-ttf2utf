@@ -25,6 +25,8 @@ transliteration. Unresolved input is surfaced instead of guessed.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
+from types import MappingProxyType
 
 from .devanagari import (
     DevanagariConversion,
@@ -162,80 +164,90 @@ if (
 ):
     raise ValueError("Kirat Rai canonical, Herald, and Unicode font aliases overlap")
 # Sunuwar / Jenticha (Koĩts) legacy display font (koits / kirat1).
-_SUNUWAR_FONTS = {"sunuwar", "jenticha", "koits", "kirat1"}
-_SUNUWAR_UNICODE_FONTS = {
-    "noto sans sunuwar",
-    "noto-sans-sunuwar",
-    "notosanssunuwar",
-    "notosanssunuwar-regular",
-    "sunuwar-unicode",
-    "unicode-sunuwar",
-}
+_SUNUWAR_FONTS = frozenset({"sunuwar", "jenticha", "koits", "kirat1"})
+_SUNUWAR_UNICODE_FONTS = frozenset(
+    {
+        "noto sans sunuwar",
+        "noto-sans-sunuwar",
+        "notosanssunuwar",
+        "notosanssunuwar-regular",
+        "sunuwar-unicode",
+        "unicode-sunuwar",
+    }
+)
 # BDRC/UTFC legacy TibetanMachine encoding (not Unicode Tibetan fonts).
-_TIBETAN_MACHINE_FONTS = {"tibetanmachine", "tibetan-machine"}
+_TIBETAN_MACHINE_FONTS = frozenset({"tibetanmachine", "tibetan-machine"})
 # Tibetan font families observed with real Unicode text layers.
-_TIBETAN_UNICODE_FONTS = {
-    "ctrc-ht",
-    "jomolhari",
-    "jomolhari-id",
-    "microsoft himalaya",
-    "microsoft-himalaya",
-    "monlam unicode",
-    "monlam-unicode",
-    "monlamuniouchan5",
-    "qomolangma",
-    "qomolangma-subtitle",
-    "qomolangma-title",
-    "qomolangma-uchen-suring",
-    "tibetan-unicode",
-    "unicode-tibetan",
-}
+_TIBETAN_UNICODE_FONTS = frozenset(
+    {
+        "ctrc-ht",
+        "jomolhari",
+        "jomolhari-id",
+        "microsoft himalaya",
+        "microsoft-himalaya",
+        "monlam unicode",
+        "monlam-unicode",
+        "monlamuniouchan5",
+        "qomolangma",
+        "qomolangma-subtitle",
+        "qomolangma-title",
+        "qomolangma-uchen-suring",
+        "tibetan-unicode",
+        "unicode-tibetan",
+    }
+)
 # Unicode Devanagari font spans that need identity routing, including the DU
 # encoding of Nithya Ranjana (Ranjana glyphs over Devanagari characters) and
 # LTK's exact Madan2 family/full/PostScript name.
-_DEVANAGARI_UNICODE_FONTS = {
-    "annapurna sil nepal",
-    "annapurna-sil-nepal",
-    "annapurnasilnepal",
-    "devanagari-unicode",
-    "madan2",
-    "nithya ranjana du",
-    "nithya-ranjana-du",
-    "nithyaranjanadu",
-    "nithyaranjanadu-regular",
-    "noto sans devanagari",
-    "noto serif devanagari",
-    "noto-sans-devanagari",
-    "noto-serif-devanagari",
-    "notosansdevanagari",
-    "notosansdevanagari-regular",
-    "notoserifdevanagari",
-    "notoserifdevanagari-regular",
-    "notoserifdevanagari-variablefont-wdth,wght",
-    "unicode-devanagari",
-}
+_DEVANAGARI_UNICODE_FONTS = frozenset(
+    {
+        "annapurna sil nepal",
+        "annapurna-sil-nepal",
+        "annapurnasilnepal",
+        "devanagari-unicode",
+        "madan2",
+        "nithya ranjana du",
+        "nithya-ranjana-du",
+        "nithyaranjanadu",
+        "nithyaranjanadu-regular",
+        "noto sans devanagari",
+        "noto serif devanagari",
+        "noto-sans-devanagari",
+        "noto-serif-devanagari",
+        "notosansdevanagari",
+        "notosansdevanagari-regular",
+        "notoserifdevanagari",
+        "notoserifdevanagari-regular",
+        "notoserifdevanagari-variablefont-wdth,wght",
+        "unicode-devanagari",
+    }
+)
 # Unicode Newa/Prachalit font keys. These normalize and validate; they do not
 # apply a legacy-byte mapping.
-_NEWA_UNICODE_FONTS = {
-    "newa",
-    "newa-unicode",
-    "noto sans newa",
-    "noto-sans-newa",
-    "notosansnewa",
-    "notosansnewa-regular",
-    "nithya ranjana nu",
-    "nithya-ranjana-nu",
-    "nithyaranjananu",
-    "nithyaranjananu-regular",
-    "prachalit-unicode",
-    "unicode-newa",
-}
-_BRAHMI_UNICODE_FONTS = {
-    "akkha-brahmi",
-    "brahmi-unicode",
-    "magar-akkha-brahmi",
-    "unicode-brahmi",
-}
+_NEWA_UNICODE_FONTS = frozenset(
+    {
+        "newa",
+        "newa-unicode",
+        "noto sans newa",
+        "noto-sans-newa",
+        "notosansnewa",
+        "notosansnewa-regular",
+        "nithya ranjana nu",
+        "nithya-ranjana-nu",
+        "nithyaranjananu",
+        "nithyaranjananu-regular",
+        "prachalit-unicode",
+        "unicode-newa",
+    }
+)
+_BRAHMI_UNICODE_FONTS = frozenset(
+    {
+        "akkha-brahmi",
+        "brahmi-unicode",
+        "magar-akkha-brahmi",
+        "unicode-brahmi",
+    }
+)
 # Sikkim Herald live-text Lepcha body font (TT*O00 named layout).
 _LEPCHA_FONTS = frozenset({"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"})
 # Jason Glavy's public legacy Lepcha encoding (different from the Herald layout).
@@ -259,32 +271,38 @@ if (
 ):
     raise ValueError("Lepcha legacy and Unicode font aliases overlap")
 # Santali Ol Chiki Optimum legacy display fonts evidenced by embedded outlines.
-_OLCHIKI_FONTS = {
-    "aale-chhatka",
-    "olck-optimum",
-    "olckoptimum-extrablack",
-    "olckoptimum-medium",
-    "olchiki",
-    "olchiki-optimum",
-}
+_OLCHIKI_FONTS = frozenset(
+    {
+        "aale-chhatka",
+        "olck-optimum",
+        "olckoptimum-extrablack",
+        "olckoptimum-medium",
+        "olchiki",
+        "olchiki-optimum",
+    }
+)
 # OLCKLatic shares the semantic letters/digits but has different punctuation.
-_OLCHIKI_LATIC_FONTS = {
-    "olck-latic",
-    "olcklatic",
-    "olcklatic-bold",
-    "olcklatic-normal",
-    "olcklatic-ultrablack",
-    "olchiki-latic",
-}
-_OLCHIKI_UNICODE_FONTS = {
-    "noto sans ol chiki",
-    "noto-sans-ol-chiki",
-    "notosansolchiki",
-    "notosansolchiki-regular",
-    "notosansolchiki-variablefont-wght",
-    "ol-chiki-unicode",
-    "unicode-ol-chiki",
-}
+_OLCHIKI_LATIC_FONTS = frozenset(
+    {
+        "olck-latic",
+        "olcklatic",
+        "olcklatic-bold",
+        "olcklatic-normal",
+        "olcklatic-ultrablack",
+        "olchiki-latic",
+    }
+)
+_OLCHIKI_UNICODE_FONTS = frozenset(
+    {
+        "noto sans ol chiki",
+        "noto-sans-ol-chiki",
+        "notosansolchiki",
+        "notosansolchiki-regular",
+        "notosansolchiki-variablefont-wght",
+        "ol-chiki-unicode",
+        "unicode-ol-chiki",
+    }
+)
 # The audited Videha Janaki spans use the project Devanagari-to-Tirhuta crosswalk.
 # Generic Tirhuta/Mithilakshar keys are compatibility aliases for that legacy route.
 _TIRHUTA_FONTS = frozenset({"janaki", "tirhuta", "mithilakshar"})
@@ -300,41 +318,16 @@ _TIRHUTA_UNICODE_FONTS = frozenset(
 )
 if _TIRHUTA_FONTS & _TIRHUTA_UNICODE_FONTS:
     raise ValueError("Tirhuta legacy and Unicode font aliases overlap")
-_GURUNG_KHEMA_UNICODE_FONTS = {
-    "gurung-khema-unicode",
-    "noto sans gurung khema",
-    "noto-sans-gurung-khema",
-    "notosansgurungkhema",
-    "notosansgurungkhema-regular",
-    "unicode-gurung-khema",
-}
-
-
-def supported_fonts() -> dict[str, str]:
-    """Map of supported font keys -> script."""
-    fonts = {f: "Devanagari" for f in supported_devanagari_fonts()}
-    fonts.update({f: "Devanagari" for f in sorted(_DEVANAGARI_UNICODE_FONTS)})
-    fonts.update({f: "Limbu" for f in sorted(_LIMBU_FONTS)})
-    fonts.update({f: "Limbu" for f in sorted(_LIMBU_UNICODE_FONTS)})
-    fonts.update({f: "Kirat Rai" for f in sorted(_KIRATRAI_FONTS)})
-    fonts.update({f: "Kirat Rai" for f in sorted(_KIRATRAI_HERALD_FONTS)})
-    fonts.update({f: "Kirat Rai" for f in sorted(_KIRATRAI_UNICODE_FONTS)})
-    fonts.update({f: "Sunuwar" for f in sorted(_SUNUWAR_FONTS)})
-    fonts.update({f: "Sunuwar" for f in sorted(_SUNUWAR_UNICODE_FONTS)})
-    fonts.update({f: "Tibetan" for f in sorted(_TIBETAN_MACHINE_FONTS)})
-    fonts.update({f: "Tibetan" for f in sorted(_TIBETAN_UNICODE_FONTS)})
-    fonts.update({f: "Newa" for f in sorted(_NEWA_UNICODE_FONTS)})
-    fonts.update({f: "Brahmi" for f in sorted(_BRAHMI_UNICODE_FONTS)})
-    fonts.update({f: "Lepcha" for f in sorted(_LEPCHA_FONTS)})
-    fonts.update({f: "Lepcha" for f in sorted(_JG_LEPCHA_FONTS)})
-    fonts.update({f: "Lepcha" for f in sorted(_LEPCHA_UNICODE_FONTS)})
-    fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_FONTS)})
-    fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_LATIC_FONTS)})
-    fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_UNICODE_FONTS)})
-    fonts.update({f: "Tirhuta" for f in sorted(_TIRHUTA_FONTS)})
-    fonts.update({f: "Tirhuta" for f in sorted(_TIRHUTA_UNICODE_FONTS)})
-    fonts.update({f: "Gurung Khema" for f in sorted(_GURUNG_KHEMA_UNICODE_FONTS)})
-    return fonts
+_GURUNG_KHEMA_UNICODE_FONTS = frozenset(
+    {
+        "gurung-khema-unicode",
+        "noto sans gurung khema",
+        "noto-sans-gurung-khema",
+        "notosansgurungkhema",
+        "notosansgurungkhema-regular",
+        "unicode-gurung-khema",
+    }
+)
 
 
 def _normalize_font_key(font: str) -> str:
@@ -343,6 +336,89 @@ def _normalize_font_key(font: str) -> str:
         raise TypeError("font must be a string")
     key = font.strip().lower().replace("_", "-")
     return re.sub(r"^[a-z]{6}\+", "", key)
+
+
+_DEVANAGARI_LEGACY_FONTS = frozenset(supported_devanagari_fonts())
+
+# Route inventories are immutable and globally disjoint. The Boolean marks
+# already-Unicode routes, which all share the generic span validator.
+_FONT_ROUTE_GROUPS: Mapping[str, tuple[str, frozenset[str], bool]] = MappingProxyType(
+    {
+        "devanagari-legacy": ("Devanagari", _DEVANAGARI_LEGACY_FONTS, False),
+        "devanagari-unicode": ("Devanagari", _DEVANAGARI_UNICODE_FONTS, True),
+        "limbu-legacy": ("Limbu", _LIMBU_FONTS, False),
+        "limbu-unicode": ("Limbu", _LIMBU_UNICODE_FONTS, True),
+        "kirat-rai-canonical": ("Kirat Rai", _KIRATRAI_FONTS, False),
+        "kirat-rai-herald": ("Kirat Rai", _KIRATRAI_HERALD_FONTS, False),
+        "kirat-rai-unicode": ("Kirat Rai", _KIRATRAI_UNICODE_FONTS, True),
+        "sunuwar-legacy": ("Sunuwar", _SUNUWAR_FONTS, False),
+        "sunuwar-unicode": ("Sunuwar", _SUNUWAR_UNICODE_FONTS, True),
+        "tibetan-machine": ("Tibetan", _TIBETAN_MACHINE_FONTS, False),
+        "tibetan-unicode": ("Tibetan", _TIBETAN_UNICODE_FONTS, True),
+        "newa-unicode": ("Newa", _NEWA_UNICODE_FONTS, True),
+        "brahmi-unicode": ("Brahmi", _BRAHMI_UNICODE_FONTS, True),
+        "lepcha-herald": ("Lepcha", _LEPCHA_FONTS, False),
+        "jg-lepcha": ("Lepcha", _JG_LEPCHA_FONTS, False),
+        "lepcha-unicode": ("Lepcha", _LEPCHA_UNICODE_FONTS, True),
+        "ol-chiki-optimum": ("Ol Chiki", _OLCHIKI_FONTS, False),
+        "ol-chiki-latic": ("Ol Chiki", _OLCHIKI_LATIC_FONTS, False),
+        "ol-chiki-unicode": ("Ol Chiki", _OLCHIKI_UNICODE_FONTS, True),
+        "tirhuta-legacy": ("Tirhuta", _TIRHUTA_FONTS, False),
+        "tirhuta-unicode": ("Tirhuta", _TIRHUTA_UNICODE_FONTS, True),
+        "gurung-khema-unicode": (
+            "Gurung Khema",
+            _GURUNG_KHEMA_UNICODE_FONTS,
+            True,
+        ),
+    }
+)
+
+
+def _build_font_alias_contract(
+    route_groups: Mapping[str, tuple[str, frozenset[str], bool]],
+) -> tuple[Mapping[str, str], Mapping[str, str], Mapping[str, str]]:
+    supported: dict[str, str] = {}
+    unicode_routes: dict[str, str] = {}
+    owners: dict[str, str] = {}
+    supported_scripts = frozenset(supported_unicode_scripts())
+
+    for route_name, (script, aliases, is_unicode) in route_groups.items():
+        if not isinstance(aliases, frozenset):
+            raise ValueError(f"font route {route_name!r} aliases must be a frozenset")
+        if type(is_unicode) is not bool:
+            raise ValueError(f"font route {route_name!r} Unicode marker must be Boolean")
+        if script not in supported_scripts:
+            raise ValueError(f"font route {route_name!r} has unsupported script {script!r}")
+        if not aliases:
+            raise ValueError(f"font route {route_name!r} has no aliases")
+        for alias in sorted(aliases):
+            if _normalize_font_key(alias) != alias:
+                raise ValueError(f"font route {route_name!r} has unnormalized alias {alias!r}")
+            previous_route = owners.get(alias)
+            if previous_route is not None:
+                raise ValueError(
+                    f"font alias {alias!r} overlaps routes {previous_route!r} and {route_name!r}"
+                )
+            owners[alias] = route_name
+            supported[alias] = script
+            if is_unicode:
+                unicode_routes[alias] = script
+
+    return (
+        MappingProxyType(supported),
+        MappingProxyType(unicode_routes),
+        MappingProxyType(owners),
+    )
+
+
+_SUPPORTED_FONT_SCRIPTS, _UNICODE_FONT_SCRIPTS, _FONT_ALIAS_ROUTES = _build_font_alias_contract(
+    _FONT_ROUTE_GROUPS
+)
+
+
+def supported_fonts() -> dict[str, str]:
+    """Return a mutable copy of the supported normalized font-key catalog."""
+    return dict(_SUPPORTED_FONT_SCRIPTS)
 
 
 def convert(text: str, font: str, *, strict: bool = False) -> str:
@@ -361,32 +437,19 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
     APIs rather than this dispatcher.
     """
     key = _normalize_font_key(font)
-    if key in _DEVANAGARI_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Devanagari", strict=strict).unicode_text
-    if key in _LIMBU_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Limbu", strict=strict).unicode_text
+    unicode_script = _UNICODE_FONT_SCRIPTS.get(key)
+    if unicode_script is not None:
+        return validate_unicode_span(text, script=unicode_script, strict=strict).unicode_text
     if key in _LIMBU_FONTS:
         return convert_limbu(text, strict=strict)
-    if key in _KIRATRAI_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Kirat Rai", strict=strict).unicode_text
     if key in _KIRATRAI_FONTS:
         return convert_kiratrai(text, strict=strict).unicode_text
     if key in _KIRATRAI_HERALD_FONTS:
         return convert_kiratrai_herald(text, strict=strict).unicode_text
     if key in _SUNUWAR_FONTS:
         return convert_sunuwar(text, strict=strict).unicode_text
-    if key in _SUNUWAR_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Sunuwar", strict=strict).unicode_text
     if key in _TIBETAN_MACHINE_FONTS:
         return convert_tibetanmachine(text, strict=strict).unicode_text
-    if key in _TIBETAN_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Tibetan", strict=strict).unicode_text
-    if key in _NEWA_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Newa", strict=strict).unicode_text
-    if key in _BRAHMI_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Brahmi", strict=strict).unicode_text
-    if key in _LEPCHA_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Lepcha", strict=strict).unicode_text
     if key in _LEPCHA_FONTS:
         return convert_lepcha(text, strict=strict).unicode_text
     if key in _JG_LEPCHA_FONTS:
@@ -395,15 +458,9 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
         return convert_olchiki(text, strict=strict).unicode_text
     if key in _OLCHIKI_LATIC_FONTS:
         return convert_olchiki_latic(text, strict=strict).unicode_text
-    if key in _OLCHIKI_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Ol Chiki", strict=strict).unicode_text
-    if key in _TIRHUTA_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Tirhuta", strict=strict).unicode_text
     if key in _TIRHUTA_FONTS:
         return convert_tirhuta(text, strict=strict).unicode_text
-    if key in _GURUNG_KHEMA_UNICODE_FONTS:
-        return validate_unicode_span(text, script="Gurung Khema", strict=strict).unicode_text
-    if key in supported_devanagari_fonts():
+    if key in _DEVANAGARI_LEGACY_FONTS:
         return convert_devanagari(text, font=key, strict=strict).unicode_text
     raise ValueError(
         f"unsupported font key {key!r}; use supported_fonts() or --list-fonts to list accepted keys"
