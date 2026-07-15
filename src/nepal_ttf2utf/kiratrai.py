@@ -24,9 +24,10 @@ is a blank spacing glyph and is normalized to an ordinary space.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Set
 from dataclasses import dataclass
 from importlib import resources
+from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
@@ -34,13 +35,32 @@ from ._controls import diagnostic_c0_codepoints
 from .unicode_span import _is_assigned_script_codepoint, _normalize_nfc
 
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
+_MAX_MAP_FILE_BYTES = 1_000_000
+_MAX_BYTE_RULES = 512
+_MAX_BYTE_CLASSES = 128
+_MAX_UNICODE_CLASSES = 128
+_MAX_BYTE_CLASS_MEMBERS = 256
+_MAX_UNICODE_CLASS_MEMBERS = 1024
+_MAX_SOURCE_LENGTH = 16
+_MAX_TARGET_LENGTH = 32
+
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
 _UNI_TOKEN_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
+_CLASS_NAME_RE = re.compile(r"[A-Za-z]\w*")
 _BYTECLASS_RE = re.compile(r"^ByteClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _UNICLASS_RE = re.compile(r"^UniClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _CLASS_RULE_RE = re.compile(r"^\[([^\]]+)\]\s*<?>\s*\[([^\]]+)\]\s*$")
 _PASS_RE = re.compile(r"^Pass\(\s*(Byte_Unicode|Unicode)\s*\)$", re.IGNORECASE)
 _PASS_PREFIX_RE = re.compile(r"^Pass\b", re.IGNORECASE)
+_HEADER_STRING_RE = re.compile(
+    r"^(EncodingName|DescriptiveName|Version|Contact|RegistrationAuthority|"
+    r'RegistrationName|Copyright)\s+"[^"]*"$'
+)
+_HEADER_PREFIX_RE = re.compile(
+    r"^(?:EncodingName|DescriptiveName|Version|Contact|RegistrationAuthority|"
+    r"RegistrationName|Copyright|RHSFlags)\b"
+)
+_RHS_FLAGS_RE = re.compile(r"^RHSFlags\s+\(ExpectsNFD\)$")
 _EXPLICIT_RULE_RE = re.compile(
     r"^(?P<source>0x[0-9A-Fa-f]{2}(?:\s+0x[0-9A-Fa-f]{2})*)\s*"
     r"(?:<>|>)\s*"
@@ -49,8 +69,9 @@ _EXPLICIT_RULE_RE = re.compile(
 
 _KIRATRAI_LO, _KIRATRAI_HI = 0x16D40, 0x16D7F
 
-# Bytes absent from SIL's canonical-new map. Kept as a public compatibility constant;
-# in Herald PDFs these ASCII values belong to the separate permuted layout below.
+# Historical seven-value subset absent from SIL's canonical-new map. Kept as a
+# public compatibility constant; it is not the complete absent-byte inventory.
+# In Herald PDFs these values belong to the separate permuted layout below.
 KIRATRAI_UNMAPPED_BYTES: frozenset[str] = frozenset("fRxFIL\\")
 
 # Sikkim Herald extracted ASCII -> canonical ``kiratraifontnew`` byte. The
@@ -123,6 +144,26 @@ def _validate_unicode_scalar(codepoint: int) -> int:
     return codepoint
 
 
+def _validate_byte(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 0xFF):
+        raise ValueError(f"invalid Kirat Rai source byte: {value!r}")
+    return value
+
+
+def _bounded_tuple(
+    values: object, limit: int, label: str, *, reject_unordered: bool = False
+) -> tuple[object, ...]:
+    if isinstance(values, (str, bytes, Mapping)) or (reject_unordered and isinstance(values, Set)):
+        raise ValueError(f"invalid Kirat Rai {label}")
+    try:
+        result = tuple(islice(iter(values), limit + 1))  # type: ignore[arg-type]
+    except TypeError as error:
+        raise ValueError(f"invalid Kirat Rai {label}") from error
+    if len(result) > limit:
+        raise ValueError(f"Kirat Rai {label} exceeds {limit} entries")
+    return result
+
+
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
     """Expand a TECkit byte-class body into ordered byte values (``0xNN`` or ``0xNN .. 0xMM``)."""
     values: list[int] = []
@@ -143,16 +184,22 @@ def _expand_byte_tokens(body: str) -> tuple[int, ...]:
                 raise ValueError(
                     f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}"
                 )
+            if len(values) + end - start + 1 > _MAX_BYTE_CLASS_MEMBERS:
+                raise ValueError(f"Kirat Rai byte class exceeds {_MAX_BYTE_CLASS_MEMBERS} members")
             values.extend(range(start, end + 1))
             index += 3
             continue
         match = _BYTE_TOKEN_RE.fullmatch(token)
         if match is None:
             raise ValueError(f"unparseable byte token in Kirat Rai map: {token!r}")
+        if len(values) == _MAX_BYTE_CLASS_MEMBERS:
+            raise ValueError(f"Kirat Rai byte class exceeds {_MAX_BYTE_CLASS_MEMBERS} members")
         values.append(int(match.group(1), 16))
         index += 1
     if not values:
         raise ValueError("empty byte class in Kirat Rai map")
+    if len(values) != len(set(values)):
+        raise ValueError("duplicate member in Kirat Rai byte class")
     return tuple(values)
 
 
@@ -180,12 +227,20 @@ def _expand_uni_tokens(body: str) -> tuple[int, ...]:
                 raise ValueError(
                     f"invalid Unicode scalar range in Kirat Rai map: {token}..{tokens[index + 2]}"
                 )
+            if len(values) + end - start + 1 > _MAX_UNICODE_CLASS_MEMBERS:
+                raise ValueError(
+                    f"Kirat Rai Unicode class exceeds {_MAX_UNICODE_CLASS_MEMBERS} members"
+                )
             values.extend(range(start, end + 1))
             index += 3
             continue
         match = _UNI_TOKEN_RE.fullmatch(token)
         if match is None:
             raise ValueError(f"unparseable unicode token in Kirat Rai map: {token!r}")
+        if len(values) == _MAX_UNICODE_CLASS_MEMBERS:
+            raise ValueError(
+                f"Kirat Rai Unicode class exceeds {_MAX_UNICODE_CLASS_MEMBERS} members"
+            )
         values.append(_validate_unicode_scalar(int(match.group(1), 16)))
         index += 1
     if not values:
@@ -197,12 +252,30 @@ def _parse_explicit_rule(line: str) -> tuple[tuple[int, ...], tuple[int, ...]]:
     match = _EXPLICIT_RULE_RE.fullmatch(line)
     if match is None:
         raise ValueError(f"invalid explicit Kirat Rai rule: {line!r}")
-    source = tuple(int(value, 16) for value in _BYTE_TOKEN_RE.findall(match.group("source")))
+    source = tuple(
+        _validate_byte(value)
+        for value in _bounded_tuple(
+            (int(token.group(1), 16) for token in _BYTE_TOKEN_RE.finditer(match.group("source"))),
+            _MAX_SOURCE_LENGTH,
+            "source rule",
+        )
+    )
     target = tuple(
-        _validate_unicode_scalar(int(value, 16))
-        for value in _UNI_TOKEN_RE.findall(match.group("target"))
+        _validate_unicode_scalar(value)
+        for value in _bounded_tuple(
+            (int(token.group(1), 16) for token in _UNI_TOKEN_RE.finditer(match.group("target"))),
+            _MAX_TARGET_LENGTH,
+            "target rule",
+        )
     )
     return source, target
+
+
+@dataclass(frozen=True)
+class _KiratRaiContract:
+    rules: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
+    precedence: str
+    source_domain: str
 
 
 @dataclass(frozen=True)
@@ -223,39 +296,91 @@ class KiratRaiConverter:
     """
 
     def __init__(self, rules: Iterable[tuple[Iterable[int], Iterable[int]]]) -> None:
-        normalized_rules = [(tuple(source), tuple(target)) for source, target in rules]
-        if not normalized_rules:
+        raw_rules = _bounded_tuple(
+            rules, _MAX_BYTE_RULES, "byte-rule sequence", reject_unordered=True
+        )
+        if not raw_rules:
             raise ValueError("KiratRaiConverter requires at least one mapping rule")
+        normalized_rules: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
         seen: set[tuple[int, ...]] = set()
-        for source, target in normalized_rules:
-            if not source or any(
-                isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 0xFF)
-                for value in source
-            ):
-                raise ValueError(f"invalid Kirat Rai source rule: {source!r}")
+        for raw_rule in raw_rules:
+            if isinstance(raw_rule, (str, bytes, Mapping, Set)):
+                raise ValueError(f"invalid Kirat Rai byte rule: {raw_rule!r}")
+            raw_parts = _bounded_tuple(raw_rule, 2, "byte rule", reject_unordered=True)
+            if len(raw_parts) != 2:
+                raise ValueError(f"invalid Kirat Rai byte rule: {raw_rule!r}")
+            raw_source, raw_target = raw_parts
+            source = tuple(
+                _validate_byte(value)
+                for value in _bounded_tuple(
+                    raw_source,
+                    _MAX_SOURCE_LENGTH,
+                    "source rule",
+                    reject_unordered=True,
+                )
+            )
+            target = tuple(
+                _validate_unicode_scalar(value)
+                for value in _bounded_tuple(
+                    raw_target,
+                    _MAX_TARGET_LENGTH,
+                    "target rule",
+                    reject_unordered=True,
+                )
+            )
+            if not source:
+                raise ValueError("empty Kirat Rai source rule")
             if not target:
                 raise ValueError(f"empty Kirat Rai target rule for source: {source!r}")
-            for codepoint in target:
-                _validate_unicode_scalar(codepoint)
+            protected_source = next((value for value in source if value <= 0x20), None)
+            if protected_source is not None and (
+                source != (protected_source,) or target != (protected_source,)
+            ):
+                raise ValueError("Kirat Rai C0 and SPACE sources must be singleton identity rules")
+            protected_target = next((value for value in target if value <= 0x20), None)
+            if protected_target is not None and (
+                source != (protected_target,) or target != (protected_target,)
+            ):
+                raise ValueError("Kirat Rai C0 and SPACE targets must be singleton identity rules")
             if source in seen:
                 label = " ".join(f"0x{value:02X}" for value in source)
                 raise ValueError(f"duplicate Kirat Rai source rule: {label}")
             seen.add(source)
-        self._rules = tuple(sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True))
+            normalized_rules.append((source, target))
+        self._contract = _KiratRaiContract(
+            rules=tuple(sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True)),
+            precedence="longest-source-first-stable",
+            source_domain="byte-scalars",
+        )
+
+    @property
+    def _rules(self) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
+        return self._contract.rules
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "KiratRaiConverter":
         map_path = Path(path)
         if not map_path.is_file():
             raise FileNotFoundError(f"Kirat Rai legacy map does not exist: {map_path}")
+        with map_path.open("rb") as stream:
+            map_bytes = stream.read(_MAX_MAP_FILE_BYTES + 1)
+        if len(map_bytes) > _MAX_MAP_FILE_BYTES:
+            raise ValueError(f"Kirat Rai map exceeds {_MAX_MAP_FILE_BYTES} bytes")
+        try:
+            map_text = map_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError as error:
+            raise ValueError(f"invalid UTF-8 in Kirat Rai map {map_path}") from error
+
         byte_classes: dict[str, tuple[int, ...]] = {}
         uni_classes: dict[str, tuple[int, ...]] = {}
         rules: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
-        in_byte_pass = False
+        current_pass = ""
+        seen_passes: set[str] = set()
+        seen_headers: set[str] = set()
         # First parse class declarations; collect rule lines for a second pass so class
         # rules can reference classes regardless of declaration order.
         rule_lines: list[str] = []
-        for raw_line in map_path.read_text(encoding="utf-8-sig").splitlines():
+        for raw_line in map_text.splitlines():
             line = raw_line.split(";", 1)[0].strip()
             if not line:
                 continue
@@ -263,37 +388,85 @@ class KiratRaiConverter:
                 pass_match = _PASS_RE.fullmatch(line)
                 if pass_match is None:
                     raise ValueError(f"invalid Kirat Rai pass declaration: {line!r}")
-                in_byte_pass = pass_match.group(1).casefold() == "byte_unicode"
+                pass_name = pass_match.group(1).casefold()
+                if pass_name in seen_passes:
+                    raise ValueError(f"duplicate Kirat Rai pass declaration: {line!r}")
+                if pass_name == "byte_unicode" and "unicode" in seen_passes:
+                    raise ValueError("Kirat Rai Byte_Unicode pass must precede Unicode pass")
+                seen_passes.add(pass_name)
+                current_pass = pass_name
                 continue
-            if not in_byte_pass:
-                continue
-            byte_match = _BYTECLASS_RE.match(line)
+
+            if not current_pass:
+                header_match = _HEADER_STRING_RE.fullmatch(line)
+                if header_match is not None:
+                    header_name = header_match.group(1)
+                    if header_name in seen_headers:
+                        raise ValueError(f"duplicate Kirat Rai header: {header_name}")
+                    seen_headers.add(header_name)
+                    continue
+                if _RHS_FLAGS_RE.fullmatch(line):
+                    if "RHSFlags" in seen_headers:
+                        raise ValueError("duplicate Kirat Rai header: RHSFlags")
+                    seen_headers.add("RHSFlags")
+                    continue
+                if _HEADER_PREFIX_RE.match(line):
+                    raise ValueError(f"invalid Kirat Rai header declaration: {line!r}")
+                raise ValueError(f"unsupported Kirat Rai pre-pass syntax: {line!r}")
+
+            if current_pass == "unicode":
+                raise ValueError(f"unsupported Kirat Rai Unicode-pass syntax: {line!r}")
+
+            if current_pass != "byte_unicode":
+                raise ValueError(f"unsupported Kirat Rai active pass: {current_pass!r}")
+
+            byte_match = _BYTECLASS_RE.fullmatch(line)
             if byte_match:
                 name = byte_match.group(1).strip()
                 if not name:
                     raise ValueError("empty Kirat Rai byte class name")
+                if _CLASS_NAME_RE.fullmatch(name) is None:
+                    raise ValueError(f"invalid Kirat Rai byte class name: {name!r}")
                 if name in byte_classes:
                     raise ValueError(f"duplicate Kirat Rai byte class: {name!r}")
+                if len(byte_classes) == _MAX_BYTE_CLASSES:
+                    raise ValueError(f"Kirat Rai byte classes exceed {_MAX_BYTE_CLASSES} entries")
                 byte_classes[name] = _expand_byte_tokens(byte_match.group(2))
                 continue
-            uni_match = _UNICLASS_RE.match(line)
+            uni_match = _UNICLASS_RE.fullmatch(line)
             if uni_match:
                 name = uni_match.group(1).strip()
                 if not name:
                     raise ValueError("empty Kirat Rai Unicode class name")
+                if _CLASS_NAME_RE.fullmatch(name) is None:
+                    raise ValueError(f"invalid Kirat Rai Unicode class name: {name!r}")
                 if name in uni_classes:
                     raise ValueError(f"duplicate Kirat Rai Unicode class: {name!r}")
+                if len(uni_classes) == _MAX_UNICODE_CLASSES:
+                    raise ValueError(
+                        f"Kirat Rai Unicode classes exceed {_MAX_UNICODE_CLASSES} entries"
+                    )
                 uni_classes[name] = _expand_uni_tokens(uni_match.group(2))
                 continue
+            if len(rule_lines) == _MAX_BYTE_RULES:
+                raise ValueError(f"Kirat Rai byte-rule sequence exceeds {_MAX_BYTE_RULES} entries")
             rule_lines.append(line)
 
+        if "byte_unicode" not in seen_passes:
+            raise ValueError("Kirat Rai map is missing Pass(Byte_Unicode)")
+
         for line in rule_lines:
-            class_rule = _CLASS_RULE_RE.match(line)
+            class_rule = _CLASS_RULE_RE.fullmatch(line)
             if class_rule:
                 left_name = class_rule.group(1).strip()
                 right_name = class_rule.group(2).strip()
                 if not left_name or not right_name:
                     raise ValueError(f"empty Kirat Rai class reference: {line!r}")
+                if (
+                    _CLASS_NAME_RE.fullmatch(left_name) is None
+                    or _CLASS_NAME_RE.fullmatch(right_name) is None
+                ):
+                    raise ValueError(f"invalid Kirat Rai class reference: {line!r}")
                 left = byte_classes.get(left_name)
                 right = uni_classes.get(right_name)
                 if left is None:
@@ -309,9 +482,15 @@ class KiratRaiConverter:
                         f"Kirat Rai class rule length mismatch for [{left_name}]>[{right_name}]: "
                         f"{len(left)} bytes vs {len(right)} codepoints"
                     )
+                if len(rules) + len(left) > _MAX_BYTE_RULES:
+                    raise ValueError(
+                        f"Kirat Rai byte-rule sequence exceeds {_MAX_BYTE_RULES} entries"
+                    )
                 for byte_value, codepoint in zip(left, right):
                     rules.append(((byte_value,), (codepoint,)))
                 continue
+            if len(rules) == _MAX_BYTE_RULES:
+                raise ValueError(f"Kirat Rai byte-rule sequence exceeds {_MAX_BYTE_RULES} entries")
             rules.append(_parse_explicit_rule(line))
         return cls(rules)
 

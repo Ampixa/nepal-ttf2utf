@@ -143,16 +143,24 @@ _LIMBU_UNICODE_FONTS = frozenset(
 if _LIMBU_FONTS & _LIMBU_UNICODE_FONTS:
     raise ValueError("Limbu legacy and Unicode font aliases overlap")
 # Canonical 2021 ``kirat rai font new`` encoding published with SIL's map.
-_KIRATRAI_FONTS = {"kiratrai", "kiratrai-new", "kiratraifontnew", "akrs", "akrs-new"}
+_KIRATRAI_FONTS = frozenset({"kiratrai", "kiratrai-new", "kiratraifontnew", "akrs", "akrs-new"})
 # Older, globally permuted layout extracted from Sikkim Herald PDF subsets.
-_KIRATRAI_HERALD_FONTS = {"kiratrai-herald", "kiratraifont", "sikkimherald-kiratrai"}
-_KIRATRAI_UNICODE_FONTS = {
-    "kanchenjunga",
-    "kanchenjunga-bold",
-    "kanchenjunga-regular",
-    "kirat-rai-unicode",
-    "unicode-kirat-rai",
-}
+_KIRATRAI_HERALD_FONTS = frozenset({"kiratrai-herald", "kiratraifont", "sikkimherald-kiratrai"})
+_KIRATRAI_UNICODE_FONTS = frozenset(
+    {
+        "kanchenjunga",
+        "kanchenjunga-bold",
+        "kanchenjunga-regular",
+        "kirat-rai-unicode",
+        "unicode-kirat-rai",
+    }
+)
+if (
+    _KIRATRAI_FONTS & _KIRATRAI_HERALD_FONTS
+    or _KIRATRAI_FONTS & _KIRATRAI_UNICODE_FONTS
+    or _KIRATRAI_HERALD_FONTS & _KIRATRAI_UNICODE_FONTS
+):
+    raise ValueError("Kirat Rai canonical, Herald, and Unicode font aliases overlap")
 # Sunuwar / Jenticha (Koĩts) legacy display font (koits / kirat1).
 _SUNUWAR_FONTS = {"sunuwar", "jenticha", "koits", "kirat1"}
 _SUNUWAR_UNICODE_FONTS = {

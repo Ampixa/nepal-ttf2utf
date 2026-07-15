@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Bound and freeze the canonical SIL Kirat Rai forward-map parser and runtime
+  contract, make its longest-source-first precedence explicit, exhaustively
+  classify all 256 byte values, and pin the ordered byte-domain aggregate.
+  The vendored map, 115-rule functional digest, legacy output, and byte
+  assignments are unchanged.
 - Make the Sikkim Herald Lepcha reorder contract immutable and
   provenance-safe. Assigned Lepcha punctuation and digits now end legacy
   clusters, preventing dependent signs from moving across digit boundaries;

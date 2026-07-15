@@ -8,11 +8,13 @@ import hashlib
 import json
 import unicodedata
 from collections import Counter
+from dataclasses import FrozenInstanceError
 from importlib import resources
-from itertools import product
+from itertools import product, repeat
 
 import pytest
 
+import nepal_ttf2utf as package_module
 import nepal_ttf2utf.kiratrai as kiratrai_module
 from nepal_ttf2utf import convert, convert_kiratrai, convert_kiratrai_herald
 from nepal_ttf2utf._controls import DIAGNOSTIC_C0
@@ -71,6 +73,8 @@ def test_kiratrai_map_matches_the_pinned_sil_source_and_parser_inventory():
         3: 1,
     }
     assert isinstance(converter._rules, tuple)
+    assert converter._contract.precedence == "longest-source-first-stable"
+    assert converter._contract.source_domain == "byte-scalars"
     functional_payload = json.dumps(
         [[list(source), list(target)] for source, target in sorted(converter._rules)],
         separators=(",", ":"),
@@ -79,6 +83,10 @@ def test_kiratrai_map_matches_the_pinned_sil_source_and_parser_inventory():
     assert hashlib.sha256(functional_payload).hexdigest() == (
         "d83310902ddacc1a04ed11c10d8b8f5ebf3af374745ca2f3c23fe9f1c49c0a8a"
     )
+    with pytest.raises(FrozenInstanceError):
+        converter._contract.precedence = "first-declared"
+    with pytest.raises(AttributeError):
+        converter._rules = ()
 
 
 def test_kiratrai_herald_routing_and_effective_output_contracts_are_pinned():
@@ -260,6 +268,71 @@ def test_every_kiratrai_source_rule_has_exact_output_and_counts():
             "UniClass [u] = (U+16D43)\n[b] > [u]\n0x41 > U+16D44\n",
             "duplicate Kirat Rai source rule",
         ),
+        (
+            "Pass(Byte_Unicode)\n0x41 > U+16D43\nPass(Byte_Unicode)\n",
+            "duplicate Kirat Rai pass declaration",
+        ),
+        (
+            "Pass(Unicode)\nPass(Byte_Unicode)\n0x41 > U+16D43\n",
+            "Byte_Unicode pass must precede Unicode pass",
+        ),
+        (
+            "EncodingName broken\nPass(Byte_Unicode)\n0x41 > U+16D43\n",
+            "invalid Kirat Rai header declaration",
+        ),
+        (
+            'EncodingName "one"\nEncodingName "two"\nPass(Byte_Unicode)\n0x41 > U+16D43\n',
+            "duplicate Kirat Rai header",
+        ),
+        (
+            "RHSFlags (ExpectsNFC)\nPass(Byte_Unicode)\n0x41 > U+16D43\n",
+            "invalid Kirat Rai header declaration",
+        ),
+        (
+            "unsupported pre-pass syntax\nPass(Byte_Unicode)\n0x41 > U+16D43\n",
+            "unsupported Kirat Rai pre-pass syntax",
+        ),
+        (
+            "Pass(Byte_Unicode)\n0x41 > U+16D43\nPass(Unicode)\n0x42 > U+16D44\n",
+            "unsupported Kirat Rai Unicode-pass syntax",
+        ),
+        (
+            "Pass(Byte_Unicode)\nByteClass [b] = (0x42 .. 0x41)\n",
+            "invalid byte range",
+        ),
+        (
+            "Pass(Byte_Unicode)\nUniClass [u] = (U+16D44 .. U+16D43)\n",
+            "invalid unicode range",
+        ),
+        (
+            "Pass(Byte_Unicode)\nByteClass [b] = (0x41 0x41)\n",
+            "duplicate member in Kirat Rai byte class",
+        ),
+        (
+            "Pass(Byte_Unicode)\nByteClass [b] = (0x41)\n[b] > [missing]\n",
+            "unknown unicode class",
+        ),
+        (
+            "Pass(Byte_Unicode)\nUniClass [u] = (U+16D43)\n[missing] > [u]\n",
+            "unknown byte class",
+        ),
+        (
+            "Pass(Byte_Unicode)\nByteClass [b] = (0x41 0x42)\n"
+            "UniClass [u] = (U+16D43)\n[b] > [u]\n",
+            "class rule length mismatch",
+        ),
+        (
+            "Pass(Byte_Unicode)\nByteClass [bad-name] = (0x41)\n",
+            "invalid Kirat Rai byte class name",
+        ),
+        (
+            "Pass(Byte_Unicode)\n0x09 0x41 > U+16D43\n",
+            "C0 and SPACE sources must be singleton identity rules",
+        ),
+        (
+            "Pass(Byte_Unicode)\n0x41 > U+0009\n",
+            "C0 and SPACE targets must be singleton identity rules",
+        ),
     ],
 )
 def test_kiratrai_parser_rejects_malformed_or_ambiguous_maps(tmp_path, map_text, message):
@@ -272,23 +345,111 @@ def test_kiratrai_parser_rejects_malformed_or_ambiguous_maps(tmp_path, map_text,
 def test_kiratrai_parser_accepts_an_exact_custom_map(tmp_path):
     map_path = tmp_path / "valid.map"
     map_path.write_text(
-        "Pass(Byte_Unicode)\nByteClass [b] = (0x41)\n"
-        "UniClass [u] = (U+16D43)\n[b] > [u]\n0x42 > U+16D44\n"
+        'EncodingName "custom test"\nRHSFlags (ExpectsNFD)\n'
+        "Pass(Byte_Unicode)\nByteClass [b] = (0x41 0x42)\n"
+        "UniClass [u] = (U+16D43 U+16D43)\n[b] > [u]\n0x43 > U+16D44\n"
         "Pass(Unicode)\n",
         encoding="utf-8",
     )
     converter = KiratRaiConverter.from_map_file(map_path)
-    assert converter.convert("AB").unicode_text == "\U00016d43\U00016d44"
+    assert converter.convert("ABC").unicode_text == "\U00016d43\U00016d43\U00016d44"
+
+
+def test_kiratrai_parser_requires_the_forward_pass(tmp_path):
+    map_path = tmp_path / "missing-forward.map"
+    map_path.write_text('EncodingName "empty"\nPass(Unicode)\n', encoding="utf-8")
+    with pytest.raises(ValueError, match=r"missing Pass\(Byte_Unicode\)"):
+        KiratRaiConverter.from_map_file(map_path)
+
+
+def test_kiratrai_parser_contextualizes_invalid_utf8(tmp_path):
+    map_path = tmp_path / "invalid-utf8.map"
+    map_path.write_bytes(b"Pass(Byte_Unicode)\n\xff")
+    with pytest.raises(ValueError, match="invalid UTF-8 in Kirat Rai map"):
+        KiratRaiConverter.from_map_file(map_path)
+
+
+def test_kiratrai_parser_bounds_file_size(tmp_path):
+    map_path = tmp_path / "oversized.map"
+    map_path.write_bytes(b";" * (kiratrai_module._MAX_MAP_FILE_BYTES + 1))
+    with pytest.raises(ValueError, match="Kirat Rai map exceeds 1000000 bytes"):
+        KiratRaiConverter.from_map_file(map_path)
+
+
+@pytest.mark.parametrize(
+    ("map_text", "message"),
+    [
+        (
+            "Pass(Byte_Unicode)\nUniClass [u] = (U+0000 .. U+0400)\n",
+            "Unicode class exceeds 1024 members",
+        ),
+        (
+            "Pass(Byte_Unicode)\n"
+            + " ".join(["0x41"] * (kiratrai_module._MAX_SOURCE_LENGTH + 1))
+            + " > U+16D43\n",
+            "source rule exceeds 16 entries",
+        ),
+        (
+            "Pass(Byte_Unicode)\n0x41 > "
+            + " ".join(["U+16D43"] * (kiratrai_module._MAX_TARGET_LENGTH + 1))
+            + "\n",
+            "target rule exceeds 32 entries",
+        ),
+        (
+            "Pass(Byte_Unicode)\n"
+            + "\n".join(
+                f"ByteClass [b{index}] = (0x41)"
+                for index in range(kiratrai_module._MAX_BYTE_CLASSES + 1)
+            )
+            + "\n",
+            "byte classes exceed 128 entries",
+        ),
+        (
+            "Pass(Byte_Unicode)\n"
+            + "\n".join(
+                f"UniClass [u{index}] = (U+16D43)"
+                for index in range(kiratrai_module._MAX_UNICODE_CLASSES + 1)
+            )
+            + "\n",
+            "Unicode classes exceed 128 entries",
+        ),
+        (
+            "Pass(Byte_Unicode)\n"
+            + "\n".join("0x41 > U+16D43" for _index in range(kiratrai_module._MAX_BYTE_RULES + 1))
+            + "\n",
+            "byte-rule sequence exceeds 512 entries",
+        ),
+    ],
+)
+def test_kiratrai_parser_bounds_inventories(tmp_path, map_text, message):
+    map_path = tmp_path / "over-limit.map"
+    map_path.write_text(map_text, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        KiratRaiConverter.from_map_file(map_path)
 
 
 @pytest.mark.parametrize(
     "rules",
     [
+        [],
         [((True,), (0x16D43,))],
+        [((-1,), (0x16D43,))],
+        [((0x100,), (0x16D43,))],
+        [((0x41,), (-1,))],
+        [((0x41,), (0xD800,))],
         [((0x41,), (True,))],
         [((0x41,), ())],
         [((), (0x16D43,))],
         [((0x41,), (0x110000,))],
+        [((0x09, 0x41), (0x16D43,))],
+        [((0x09,), (0x16D43,))],
+        [((0x41,), (0x09,))],
+        [((0x41,),)],
+        ["invalid"],
+        {((0x41,), (0x16D43,))},
+        {"source": ((0x41,), (0x16D43,))},
+        [({0x41}, (0x16D43,))],
+        [((0x41,), {0x16D43})],
     ],
 )
 def test_kiratrai_constructor_rejects_invalid_rules(rules):
@@ -314,6 +475,32 @@ def test_kiratrai_constructor_consumes_one_shot_rules_once():
     assert converter.convert("A").unicode_text == "\U00016d43"
 
 
+@pytest.mark.parametrize(
+    ("rules", "message"),
+    [
+        (
+            repeat(((0x41,), (0x16D43,))),
+            "byte-rule sequence exceeds 512 entries",
+        ),
+        (
+            [repeat((0x41,))],
+            "byte rule exceeds 2 entries",
+        ),
+        (
+            [(repeat(0x41), (0x16D43,))],
+            "source rule exceeds 16 entries",
+        ),
+        (
+            [((0x41,), repeat(0x16D43))],
+            "target rule exceeds 32 entries",
+        ),
+    ],
+)
+def test_kiratrai_constructor_bounds_iterators(rules, message):
+    with pytest.raises(ValueError, match=message):
+        KiratRaiConverter(rules)
+
+
 def test_kiratrai_byte_classes_map_positionally():
     conv = KiratRaiConverter.default()
     # cons1 byte class -> U+16D43..; 'a' (0x61) is position 0 -> U+16D43 LETTER A.
@@ -331,6 +518,88 @@ def test_kiratrai_multibyte_ligature_rules_take_precedence():
     assert conv.convert("//").unicode_text == "\U00016d6f"
     # 'ee' (0x65 0x65) -> U+16D68 VOWEL SIGN AI.
     assert conv.convert("ee").unicode_text == "\U00016d68"
+
+
+def test_kiratrai_prefix_relations_and_precedence_are_exact():
+    converter = KiratRaiConverter.default()
+    sources = tuple(source for source, _target in converter._rules)
+    prefix_relations = {
+        (shorter, longer)
+        for shorter in sources
+        for longer in sources
+        if len(shorter) < len(longer) and longer[: len(shorter)] == shorter
+    }
+    assert prefix_relations == {
+        ((0x41,), (0x41, 0x65)),
+        ((0x41,), (0x41, 0x65, 0x65)),
+        ((0x41, 0x65), (0x41, 0x65, 0x65)),
+        ((0x65,), (0x65, 0x65)),
+        ((0x2F,), (0x2F, 0x2F)),
+        ((0x7C,), (0x7C, 0x7C)),
+    }
+    for shorter, longer in prefix_relations:
+        assert sources.index(longer) < sources.index(shorter)
+
+
+def test_every_byte_has_an_exact_canonical_kiratrai_classification():
+    converter = KiratRaiConverter.default()
+    singleton_targets = {
+        source[0]: target for source, target in converter._rules if len(source) == 1
+    }
+    categories: Counter[str] = Counter()
+
+    for codepoint in range(0x100):
+        source = chr(codepoint)
+        result = converter.convert(source)
+        if codepoint not in singleton_targets:
+            assert result.unicode_text == source
+            assert result.kiratrai_char_count == 0
+            assert result.replacement_count == 0
+            assert result.unmapped_codepoints == [f"U+{codepoint:04X}"]
+            categories["preserved-diagnosed"] += 1
+        else:
+            expected = unicodedata.normalize(
+                "NFC", "".join(chr(value) for value in singleton_targets[codepoint])
+            )
+            assert result.unicode_text == expected
+            assert result.replacement_count == 1
+            assert result.kiratrai_char_count == sum(
+                0x16D40 <= ord(char) <= 0x16D7F for char in expected
+            )
+            if source in DIAGNOSTIC_C0:
+                assert result.unmapped_codepoints == [f"U+{codepoint:04X}"]
+                categories["mapped-c0-diagnostic"] += 1
+            elif result.kiratrai_char_count:
+                assert result.unmapped_codepoints == []
+                categories["mapped-assigned-kiratrai"] += 1
+            else:
+                assert result.unmapped_codepoints == []
+                categories["mapped-clean-literal"] += 1
+
+        if result.unmapped_codepoints:
+            with pytest.raises(ValueError, match=f"U\\+{codepoint:04X}"):
+                convert_kiratrai(source, strict=True)
+        else:
+            assert convert_kiratrai(source, strict=True) == result
+
+    assert categories == {
+        "mapped-assigned-kiratrai": 55,
+        "mapped-clean-literal": 26,
+        "mapped-c0-diagnostic": 29,
+        "preserved-diagnosed": 146,
+    }
+
+
+def test_canonical_kiratrai_ordered_byte_domain_is_pinned():
+    result = KiratRaiConverter.default().convert("".join(chr(value) for value in range(0x100)))
+    assert len(result.unicode_text) == 256
+    assert len(result.unicode_text.encode("utf-8")) == 549
+    assert result.kiratrai_char_count == 55
+    assert result.replacement_count == 110
+    assert len(result.unmapped_codepoints) == 175
+    assert hashlib.sha256(result.unicode_text.encode("utf-8")).hexdigest() == (
+        "ecbc24441f70a67759fa7a46cf64d88f588b318e891bc9c009df9e87688550cd"
+    )
 
 
 def test_kiratrai_mapped_bytes_are_in_block_and_nfc():
@@ -579,17 +848,17 @@ def test_kiratrai_herald_public_contract_and_private_snapshots_are_immutable(mon
     monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_PREMAP", {"?": "k"})
     monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_PASSTHROUGH", frozenset("?"))
     monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_BLANKS", frozenset("?"))
-    canonical._rules = (((ord("?"),), (0x16D43,)),)
+    with pytest.raises(AttributeError):
+        canonical._rules = (((ord("?"),), (0x16D43,)),)
 
     assert converter.convert("a?Z0") == expected
     assert KiratRaiHeraldConverter.default().convert("a?Z0") == expected
     assert convert_kiratrai_herald("a?Z0") == expected
 
 
-def test_kiratrai_herald_constructor_snapshots_custom_canonical_rules():
+def test_kiratrai_herald_constructor_accepts_a_validated_custom_canonical_contract():
     canonical = KiratRaiConverter([((ord("k"),), (0x16D43,))])
     converter = KiratRaiHeraldConverter(canonical)
-    canonical._rules = (((ord("k"),), (0x16D44,)),)
 
     assert converter.convert("a").unicode_text == chr(0x16D43)
     with pytest.raises(ValueError, match="requires a KiratRaiConverter"):
@@ -628,3 +897,32 @@ def test_convert_dispatches_old_and_new_kiratrai_layouts_separately():
 @pytest.mark.parametrize("font", ["kiratrai-herald", "kiratraifont", "sikkimherald-kiratrai"])
 def test_every_herald_alias_uses_the_frozen_routing_contract(font):
     assert convert("fZ0", font=font, strict=True) == "".join((chr(0x16D48), " ", chr(0x16D70)))
+
+
+def test_kiratrai_alias_contracts_are_frozen_disjoint_and_exact():
+    assert package_module._KIRATRAI_FONTS == frozenset(
+        {"kiratrai", "kiratrai-new", "kiratraifontnew", "akrs", "akrs-new"}
+    )
+    assert package_module._KIRATRAI_HERALD_FONTS == frozenset(
+        {"kiratrai-herald", "kiratraifont", "sikkimherald-kiratrai"}
+    )
+    assert package_module._KIRATRAI_UNICODE_FONTS == frozenset(
+        {
+            "kanchenjunga",
+            "kanchenjunga-bold",
+            "kanchenjunga-regular",
+            "kirat-rai-unicode",
+            "unicode-kirat-rai",
+        }
+    )
+    alias_sets = (
+        package_module._KIRATRAI_FONTS,
+        package_module._KIRATRAI_HERALD_FONTS,
+        package_module._KIRATRAI_UNICODE_FONTS,
+    )
+    assert all(not alias_sets[left] & alias_sets[right] for left, right in ((0, 1), (0, 2), (1, 2)))
+    for aliases in alias_sets:
+        with pytest.raises(AttributeError):
+            aliases.add("collision")
+    for font in package_module._KIRATRAI_FONTS:
+        assert convert("Aee", font=font, strict=True) == chr(0x16D6A)

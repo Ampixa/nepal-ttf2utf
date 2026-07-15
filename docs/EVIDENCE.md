@@ -108,7 +108,7 @@ matched replacements, and 156 unique diagnostics. The UTF-8 output SHA-256 is
 This classifies the input inventory as 100 mapped-clean values, 29 mapped C0
 diagnostics, and 127 preserved diagnostics.
 
-## Sikkim Herald Kirat Rai
+## Canonical and Sikkim Herald Kirat Rai
 
 SIL's public
 [`kiratraifontnew.map`](https://github.com/silnrsi/wsresources/blob/2a39449d20420fe7259f9ce5231c347432840075/scripts/Krai/legacy/kiratraifontnew/mappings/kiratraifontnew.map)
@@ -121,12 +121,29 @@ single-byte rules, four double-byte rules, and one triple-byte rule with 115
 unique source sequences. Tests exercise every flattened rule. The native reader
 requires exact tokens and pass syntax, valid Unicode scalar targets, and unique,
 nonempty class names and source sequences in the supported forward
-`Byte_Unicode` subset; malformed or ambiguous rules in that subset fail closed.
+`Byte_Unicode` subset. Map bytes, class and rule inventories, class expansion,
+and direct-constructor iterables are bounded. Duplicate or misordered passes,
+unsupported active-pass syntax, malformed or ambiguous rules, and structural
+C0 or SPACE rewrites fail closed. The immutable runtime contract records
+longest-source-first precedence; the six prefix relations required by the SIL
+map remain valid.
 The functional-digest payload is an outer JSON array of
 `[source-byte-array, target-codepoint-array]` pairs, sorted lexicographically by
 source and target, serialized with separators `(",", ":")`, and encoded as
 ASCII. The resulting 1,592-byte payload has SHA-256
 `d83310902ddacc1a04ed11c10d8b8f5ebf3af374745ca2f3c23fe9f1c49c0a8a`.
+
+Tests classify all 256 canonical byte values. Fifty-five singleton sources map
+to assigned Kirat Rai characters, 26 map to clean literal or structural output,
+and 29 map to diagnosed C0 identity output. The other 146 values are preserved
+and diagnosed. Thus strict conversion accepts 81 singleton values and rejects
+175. Conversion of the ordered U+0000..U+00FF input is an aggregate
+compatibility pin: 256 output characters, 549 UTF-8 bytes, 55 Kirat Rai
+characters, 110 matched replacements, and 175 unique diagnostics. The UTF-8
+output SHA-256 is
+`ecbc24441f70a67759fa7a46cf64d88f588b318e891bc9c009df9e87688550cd`.
+These parser and coverage constraints do not modify the vendored SIL map or add
+legacy-byte assignments.
 
 The font embedded at xref 536 in Unicode proposal
 [`L2/22-043R`](https://www.unicode.org/L2/L2022/22043r-kirat-rai.pdf)

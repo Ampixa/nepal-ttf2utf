@@ -88,6 +88,16 @@ def main() -> int:
     assert mixed_limbu_triple.unicode_text == "\u1921\u193a\u192b"
     assert mixed_limbu_triple.replacement_count == 1
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
+    canonical_kirat_longest = convert_kiratrai("Aee", strict=True)
+    assert canonical_kirat_longest.unicode_text == "\U00016d6a"
+    assert canonical_kirat_longest.replacement_count == 1
+    assert nepal_ttf2utf.convert("Aee", font="akrs-new", strict=True) == "\U00016d6a"
+    try:
+        convert_kiratrai("f", strict=True)
+    except ValueError as error:
+        assert "U+0066" in str(error)
+    else:
+        raise AssertionError("strict canonical Kirat Rai conversion accepted an unmapped byte")
     assert convert_kiratrai_herald("fZ0", strict=True).unicode_text == "𖵈 𖵰"
     assert nepal_ttf2utf.convert("fZ0", font="kiratrai-herald", strict=True) == "𖵈 𖵰"
     gurung_ordered = validate_unicode_span(
