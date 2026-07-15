@@ -1,7 +1,7 @@
 {
   "_doc": "Byte->Unicode map for the Sikkim Herald live-text Lepcha body font (named layout group: TT21B1O00/TT106DO00/TTDA7O00/TT70AO00, outline-identical across the 2021-11-19 / 2022-03-24 / 2022-04-07 / 2022-06-01 editions). Byte->glyphname is identity Latin (PDF /Encoding); the glyph OUTLINE is Lepcha. Derived by glyph-shape identity (NCC/IoU vs Noto Sans Lepcha + Mingzat) anchored on the alphabetic consonant structure and positional statistics, then round-trip-validated against the printed crops. See outputs/lepcha-map-derivation/.",
-  "_confidence": "Consonants A..Z + lowercase conjuncts/SHA/WA + digits + post/pre vowels (c=O,d=I,f=OO,g=U,h=UU,i=E) and final signs are visually + round-trip confirmed (HIGH). Bytes NOT in this map are deliberately UNRESOLVED (do not guess): 0x5D ']' (544x, small superscript pre-base mark; isolated shape best-matches CONSONANT SIGN K (0.79) but its pre-base position is inconsistent with a final sign and forcing it to any vowel creates invalid double-vowel clusters -> identity unresolved); 0x25 '%' (224x, almost always after NUKTA 0x5C -> a NUKTA-companion glyph, identity unresolved); 0x2A '*', 0x2D '-' (likely literal punctuation), 0x28/0x29/0x2B/0x2F (rare). Lines containing any unmapped byte are excluded from faithful GT (clean gating). See outputs/lepcha-map-derivation/ for contact sheets + round-trip panels + the dotted-circle validity metric.",
-  "_unresolved_bytes": ["5D", "25", "2A", "2D", "28", "29", "2B", "2F"],
+  "_confidence": "Consonants A..Z + lowercase conjuncts/SHA/WA + digits + post/pre vowels and final signs are confirmed. Byte 0x5D is U+1C2D FINAL K stored before the following base in the legacy visual stream: it is the sole missing final-sign slot, its outline is the top match, and corpus clusters become canonical only with next-base reordering. Byte 0x25 is U+1C25 SUBJOINED RA: it fills the sole missing medial and is independently attested in native base+NUKTA+RA and base+RA+vowel sequences. Byte 0x2D is literal hyphen punctuation. Bytes 0x2A, 0x28, 0x29, 0x2B, and 0x2F remain unresolved and are not guessed.",
+  "_unresolved_bytes": ["2A", "28", "29", "2B", "2F"],
   "map": {
     "41": ["1C00"],
     "42": ["1C02"],
@@ -62,6 +62,8 @@
     "5C": ["1C37"],
     "61": ["1C36"],
     "26": ["1C24"],
+    "25": ["1C25"],
+    "5D": ["1C2D"],
 
     "30": ["1C40"],
     "31": ["1C41"],

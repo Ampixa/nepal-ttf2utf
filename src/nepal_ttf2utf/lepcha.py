@@ -22,11 +22,10 @@ reordered after the base for Unicode storage), post-base vowel signs, final cons
 signs, RAN/NUKTA, and digits. Output is NFC in canonical Lepcha storage order
 ``C (subjoined) (vowel) (final) (ran)``.
 
-Coverage is partial: a small set of bytes is deliberately UNRESOLVED — notably ``]``
-(0x5D, a pre-base superscript mark whose identity stays ambiguous) and ``%`` (0x25, a
-NUKTA-companion glyph) — plus a few rare punctuation bytes. Unresolved bytes pass
-through and are surfaced in ``unmapped_bytes`` (or raised in ``strict`` mode), never
-guessed.
+The legacy ``]`` glyph is final K stored visually before the following base; it is
+reordered with the pre-base vowels. ``%`` is subjoined RA, including the documented
+NUKTA+RA retroflex sequences. A small set of rare bytes remains deliberately
+unresolved and is surfaced in ``unmapped_bytes`` (or raised in ``strict`` mode).
 """
 
 from __future__ import annotations
@@ -44,6 +43,8 @@ _LEPCHA_CODEPOINT_RE = re.compile(r"[ᰀ-ᱏ]")
 # Pre-base dependent vowel signs (keyed before the base in the legacy visual stream;
 # Unicode stores them after the base). I / O / OO.
 PRE_BASE_VOWELS = frozenset({0x1C27, 0x1C28, 0x1C29})
+VISUAL_LEADING_FINALS = frozenset({0x1C2D})  # final K, legacy byte 0x5D
+LEPCHA_PASSTHROUGH = frozenset("-")
 
 # Codepoint classes for canonical ordering within a cluster.
 _SUBJOINED = frozenset({0x1C24, 0x1C25})  # subjoined YA, RA
@@ -137,6 +138,8 @@ class LepchaConverter:
                 # this as a string token also prevents the legacy visual-order pass
                 # from reinterpreting already-logical Unicode input.
                 out.append(ch)
+            elif ch in LEPCHA_PASSTHROUGH:
+                out.append(ch)
             else:
                 # Unmapped legacy byte (layout/punctuation glyph not in the map).
                 out.append(ch)
@@ -174,11 +177,10 @@ class LepchaConverter:
     def _reorder(self, tokens: list[int | str]) -> list[int | str]:
         """Reorder visual-order codepoint runs into logical Lepcha clusters.
 
-        A syllable = optional leading PRE-BASE vowel sign(s) (I/O/OO, keyed left of the
-        base in the legacy stream), then the base, then trailing dependent signs. Each
-        syllable is emitted in canonical storage order ``base + subjoined + nukta +
-        vowel + final + ran``. A trailing sign-run STOPS at the next pre-base vowel,
-        which begins the next syllable.
+        A syllable begins with optional visually leading signs: I/O/OO and final K,
+        all keyed left of the base in the legacy stream. Each syllable is emitted in
+        canonical storage order. A trailing sign-run stops at the next visually
+        leading sign, which begins the next syllable.
         """
         out: list[int | str] = []
         i = 0
@@ -190,12 +192,12 @@ class LepchaConverter:
                 i += 1
                 continue
 
-            # Collect any leading pre-base vowel signs for the upcoming base.
+            # Collect visually leading vowel/final signs for the upcoming base.
             pre: list[int] = []
             while (
                 i < n
                 and isinstance(tokens[i], int)
-                and tokens[i] in PRE_BASE_VOWELS
+                and (tokens[i] in PRE_BASE_VOWELS or tokens[i] in VISUAL_LEADING_FINALS)
                 and tokens[i] not in _BASES
             ):
                 pre.append(tokens[i])  # type: ignore[arg-type]
@@ -216,14 +218,15 @@ class LepchaConverter:
 
             base = cur
             i += 1
-            # Trailing dependent signs, stopping at the next base OR the next pre-base
-            # vowel (which starts a new syllable).
+            # Trailing dependent signs, stopping at the next base or visually
+            # leading sign (which starts a new syllable).
             post: list[int] = []
             while (
                 i < n
                 and isinstance(tokens[i], int)
                 and tokens[i] not in _BASES
                 and tokens[i] not in PRE_BASE_VOWELS
+                and tokens[i] not in VISUAL_LEADING_FINALS
             ):
                 post.append(tokens[i])  # type: ignore[arg-type]
                 i += 1
@@ -255,7 +258,7 @@ def convert_lepcha(text: str, *, strict: bool = False) -> LepchaConversion:
     """Convert Sikkim Herald live-text Lepcha to Unicode Lepcha (NFC).
 
     Returns a :class:`LepchaConversion`. Bytes outside the derived map (the small set
-    of deliberately-unresolved bytes, e.g. ``]`` and ``%``) pass through and are
+    of deliberately-unresolved rare bytes) pass through and are
     surfaced in ``unmapped_bytes``. With ``strict=True`` any such leftover raises
     ``ValueError`` instead of passing silently.
     """

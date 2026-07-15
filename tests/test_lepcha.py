@@ -76,15 +76,29 @@ def test_lepcha_output_is_nfc_and_in_block():
     assert res.unicode_text == unicodedata.normalize("NFC", res.unicode_text)
 
 
-def test_lepcha_unmapped_bytes_are_flagged_not_silently_dropped():
-    # 0x5D ']' and 0x25 '%' are deliberately unresolved: they pass through and are
-    # reported in unmapped_bytes (raised in strict mode).
-    res = convert_lepcha("A]C%")
-    assert "0x5D" in res.unmapped_bytes
-    assert "0x25" in res.unmapped_bytes
-    assert "]" in res.unicode_text and "%" in res.unicode_text
+def test_lepcha_remaining_unmapped_bytes_are_flagged_not_silently_dropped():
+    res = convert_lepcha("A*()+/")
+    assert res.unmapped_bytes == ["0x28", "0x29", "0x2A", "0x2B", "0x2F"]
     with pytest.raises(ValueError):
-        convert_lepcha("A]C%", strict=True)
+        convert_lepcha("A*()+/", strict=True)
+
+
+def test_lepcha_visual_leading_final_k_moves_to_following_base():
+    # Legacy ]=FINAL K and d=pre-base I both precede the base T. The final must
+    # not attach to the preceding A syllable.
+    result = convert_lepcha("A]dT", strict=True)
+    assert [unicodedata.name(ch) for ch in result.unicode_text] == [
+        "LEPCHA LETTER KA",
+        "LEPCHA LETTER DZA",
+        "LEPCHA VOWEL SIGN I",
+        "LEPCHA CONSONANT SIGN K",
+    ]
+
+
+def test_lepcha_subjoined_ra_and_hyphen_are_resolved():
+    result = convert_lepcha(r"C\% -", strict=True)
+    assert result.unicode_text == "ᰃ᰷ᰥ -"
+    assert not result.unmapped_bytes
 
 
 def test_convert_dispatches_to_lepcha():
