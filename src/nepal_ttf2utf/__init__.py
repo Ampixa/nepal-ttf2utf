@@ -43,6 +43,15 @@ from .sunuwar import SunuwarConversion, SunuwarConverter, convert_sunuwar
 from .tibetan import TibetanMachineConversion, TibetanMachineConverter, convert_tibetanmachine
 from .tirhuta import TirhutaConversion, TirhutaConverter, convert_tirhuta
 from .unicode_span import UnicodeSpanConversion, validate_unicode_span
+from .videha import (
+    VIDEHA_2008_04_15,
+    VIDEHA_ISSUE_001,
+    UnknownJanakiGlyphError,
+    VidehaJanakiRecovery,
+    VidehaProfileError,
+    janaki_gid_map_sha256,
+    recover_videha_janaki_trace,
+)
 
 __all__ = [
     "convert",
@@ -58,6 +67,8 @@ __all__ = [
     "convert_olchiki",
     "convert_tirhuta",
     "validate_unicode_span",
+    "recover_videha_janaki_trace",
+    "janaki_gid_map_sha256",
     "DevanagariConversion",
     "LimbuConversion",
     "LimbuConverter",
@@ -77,6 +88,11 @@ __all__ = [
     "TirhutaConversion",
     "TirhutaConverter",
     "UnicodeSpanConversion",
+    "VidehaJanakiRecovery",
+    "VidehaProfileError",
+    "UnknownJanakiGlyphError",
+    "VIDEHA_ISSUE_001",
+    "VIDEHA_2008_04_15",
     "supported_devanagari_fonts",
 ]
 
