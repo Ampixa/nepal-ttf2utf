@@ -291,11 +291,32 @@ Tests execute every flattened byte rule and every declared reorder rule, exhaust
 all 256 possible preceding bytes for the contextual rule, and classify every
 single-byte input. The classification is 128 mapped and strict-clean values,
 29 mapped C0 diagnostics, three mapped-but-uncertain placeholders, and 96
-preserved unmapped values. The public constructor freezes finite rule and
-class inputs and rejects empty, deleting, invalid-scalar, duplicate,
+preserved unmapped values. Converting the ordered U+0000–U+00FF aggregate
+produces 319 output characters with UTF-8 SHA-256
+`2f9413d6d9a14c8f2c4f76aa2585094bb711d25a9c5c14297a8ad5b1be3568c2`.
+The public constructor freezes finite rule and class inputs and rejects empty,
+deleting, invalid-scalar, duplicate,
 prefix-conflicting, or ambiguous rules. The source reader accepts only the
 implemented forward and reorder grammar and fails closed on unsupported active
 syntax rather than silently discarding it.
+
+The Unicode reorder pass is a transformation of legacy-byte-derived output,
+not a normalization rule for arbitrary Lepcha text. Every scalar emitted by a
+byte or contextual rule retains derived provenance through the pass. A declared
+class pattern is permuted only when all participating scalars are derived. If a
+pattern contains genuine Unicode Lepcha or another preserved input scalar, the
+complete matched window remains in input order; this also prevents a shorter
+suffix rule from crossing the provenance boundary. Whole-output NFC still
+applies afterward.
+
+Tests exercise all 28,512 class-member products represented by the 72 declared
+reorder rules as fully derived raw patterns and as non-derived mirrors. For one
+legacy-reachable member vector per rule, conversion also covers all 1,260
+non-all-derived provenance masks plus the 72 fully derived cases. The immutable
+runtime snapshot stores byte rules and reorder rules as tuples and Unicode
+classes as a read-only mapping. These safeguards do not change the 8,730-byte
+parsed-structure payload or its digest, add a mapping, or claim that SIL's
+legacy reorder rules apply to already-Unicode Lepcha.
 
 Three forward rules map legacy `0x3C`, `0x3D`, and `0x3E` to U+25CC DOTTED
 CIRCLE. SIL annotates their source glyphs as uncertain circled `v`, `c`, and

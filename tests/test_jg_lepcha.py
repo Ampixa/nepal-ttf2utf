@@ -6,11 +6,14 @@ import re
 import unicodedata
 from collections import Counter
 from collections.abc import Mapping
+from dataclasses import FrozenInstanceError
 from importlib import resources
-from itertools import repeat
+from itertools import product, repeat
+from types import MappingProxyType
 
 import pytest
 
+import nepal_ttf2utf as package_module
 from nepal_ttf2utf import convert, convert_jg_lepcha
 from nepal_ttf2utf._controls import DIAGNOSTIC_C0
 from nepal_ttf2utf.jg_lepcha import JGLepchaConverter, _ReorderRule
@@ -57,6 +60,16 @@ def _functional_payload(converter: JGLepchaConverter) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("ascii")
+
+
+def _singleton_legacy_source_by_target(converter: JGLepchaConverter) -> dict[int, str]:
+    result: dict[int, str] = {}
+    for source, target in converter._byte_rules:
+        if len(source) != 1 or len(target) != 1 or source[0] == 0x61:
+            continue
+        result.setdefault(target[0], chr(source[0]))
+    assert all(set(members) & set(result) for members in converter._unicode_classes.values())
+    return result
 
 
 def test_jg_lepcha_map_matches_the_pinned_sil_source_and_parser_inventory():
@@ -110,6 +123,10 @@ def test_jg_lepcha_map_matches_the_pinned_sil_source_and_parser_inventory():
         0x1C26,
     )
     assert converter._uncertain_source_codepoints == frozenset({0x3C, 0x3D, 0x3E})
+    assert isinstance(converter._byte_rules, tuple)
+    assert isinstance(converter._reorder_rules, tuple)
+    assert isinstance(converter._unicode_classes, MappingProxyType)
+    assert converter._contract.reorder_provenance == "legacy-byte-derived-only"
     payload = _functional_payload(converter)
     assert len(payload) == 8730
     assert hashlib.sha256(payload).hexdigest() == (
@@ -126,8 +143,11 @@ def test_every_jg_lepcha_byte_rule_has_exact_isolated_behavior():
             "NFC", "".join(chr(codepoint) for codepoint in expected_target)
         )
         result = converter.convert(chr(source_byte))
+        mapped, derived, *_metadata = converter._byte_pass_with_provenance(chr(source_byte))
         label = f"U+{source_byte:04X}"
 
+        assert mapped == "".join(chr(codepoint) for codepoint in expected_target), label
+        assert derived == (True,) * len(mapped), label
         assert result.unicode_text == expected, label
         assert result.lepcha_char_count == sum(
             0x1C00 <= ord(character) <= 0x1C4F for character in expected
@@ -150,12 +170,14 @@ def test_every_single_byte_has_an_explicit_jg_lepcha_classification():
         character = chr(source)
         label = f"U+{source:04X}"
         result = converter.convert(character)
+        mapped, derived, *_metadata = converter._byte_pass_with_provenance(character)
         if source in byte_map:
             expected_target = (0x1C26,) if source == 0x61 else byte_map[source]
             expected = unicodedata.normalize(
                 "NFC", "".join(chr(codepoint) for codepoint in expected_target)
             )
             assert result.unicode_text == expected, label
+            assert derived == (True,) * len(mapped), label
             assert result.replacement_count == 1, label
             assert result.lepcha_char_count == sum(
                 0x1C00 <= ord(output) <= 0x1C4F for output in expected
@@ -175,6 +197,7 @@ def test_every_single_byte_has_an_explicit_jg_lepcha_classification():
         else:
             classification = "unmapped"
             assert result.unicode_text == character, label
+            assert derived == (False,), label
             assert result.lepcha_char_count == 0, label
             assert result.replacement_count == 0, label
             assert result.unmapped_codepoints == [label], label
@@ -193,6 +216,19 @@ def test_every_single_byte_has_an_explicit_jg_lepcha_classification():
         "uncertain": 3,
         "unmapped": 96,
     }
+
+
+def test_complete_byte_aggregate_retains_the_pinned_legacy_output():
+    source = "".join(chr(codepoint) for codepoint in range(0x100))
+    result = JGLepchaConverter.default().convert(source)
+    assert len(result.unicode_text) == 319
+    assert result.lepcha_char_count == 186
+    assert result.replacement_count == 160
+    assert len(result.unmapped_codepoints) == 125
+    assert result.uncertain_codepoints == ["U+003C", "U+003D", "U+003E"]
+    assert hashlib.sha256(result.unicode_text.encode("utf-8")).hexdigest() == (
+        "2f9413d6d9a14c8f2c4f76aa2585094bb711d25a9c5c14297a8ad5b1be3568c2"
+    )
 
 
 def test_jg_lepcha_context_rule_decision_is_exhaustive_over_previous_bytes():
@@ -222,6 +258,97 @@ def test_every_jg_lepcha_reorder_rule_performs_its_exact_permutation():
             None,
         )
         assert isolated._reorder_pass("".join(source)) == expected, rule
+
+
+def test_every_jg_lepcha_reorder_class_product_is_provenance_safe():
+    converter = JGLepchaConverter.default()
+    exercised = 0
+    for rule in converter._reorder_rules:
+        member_axes = [sorted(converter._unicode_classes[name]) for name, _variable in rule.slots]
+        for values in product(*member_axes):
+            source = "".join(chr(value) for value in values)
+            bound = {
+                variable: chr(value) for (_class_name, variable), value in zip(rule.slots, values)
+            }
+            expected = "".join(bound[variable] for variable in rule.output_vars)
+            assert converter._reorder_pass(source) == expected, (rule, values)
+            assert converter._reorder_pass(source, (False,) * len(source)) == source, (
+                rule,
+                values,
+            )
+            exercised += 1
+    assert exercised == 28_512
+
+
+def test_every_jg_lepcha_reorder_rule_exhausts_representative_provenance_masks():
+    converter = JGLepchaConverter.default()
+    legacy_source = _singleton_legacy_source_by_target(converter)
+    all_derived = 0
+    mixed_or_native = 0
+
+    for rule in converter._reorder_rules:
+        values = tuple(
+            min(set(converter._unicode_classes[name]) & set(legacy_source))
+            for name, _variable in rule.slots
+        )
+        bound = {variable: chr(value) for (_class_name, variable), value in zip(rule.slots, values)}
+        expected_reordered = unicodedata.normalize(
+            "NFC", "".join(bound[variable] for variable in rule.output_vars)
+        )
+        legacy_input = "".join(legacy_source[value] for value in values)
+        result = converter.convert(legacy_input)
+        assert result.unicode_text == expected_reordered, rule
+        assert result.replacement_count == len(values), rule
+        assert result.unmapped_codepoints == result.uncertain_codepoints == [], rule
+        all_derived += 1
+
+        expected_preserved = unicodedata.normalize("NFC", "".join(chr(value) for value in values))
+        for mask in product((False, True), repeat=len(values)):
+            if all(mask):
+                continue
+            source = "".join(
+                legacy_source[value] if is_derived else chr(value)
+                for value, is_derived in zip(values, mask)
+            )
+            result = converter.convert(source)
+            assert result.unicode_text == expected_preserved, (rule, mask)
+            assert result.replacement_count == sum(mask), (rule, mask)
+            assert result.unmapped_codepoints == result.uncertain_codepoints == [], (rule, mask)
+            mixed_or_native += 1
+
+    assert all_derived == 72
+    assert mixed_or_native == 1_260
+
+
+@pytest.mark.parametrize(
+    ("source", "expected", "replacements"),
+    [
+        ("\u1c27\u1c00", "\u1c27\u1c00", 0),
+        ("i\u1c00", "\u1c27\u1c00", 1),
+        ("\u1c27k", "\u1c27\u1c00", 1),
+        ("ik", "\u1c00\u1c27", 2),
+    ],
+)
+def test_public_jg_lepcha_reorder_requires_fully_legacy_derived_window(
+    source, expected, replacements
+):
+    result = convert_jg_lepcha(source, strict=True)
+    assert result.unicode_text == unicodedata.normalize("NFC", expected)
+    assert result.replacement_count == replacements
+    assert result.unmapped_codepoints == result.uncertain_codepoints == []
+
+
+@pytest.mark.parametrize(
+    "derived",
+    [
+        (True,),
+        (True, 1),
+        [True, True],
+    ],
+)
+def test_jg_lepcha_reorder_rejects_invalid_internal_provenance(derived):
+    with pytest.raises(ValueError, match="reorder provenance"):
+        JGLepchaConverter.default()._reorder_pass("\u1c27\u1c00", derived)
 
 
 def test_every_assigned_unicode_lepcha_character_passes_through_strictly():
@@ -430,6 +557,17 @@ def test_jg_lepcha_constructor_freezes_mutable_and_one_shot_inputs():
     assert converter._reorder_pass("ᰧᰀ") == "ᰀᰧ"
     assert context_converter.convert("BA").unicode_text == "ᰁᰀ"
 
+    with pytest.raises(AttributeError):
+        converter._byte_rules.append(((0x42,), (0x1C01,)))
+    with pytest.raises(AttributeError):
+        converter._reorder_rules.append(_ReorderRule((), ()))
+    with pytest.raises(TypeError):
+        converter._unicode_classes["Forged"] = frozenset({0x1C00})
+    with pytest.raises(AttributeError):
+        converter._unicode_classes["Cons"].add(0x1C01)
+    with pytest.raises(FrozenInstanceError):
+        converter._contract.reorder_provenance = "all-input"
+
 
 @pytest.mark.parametrize(
     "factory",
@@ -455,7 +593,7 @@ def test_jg_lepcha_constructor_preserves_identical_upstream_reorder_redundancy()
         {"Vowel": (0x1C27,), "Cons": (0x1C00,)},
         None,
     )
-    assert converter._reorder_rules == [rule, rule]
+    assert converter._reorder_rules == (rule, rule)
 
 
 VALID_CUSTOM_MAP = """EncodingName "Fixture"
@@ -765,7 +903,15 @@ def test_jg_lepcha_genuine_unicode_passes_through():
 @pytest.mark.parametrize("font", ["jg-lepcha", "jglepcha", "lepcha-jg"])
 def test_every_jg_lepcha_dispatcher_alias_has_exact_strict_behavior(font):
     assert convert("k", font=font, strict=True) == "ᰀ"
+    assert convert("\u1c27\u1c00", font=font, strict=True) == "\u1c27\u1c00"
+    assert convert("i\u1c00", font=font, strict=True) == "\u1c27\u1c00"
     with pytest.raises(ValueError, match=r"U\+003C.*U\+25CC"):
         convert("<", font=font, strict=True)
     with pytest.raises(ValueError, match=r"U\+007E"):
         convert("~", font=font, strict=True)
+
+
+def test_jg_lepcha_alias_inventory_is_immutable():
+    assert package_module._JG_LEPCHA_FONTS == frozenset({"jg-lepcha", "jglepcha", "lepcha-jg"})
+    with pytest.raises(AttributeError):
+        package_module._JG_LEPCHA_FONTS.add("forged")

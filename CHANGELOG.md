@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Restrict JG Lepcha visual-order repair to output wholly derived from the legacy
+  byte pass, preserving genuine Unicode Lepcha and mixed-provenance match windows.
+  Store the parsed byte, reorder, and class state as immutable snapshots without
+  changing SIL's pinned map contract, legacy-only output, or diagnostics.
 - Correct and pin the project-defined Janaki core crosswalk: reject Devanagari
   independent SHORT E/O because Tirhuta has no corresponding independent forms,
   freeze the remaining 90 mappings and 49 passthrough values, and restrict visual-order

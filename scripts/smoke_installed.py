@@ -72,6 +72,13 @@ def main() -> int:
     assert convert_kiratrai_herald("fZ0", strict=True).unicode_text == "𖵈 𖵰"
     assert nepal_ttf2utf.convert("fZ0", font="kiratrai-herald", strict=True) == "𖵈 𖵰"
     assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
+    native_jg_lepcha = "\u1c27\u1c00"
+    native_jg_result = convert_jg_lepcha(native_jg_lepcha, strict=True)
+    assert native_jg_result.unicode_text == native_jg_lepcha
+    assert native_jg_result.replacement_count == 0
+    mixed_jg_result = convert_jg_lepcha("i\u1c00", strict=True)
+    assert mixed_jg_result.unicode_text == native_jg_lepcha
+    assert mixed_jg_result.replacement_count == 1
     assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
     assert nepal_ttf2utf.convert("!", font="tibetan-machine", strict=True) == "ཀ"
     try:

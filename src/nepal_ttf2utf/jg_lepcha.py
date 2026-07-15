@@ -3,8 +3,10 @@
 This converter applies SIL's two-pass TECkit map without requiring a TECkit
 runtime. The byte pass handles classes, composite glyphs, and conjunct glyphs;
 the Unicode pass reorders the font's visual-order vowel/final signs into Lepcha
-logical order. Three source rules explicitly marked uncertain by SIL emit the
-generic U+25CC placeholder; their source values remain separate diagnostics.
+logical order only when every participating scalar came from the legacy byte
+pass. Pre-existing Unicode Lepcha and mixed-provenance windows are not custom
+reordered. Three source rules explicitly marked uncertain by SIL emit the generic
+U+25CC placeholder; their source values remain separate diagnostics.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from itertools import islice
 from pathlib import Path
+from types import MappingProxyType
 
 from ._controls import diagnostic_c0_codepoints
 from .unicode_span import _is_assigned_script_codepoint
@@ -208,6 +211,16 @@ def _parse_explicit_rule(line: str) -> tuple[tuple[int, ...], tuple[int, ...]]:
 class _ReorderRule:
     slots: tuple[tuple[str, str], ...]
     output_vars: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _JGLepchaContract:
+    byte_rules: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
+    reorder_rules: tuple[_ReorderRule, ...]
+    unicode_classes: Mapping[str, frozenset[int]]
+    context_rule: tuple[int, frozenset[int], int] | None
+    uncertain_source_codepoints: frozenset[int]
+    reorder_provenance: str
 
 
 @dataclass(frozen=True)
@@ -464,15 +477,38 @@ class JGLepchaConverter:
                 raise ValueError("JG Lepcha context trigger requires a singleton fallback rule")
             normalized_context = (trigger, excluded, replacement)
 
-        self._byte_rules = sorted(
-            normalized_byte_rules, key=lambda item: len(item[0]), reverse=True
+        self._contract = _JGLepchaContract(
+            byte_rules=tuple(
+                sorted(normalized_byte_rules, key=lambda item: len(item[0]), reverse=True)
+            ),
+            reorder_rules=tuple(
+                sorted(normalized_reorder_rules, key=lambda rule: len(rule.slots), reverse=True)
+            ),
+            unicode_classes=MappingProxyType(dict(normalized_classes)),
+            context_rule=normalized_context,
+            uncertain_source_codepoints=uncertain,
+            reorder_provenance="legacy-byte-derived-only",
         )
-        self._reorder_rules = sorted(
-            normalized_reorder_rules, key=lambda rule: len(rule.slots), reverse=True
-        )
-        self._unicode_classes = normalized_classes
-        self._context_rule = normalized_context
-        self._uncertain_source_codepoints = uncertain
+
+    @property
+    def _byte_rules(self) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
+        return self._contract.byte_rules
+
+    @property
+    def _reorder_rules(self) -> tuple[_ReorderRule, ...]:
+        return self._contract.reorder_rules
+
+    @property
+    def _unicode_classes(self) -> Mapping[str, frozenset[int]]:
+        return self._contract.unicode_classes
+
+    @property
+    def _context_rule(self) -> tuple[int, frozenset[int], int] | None:
+        return self._contract.context_rule
+
+    @property
+    def _uncertain_source_codepoints(self) -> frozenset[int]:
+        return self._contract.uncertain_source_codepoints
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "JGLepchaConverter":
@@ -710,8 +746,11 @@ class JGLepchaConverter:
             ord(text[index + offset]) == codepoint for offset, codepoint in enumerate(source)
         )
 
-    def _byte_pass(self, text: str) -> tuple[str, int, list[str], list[str]]:
+    def _byte_pass_with_provenance(
+        self, text: str
+    ) -> tuple[str, tuple[bool, ...], int, list[str], list[str]]:
         output: list[str] = []
+        derived: list[bool] = []
         unmapped: set[str] = set()
         uncertain: set[str] = set()
         replacements = 0
@@ -724,6 +763,7 @@ class JGLepchaConverter:
                     previous is None or previous not in excluded_previous
                 ):
                     output.append(chr(replacement))
+                    derived.append(True)
                     replacements += 1
                     index += 1
                     continue
@@ -731,6 +771,7 @@ class JGLepchaConverter:
             for source, target in self._byte_rules:
                 if self._matches(text, index, source):
                     output.extend(chr(codepoint) for codepoint in target)
+                    derived.extend([True] * len(target))
                     uncertain.update(
                         f"U+{codepoint:04X}"
                         for codepoint in source
@@ -742,13 +783,32 @@ class JGLepchaConverter:
             else:
                 char = text[index]
                 output.append(char)
+                derived.append(False)
                 codepoint = ord(char)
                 if not _is_assigned_script_codepoint(codepoint, "Lepcha"):
                     unmapped.add(f"U+{codepoint:04X}")
                 index += 1
-        return "".join(output), replacements, sorted(unmapped), sorted(uncertain)
+        return (
+            "".join(output),
+            tuple(derived),
+            replacements,
+            sorted(unmapped),
+            sorted(uncertain),
+        )
 
-    def _reorder_pass(self, text: str) -> str:
+    def _byte_pass(self, text: str) -> tuple[str, int, list[str], list[str]]:
+        mapped, _derived, replacements, unmapped, uncertain = self._byte_pass_with_provenance(text)
+        return mapped, replacements, unmapped, uncertain
+
+    def _reorder_pass(self, text: str, derived: tuple[bool, ...] | None = None) -> str:
+        if derived is None:
+            derived = (True,) * len(text)
+        if (
+            type(derived) is not tuple
+            or len(derived) != len(text)
+            or any(type(value) is not bool for value in derived)
+        ):
+            raise ValueError("invalid JG Lepcha reorder provenance")
         output: list[str] = []
         index = 0
         while index < len(text):
@@ -763,8 +823,12 @@ class JGLepchaConverter:
                         break
                     bound[variable] = char
                 else:
-                    output.extend(bound[variable] for variable in rule.output_vars)
-                    index += len(rule.slots)
+                    end = index + len(rule.slots)
+                    if all(derived[index:end]):
+                        output.extend(bound[variable] for variable in rule.output_vars)
+                    else:
+                        output.extend(text[index:end])
+                    index = end
                     break
             else:
                 output.append(text[index])
@@ -772,8 +836,8 @@ class JGLepchaConverter:
         return "".join(output)
 
     def convert(self, text: str) -> JGLepchaConversion:
-        mapped, replacements, unmapped, uncertain = self._byte_pass(text)
-        converted = unicodedata.normalize("NFC", self._reorder_pass(mapped))
+        mapped, derived, replacements, unmapped, uncertain = self._byte_pass_with_provenance(text)
+        converted = unicodedata.normalize("NFC", self._reorder_pass(mapped, derived))
         # The source CTL class maps every C0 value to itself. Preserve that
         # output/count behavior while diagnosing values outside the allowlist.
         unmapped = sorted(set(unmapped) | diagnostic_c0_codepoints(converted))

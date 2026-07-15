@@ -227,7 +227,7 @@ _BRAHMI_UNICODE_FONTS = {
 # Sikkim Herald live-text Lepcha body font (TT*O00 named layout).
 _LEPCHA_FONTS = {"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"}
 # Jason Glavy's public legacy Lepcha encoding (different from the Herald layout).
-_JG_LEPCHA_FONTS = {"jg-lepcha", "jglepcha", "lepcha-jg"}
+_JG_LEPCHA_FONTS = frozenset({"jg-lepcha", "jglepcha", "lepcha-jg"})
 _LEPCHA_UNICODE_FONTS = {
     "lepcha-unicode",
     "mingzat",
