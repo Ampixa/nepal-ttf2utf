@@ -2,3 +2,4 @@
 src/nepal_ttf2utf/maps/JGLepcha.map -text whitespace=-blank-at-eol,-blank-at-eof
 src/nepal_ttf2utf/maps/Limbu.map -text whitespace=-blank-at-eol,-blank-at-eof
 src/nepal_ttf2utf/maps/TibetanMachine.csv -text whitespace=-blank-at-eol,-blank-at-eof
+src/nepal_ttf2utf/maps/kiratraifontnew.map -text whitespace=-blank-at-eol,-blank-at-eof

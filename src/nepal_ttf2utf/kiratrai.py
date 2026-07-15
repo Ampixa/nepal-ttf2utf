@@ -23,6 +23,7 @@ is a blank spacing glyph and is normalized to an ordinary space.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -36,6 +37,13 @@ _UNI_TOKEN_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
 _BYTECLASS_RE = re.compile(r"^ByteClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _UNICLASS_RE = re.compile(r"^UniClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _CLASS_RULE_RE = re.compile(r"^\[([^\]]+)\]\s*<?>\s*\[([^\]]+)\]\s*$")
+_PASS_RE = re.compile(r"^Pass\(\s*(Byte_Unicode|Unicode)\s*\)$", re.IGNORECASE)
+_PASS_PREFIX_RE = re.compile(r"^Pass\b", re.IGNORECASE)
+_EXPLICIT_RULE_RE = re.compile(
+    r"^(?P<source>0x[0-9A-Fa-f]{2}(?:\s+0x[0-9A-Fa-f]{2})*)\s*"
+    r"(?:<>|>)\s*"
+    r"(?P<target>U\+[0-9A-Fa-f]{4,6}(?:\s+U\+[0-9A-Fa-f]{4,6})*)$"
+)
 
 _KIRATRAI_LO, _KIRATRAI_HI = 0x16D40, 0x16D7F
 
@@ -94,19 +102,38 @@ KIRATRAI_HERALD_PASSTHROUGH: frozenset[str] = frozenset(" \t\r\n0123456789(),-/.
 KIRATRAI_HERALD_BLANKS: frozenset[str] = frozenset("\\Z")
 
 
+def _tokens(body: str) -> list[str]:
+    body = re.sub(r"\s*\.\.\s*", " .. ", body)
+    return [token for token in body.split() if token]
+
+
+def _validate_unicode_scalar(codepoint: int) -> int:
+    if (
+        isinstance(codepoint, bool)
+        or not isinstance(codepoint, int)
+        or not (0 <= codepoint <= 0x10FFFF)
+        or 0xD800 <= codepoint <= 0xDFFF
+    ):
+        raise ValueError(f"invalid Unicode scalar in Kirat Rai map: {codepoint!r}")
+    return codepoint
+
+
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
     """Expand a TECkit byte-class body into ordered byte values (``0xNN`` or ``0xNN .. 0xMM``)."""
     values: list[int] = []
-    tokens = re.split(r"\s+", body.strip())
+    tokens = _tokens(body)
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if not token:
-            index += 1
-            continue
         if index + 2 < len(tokens) and tokens[index + 1] == "..":
-            start = int(token, 16)
-            end = int(tokens[index + 2], 16)
+            start_match = _BYTE_TOKEN_RE.fullmatch(token)
+            end_match = _BYTE_TOKEN_RE.fullmatch(tokens[index + 2])
+            if start_match is None or end_match is None:
+                raise ValueError(
+                    f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
+            start = int(start_match.group(1), 16)
+            end = int(end_match.group(1), 16)
             if end < start:
                 raise ValueError(
                     f"invalid byte range in Kirat Rai map: {token}..{tokens[index + 2]}"
@@ -114,43 +141,63 @@ def _expand_byte_tokens(body: str) -> tuple[int, ...]:
             values.extend(range(start, end + 1))
             index += 3
             continue
-        values.append(int(token, 16))
+        match = _BYTE_TOKEN_RE.fullmatch(token)
+        if match is None:
+            raise ValueError(f"unparseable byte token in Kirat Rai map: {token!r}")
+        values.append(int(match.group(1), 16))
         index += 1
+    if not values:
+        raise ValueError("empty byte class in Kirat Rai map")
     return tuple(values)
 
 
 def _expand_uni_tokens(body: str) -> tuple[int, ...]:
     """Expand a TECkit Unicode-class body into ordered codepoints (``U+NNNN`` or ranges)."""
     values: list[int] = []
-    tokens = re.split(r"\s+", body.strip())
+    tokens = _tokens(body)
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if not token:
-            index += 1
-            continue
         if index + 2 < len(tokens) and tokens[index + 1] == "..":
-            start_match = _UNI_TOKEN_RE.match(token)
-            end_match = _UNI_TOKEN_RE.match(tokens[index + 2])
+            start_match = _UNI_TOKEN_RE.fullmatch(token)
+            end_match = _UNI_TOKEN_RE.fullmatch(tokens[index + 2])
             if start_match is None or end_match is None:
                 raise ValueError(
                     f"unparseable unicode range in Kirat Rai map: {token}..{tokens[index + 2]}"
                 )
-            start = int(start_match.group(1), 16)
-            end = int(end_match.group(1), 16)
+            start = _validate_unicode_scalar(int(start_match.group(1), 16))
+            end = _validate_unicode_scalar(int(end_match.group(1), 16))
             if end < start:
                 raise ValueError(
                     f"invalid unicode range in Kirat Rai map: {token}..{tokens[index + 2]}"
                 )
+            if start <= 0xDFFF and end >= 0xD800:
+                raise ValueError(
+                    f"invalid Unicode scalar range in Kirat Rai map: {token}..{tokens[index + 2]}"
+                )
             values.extend(range(start, end + 1))
             index += 3
             continue
-        match = _UNI_TOKEN_RE.match(token)
+        match = _UNI_TOKEN_RE.fullmatch(token)
         if match is None:
             raise ValueError(f"unparseable unicode token in Kirat Rai map: {token!r}")
-        values.append(int(match.group(1), 16))
+        values.append(_validate_unicode_scalar(int(match.group(1), 16)))
         index += 1
+    if not values:
+        raise ValueError("empty Unicode class in Kirat Rai map")
     return tuple(values)
+
+
+def _parse_explicit_rule(line: str) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    match = _EXPLICIT_RULE_RE.fullmatch(line)
+    if match is None:
+        raise ValueError(f"invalid explicit Kirat Rai rule: {line!r}")
+    source = tuple(int(value, 16) for value in _BYTE_TOKEN_RE.findall(match.group("source")))
+    target = tuple(
+        _validate_unicode_scalar(int(value, 16))
+        for value in _UNI_TOKEN_RE.findall(match.group("target"))
+    )
+    return source, target
 
 
 @dataclass(frozen=True)
@@ -170,18 +217,26 @@ class KiratRaiConverter:
     danda) take precedence over the single-byte class rules.
     """
 
-    def __init__(self, rules: list[tuple[tuple[int, ...], tuple[int, ...]]]) -> None:
-        if not rules:
+    def __init__(self, rules: Iterable[tuple[Iterable[int], Iterable[int]]]) -> None:
+        normalized_rules = [(tuple(source), tuple(target)) for source, target in rules]
+        if not normalized_rules:
             raise ValueError("KiratRaiConverter requires at least one mapping rule")
-        # De-duplicate while preserving longest-source-first ordering.
         seen: set[tuple[int, ...]] = set()
-        ordered: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
-        for source, target in sorted(rules, key=lambda item: len(item[0]), reverse=True):
+        for source, target in normalized_rules:
+            if not source or any(
+                isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 0xFF)
+                for value in source
+            ):
+                raise ValueError(f"invalid Kirat Rai source rule: {source!r}")
+            if not target:
+                raise ValueError(f"empty Kirat Rai target rule for source: {source!r}")
+            for codepoint in target:
+                _validate_unicode_scalar(codepoint)
             if source in seen:
-                continue
+                label = " ".join(f"0x{value:02X}" for value in source)
+                raise ValueError(f"duplicate Kirat Rai source rule: {label}")
             seen.add(source)
-            ordered.append((source, target))
-        self._rules = ordered
+        self._rules = sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True)
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "KiratRaiConverter":
@@ -199,19 +254,31 @@ class KiratRaiConverter:
             line = raw_line.split(";", 1)[0].strip()
             if not line:
                 continue
-            lowered = line.lower()
-            if lowered.startswith("pass("):
-                in_byte_pass = lowered == "pass(byte_unicode)"
+            if _PASS_PREFIX_RE.match(line):
+                pass_match = _PASS_RE.fullmatch(line)
+                if pass_match is None:
+                    raise ValueError(f"invalid Kirat Rai pass declaration: {line!r}")
+                in_byte_pass = pass_match.group(1).casefold() == "byte_unicode"
                 continue
             if not in_byte_pass:
                 continue
             byte_match = _BYTECLASS_RE.match(line)
             if byte_match:
-                byte_classes[byte_match.group(1).strip()] = _expand_byte_tokens(byte_match.group(2))
+                name = byte_match.group(1).strip()
+                if not name:
+                    raise ValueError("empty Kirat Rai byte class name")
+                if name in byte_classes:
+                    raise ValueError(f"duplicate Kirat Rai byte class: {name!r}")
+                byte_classes[name] = _expand_byte_tokens(byte_match.group(2))
                 continue
             uni_match = _UNICLASS_RE.match(line)
             if uni_match:
-                uni_classes[uni_match.group(1).strip()] = _expand_uni_tokens(uni_match.group(2))
+                name = uni_match.group(1).strip()
+                if not name:
+                    raise ValueError("empty Kirat Rai Unicode class name")
+                if name in uni_classes:
+                    raise ValueError(f"duplicate Kirat Rai Unicode class: {name!r}")
+                uni_classes[name] = _expand_uni_tokens(uni_match.group(2))
                 continue
             rule_lines.append(line)
 
@@ -220,6 +287,8 @@ class KiratRaiConverter:
             if class_rule:
                 left_name = class_rule.group(1).strip()
                 right_name = class_rule.group(2).strip()
+                if not left_name or not right_name:
+                    raise ValueError(f"empty Kirat Rai class reference: {line!r}")
                 left = byte_classes.get(left_name)
                 right = uni_classes.get(right_name)
                 if left is None:
@@ -238,17 +307,7 @@ class KiratRaiConverter:
                 for byte_value, codepoint in zip(left, right):
                     rules.append(((byte_value,), (codepoint,)))
                 continue
-            if "<>" in line or ">" in line:
-                left_text, right_text = line.split("<>", 1) if "<>" in line else line.split(">", 1)
-                source = _BYTE_TOKEN_RE.findall(left_text)
-                target = _UNI_TOKEN_RE.findall(right_text)
-                if source and target:
-                    rules.append(
-                        (
-                            tuple(int(value, 16) for value in source),
-                            tuple(int(value, 16) for value in target),
-                        )
-                    )
+            rules.append(_parse_explicit_rule(line))
         return cls(rules)
 
     @classmethod

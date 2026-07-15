@@ -69,9 +69,24 @@ legacy input therefore retains the package's preserve-and-diagnose behavior.
 ## Sikkim Herald Kirat Rai
 
 SIL's public
-[`kiratraifontnew.map`](https://github.com/silnrsi/wsresources/blob/master/scripts/Krai/legacy/kiratraifontnew/mappings/kiratraifontnew.map)
-targets the canonical 2021 **kirat rai font new** encoding. The font embedded at
-xref 536 in Unicode proposal
+[`kiratraifontnew.map`](https://github.com/silnrsi/wsresources/blob/2a39449d20420fe7259f9ce5231c347432840075/scripts/Krai/legacy/kiratraifontnew/mappings/kiratraifontnew.map)
+at `wsresources` revision `2a39449d20420fe7259f9ce5231c347432840075`
+targets the canonical 2021 **kirat rai font new** encoding. The byte-identical
+vendored map has SHA-256
+`1750a51d4c40156ed49a57105d5d83905f263b7c084b7d7539ab7055a931a3c4`.
+It defines eight byte classes and eight Unicode classes, which flatten to 110
+single-byte rules, four double-byte rules, and one triple-byte rule with 115
+unique source sequences. Tests exercise every flattened rule. The native reader
+requires exact tokens and pass syntax, valid Unicode scalar targets, and unique,
+nonempty class names and source sequences in the supported forward
+`Byte_Unicode` subset; malformed or ambiguous rules in that subset fail closed.
+The functional-digest payload is an outer JSON array of
+`[source-byte-array, target-codepoint-array]` pairs, sorted lexicographically by
+source and target, serialized with separators `(",", ":")`, and encoded as
+ASCII. The resulting 1,592-byte payload has SHA-256
+`d83310902ddacc1a04ed11c10d8b8f5ebf3af374745ca2f3c23fe9f1c49c0a8a`.
+
+The font embedded at xref 536 in Unicode proposal
 [`L2/22-043R`](https://www.unicode.org/L2/L2022/22043r-kirat-rai.pdf)
 has SHA-256
 `bab945f8a5fe51f9401dc2a55a54ac99f3ba2b5071ac72324a05e7ff82cb4149`.

@@ -18,7 +18,10 @@ The following mapping resources originate in
 licensed under the MIT License:
 
 - `src/nepal_ttf2utf/maps/Limbu.map` — copyright 2007 SIL International.
-- `src/nepal_ttf2utf/maps/kiratraifontnew.map` — copyright 2021 SIL International.
+- `src/nepal_ttf2utf/maps/kiratraifontnew.map` — copyright 2021 SIL
+  International; exact file from revision
+  `2a39449d20420fe7259f9ce5231c347432840075`; SHA-256
+  `1750a51d4c40156ed49a57105d5d83905f263b7c084b7d7539ab7055a931a3c4`.
 - `src/nepal_ttf2utf/maps/JGLepcha.map` — SIL's exact JG Lepcha conversion map,
   version 1.1, from revision
   `2a39449d20420fe7259f9ce5231c347432840075`; SHA-256

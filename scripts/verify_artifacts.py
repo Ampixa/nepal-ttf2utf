@@ -51,6 +51,9 @@ PINNED_RESOURCE_HASHES = {
     "maps/JGLepcha.map": "179d172b4bd4223f40b1ddc1a0daeb6547b5ad97dc1be7df2b09f2bf45ff6b2d",
     "maps/Limbu.map": "2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58",
     "maps/TibetanMachine.csv": ("eabcdd119ee7fa81ca221e3879745d3886ec4293b1bca72801a18498972cbc24"),
+    "maps/kiratraifontnew.map": (
+        "1750a51d4c40156ed49a57105d5d83905f263b7c084b7d7539ab7055a931a3c4"
+    ),
 }
 LICENSE_FILES = (
     "LICENSE",
