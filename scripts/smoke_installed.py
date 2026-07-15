@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 from importlib import metadata, resources
 from pathlib import Path
@@ -70,8 +71,18 @@ def main() -> int:
     for name in EXPECTED_RESOURCES:
         assert (map_package / name).read_bytes()
 
+    limbu_map = (map_package / "Limbu.map").read_bytes()
+    assert len(limbu_map) == 5981
+    assert hashlib.sha256(limbu_map).hexdigest() == (
+        "2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58"
+    )
+
     assert convert_limbu("k", strict=True) == "ᤐ"
     limbu = LimbuConverter.default()
+    legacy_limbu_multibyte = limbu.convert("f]f}")
+    assert legacy_limbu_multibyte.unicode_text == "\u1925\u1926"
+    assert legacy_limbu_multibyte.replacement_count == 2
+    assert legacy_limbu_multibyte.unmapped_codepoints == []
     legacy_limbu_pair = limbu.convert("H")
     assert legacy_limbu_pair.unicode_text == "\u192a\u1922"
     assert legacy_limbu_pair.replacement_count == 1
@@ -88,6 +99,33 @@ def main() -> int:
     mixed_limbu_triple = limbu.convert("L\u192b")
     assert mixed_limbu_triple.unicode_text == "\u1921\u193a\u192b"
     assert mixed_limbu_triple.replacement_count == 1
+    unresolved_limbu = limbu.convert("#X")
+    assert unresolved_limbu.unicode_text == "#X"
+    assert unresolved_limbu.replacement_count == 0
+    assert unresolved_limbu.unmapped_codepoints == ["U+0023", "U+0058"]
+    try:
+        convert_limbu("#X", strict=True)
+    except ValueError as error:
+        assert "U+0023 U+0058" in str(error)
+    else:
+        raise AssertionError("strict Limbu conversion accepted unresolved bytes")
+    ordered_limbu = limbu.convert("".join(chr(value) for value in range(256)))
+    assert len(ordered_limbu.unicode_text) == 258
+    assert len(ordered_limbu.unicode_text.encode("utf-8")) == 516
+    assert ordered_limbu.limbu_char_count == 62
+    assert ordered_limbu.replacement_count == 129
+    assert len(ordered_limbu.unmapped_codepoints) == 156
+    assert hashlib.sha256(ordered_limbu.unicode_text.encode("utf-8")).hexdigest() == (
+        "f9f55d84875b4a73e5e324e95c0d97fb156d164c9f6d44fef9cf6ca08cc526ca"
+    )
+    limbu_diagnostics = json.dumps(
+        [int(label[2:], 16) for label in ordered_limbu.unmapped_codepoints],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(limbu_diagnostics) == 585
+    assert hashlib.sha256(limbu_diagnostics).hexdigest() == (
+        "bc2b21c6ff8ef6f3e3dfcc8253b4489b1a47fe4c3fc94f90e1b5414b6a50742e"
+    )
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
     canonical_kirat_longest = convert_kiratrai("Aee", strict=True)
     assert canonical_kirat_longest.unicode_text == "\U00016d6a"

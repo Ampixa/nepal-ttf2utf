@@ -135,28 +135,57 @@ and a positional 32-member C0 class, producing 131 unique flattened rules after
 class expansion: 129 single-byte sources and two double-byte sources. Tests
 exercise every flattened rule through Unicode-order repair and NFC.
 
-The native reader requires exact pass, default-directive, token, and rule
-syntax; valid Unicode scalar targets; and nonempty, unique class names and
-source sequences in the supported forward `Byte_Unicode` subset. Pass and
-default declarations must also be unique. Malformed or ambiguous rules in that
-subset fail closed. The two default-substitution
-directives are recognized but deliberately not applied, so undefined legacy
-input retains the package's preserve-and-diagnose behavior. The map's Unicode
-pass declares exactly two reorder patterns: each product of nine vowels with
-three subjoined signs, and each corresponding product with U+193A LIMBU SIGN
-KEMPHRENG between them. These 27 pair and 27 triple products remain implemented
-directly rather than interpreted as a general `Pass(Unicode)` grammar. Every
-participating role is reachable from the legacy byte pass. Reverse conversion
-is not implemented.
+The native reader accepts a bounded two-pass subset rather than general TECkit
+syntax. Input is limited to 1,000,000 bytes, 4,096 physical lines, and 4,096
+codepoints per line. Parser and direct-constructor limits are 512 flattened
+byte rules, 16 source bytes per rule, and 32 target scalars per rule. A map may
+declare at most 128 byte classes, 128 byte-pass Unicode classes, and 128
+Unicode-pass reorder classes; byte and Unicode classes are limited to 256 and
+1,024 unique members respectively. Invalid UTF-8, malformed or duplicate
+headers, classes, defaults, passes, and rules, unordered direct-constructor
+inputs, and over-limit structures fail closed.
+
+Both `Pass(Byte_Unicode)` and `Pass(Unicode)` are required exactly once and in
+that order. The byte pass requires the canonical `ByteDefault 0x5E` and
+`UniDefault replacement_character` declarations. These defaults are validated
+but deliberately not applied, so undefined legacy input retains the package's
+preserve-and-diagnose behavior. C0 and SPACE values may occur only in matching
+singleton identity rules. Forward sources have a byte-scalar domain and use
+stable longest-source-first matching. The canonical map has exactly two source
+prefix relations, from `f` to `f]` and `f}`, so its double-byte vowel rules win
+over the singleton `f` rule.
+
+The Unicode pass is limited to two exact class roles, `VOWEL` for
+U+1920–U+1928 and `SUBJ` for U+1929–U+192B, followed by these two rule forms:
+
+```text
+[VOWEL]=V [SUBJ]=S <> @S @V
+[VOWEL]=V U+193A [SUBJ]=S <> @S @V U+193A
+```
+
+The parser verifies the class contents, variable roles, swapped output,
+preserved U+193A literal, assigned Limbu repertoire, disjoint roles, and
+reachability of every participating scalar from the byte pass. Any other
+active Unicode-pass syntax is rejected. These forms cover 27 vowel/subjoined
+pairs and 27 corresponding triples containing U+193A LIMBU SIGN KEMPHRENG;
+reverse conversion is not implemented.
+
+The Unicode-pass source payload is the compact ASCII JSON array of its four
+active lines in source order after comments and edge whitespace are removed
+and each internal whitespace run is collapsed to one ASCII space: the `VOWEL`
+and `SUBJ` declarations followed by the pair and triple rules shown above. The
+158-byte payload has SHA-256
+`62ea3686454059d2aacc9a60cb951403a7e581beb181522d066765a5338960dd`.
 
 The converter records one provenance flag for every scalar emitted or
 preserved by the byte pass. A pair or triple is reordered only when every
 participating scalar was emitted by a matched legacy rule. This boundary is a
 package policy for mixed Python strings, not a rule asserted by the SIL map;
 native and mixed-provenance windows remain in post-mapping order before
-whole-output NFC normalization. The parsed rules, reorder classes, KEMPHRENG
-scalar, and provenance policy are stored as an immutable per-converter
-snapshot. Exhaustive tests cover all 54 fully derived products and all 270
+whole-output NFC normalization. Each parsed file produces an immutable
+per-converter snapshot of its byte rules, Unicode reorder roles, KEMPHRENG
+scalar, pass order, precedence, byte-scalar source domain, and provenance
+policy. Exhaustive tests cover all 54 fully derived products and all 270
 non-all-derived product/mask cases.
 
 The functional-digest payload is an outer JSON array of
@@ -164,6 +193,10 @@ The functional-digest payload is an outer JSON array of
 source and target, serialized with separators `(",", ":")`, and encoded as
 ASCII. The resulting 1,741-byte payload has SHA-256
 `31c47c252d2c82e9ab0d05619e80e1e0d1897a2b55f581edf8f987897e97956e`.
+The runtime-order payload uses the same pair representation and serialization
+without sorting the outer rule array. Its 1,741-byte representation has
+SHA-256
+`5f5073d61a43689f0de70aea6858a35f01482329816044a4d31a83920b62d7b6`.
 The reorder-state payload is a sorted-key JSON object containing decimal
 `kemphreng`, the `legacy-byte-derived-only` provenance label, and sorted decimal
 `subjoined` and `vowels` arrays, serialized with the same compact separators and
@@ -171,11 +204,17 @@ ASCII encoding. Its 143-byte representation has SHA-256
 `33e0df0d27fafe33b5fe6126dbe7074613b4c3e344b1d3595a9b03069bdb535e`.
 
 Conversion of the ordered U+0000..U+00FF input remains an aggregate
-compatibility pin: 258 output characters, 62 Limbu-block characters, 129
-matched replacements, and 156 unique diagnostics. The UTF-8 output SHA-256 is
+compatibility pin: 258 output characters, 516 UTF-8 bytes, 62 Limbu-block
+characters, 129 matched replacements, and 156 unique diagnostics. The UTF-8
+output SHA-256 is
 `f9f55d84875b4a73e5e324e95c0d97fb156d164c9f6d44fef9cf6ca08cc526ca`.
 This classifies the input inventory as 100 mapped-clean values, 29 mapped C0
-diagnostics, and 127 preserved diagnostics.
+diagnostics, and 127 preserved diagnostics. The independent diagnostic payload
+is the compact ASCII JSON array of integer codepoints parsed from the ordered
+diagnostic labels. Its 585-byte representation has SHA-256
+`bc2b21c6ff8ef6f3e3dfcc8253b4489b1a47fe4c3fc94f90e1b5414b6a50742e`.
+Parser hardening does not modify the vendored SIL map, add byte assignments, or
+resolve legacy `#` and `X`.
 
 ## Canonical and Sikkim Herald Kirat Rai
 

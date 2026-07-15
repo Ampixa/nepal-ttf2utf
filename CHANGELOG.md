@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Harden the pinned SIL Limbu two-pass parser and runtime contract: require the
+  canonical defaults and pass order, validate the two supported Unicode reorder
+  forms, bound map and direct-constructor structures, protect C0 and SPACE
+  identity rules, and record stable longest-source-first byte-scalar matching
+  with immutable per-file reorder state. The vendored map, functional and
+  reorder digests, legacy output, diagnostics, and unresolved `#` and `X` are
+  unchanged.
 - Pin the five legacy Devanagari maps to the exact `npttf2utf` 0.3.7 raw and
   functional contracts, load them into immutable snapshots, and bound source
   and mapped post-rule segments to 4,096 codepoints. NayaNepal and Gorkhapatra
