@@ -27,7 +27,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Kirat Rai | `kiratrai`, `kiratrai-new`, `kiratraifontnew`, `akrs`, `akrs-new` | Native reader for SIL's hash-pinned canonical 2021 [`kiratraifontnew.map`](src/nepal_ttf2utf/maps/kiratraifontnew.map). Its supported forward `Byte_Unicode` subset fails closed on malformed or ambiguous rules. |
 | Kirat Rai | `kiratrai-herald`, `kiratraifont`, `sikkimherald-kiratrai` | Complete premap for the older, globally permuted Sikkim Herald layout. The only unmatched corpus glyph, legacy `Z`, is an empty glyph and normalizes to a space. |
 | Kirat Rai | Kanchenjunga family and `kirat-rai-unicode` | Unicode Kirat Rai validation for the modern Unicode font family. |
-| Sunuwar / Jenticha | `sunuwar`, `jenticha`, `koits`, `kirat1` | All observed script bytes are confirmed. The final `\|` byte is the Sikkim regional form of U+11BC5 UTTHI. |
+| Sunuwar / Jenticha | `sunuwar`, `jenticha`, `koits`, `kirat1` | Pinned 38-source project contract: 28 letters, ten digits, 20 literal passthrough characters, and no uncertain mapping entries. The built-in map assigns `\|` to U+11BC5 UTTHI; it is project-derived, not a published upstream byte standard. |
 | Sunuwar / Jenticha | Noto Sans Sunuwar and `sunuwar-unicode` | Unicode Sunuwar validation, independent of the older `kirat1` layout. |
 | Lepcha / Róng | `jg-lepcha`, `jglepcha`, `lepcha-jg` | Native forward reader for SIL's hash-pinned two-pass [`JGLepcha.map`](src/nepal_ttf2utf/maps/JGLepcha.map), with an independently pinned parsed contract and a fail-closed supported grammar. Legacy `<`, `=`, and `>` have only upstream U+25CC placeholders, so they remain uncertain and fail strict conversion. |
 | Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Hash-pinned, corpus-derived Sikkim Herald layout. Legacy `]`, `%`, and `-` are resolved. The observed unresolved glyph bytes are `*`, `(`, `)`, `+`, and `/`; any other unsupported byte is also diagnosed. Custom maps fail closed on malformed or ambiguous schemas. |
@@ -48,8 +48,8 @@ routing keys. Input matching is case-insensitive, ignores surrounding
 whitespace, treats `_` as `-`, and removes a leading six-letter PDF subset tag
 such as `ABCDEF+`. No other family or weight names are inferred. Unknown keys
 raise `ValueError`; the command-line interface exits with status 2 and points
-to `--list-fonts`. The measurements and source links behind derived mappings
-are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+to `--list-fonts`. The available measurements and source links behind derived
+mappings are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
 Already-Unicode routes use an assigned repertoire pinned to Unicode 17.0
 rather than the host Python's Unicode database. This keeps Unicode 16 scripts

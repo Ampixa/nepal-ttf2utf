@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin and exhaust the 38-source Sunuwar project contract; freeze its public and
+  effective tables, require a Boolean compatibility flag, add installed-wheel
+  coverage, and state the non-distributed derivation boundary explicitly.
 - Pin and exhaust the 63-source OLCKOptimum and derived 67-source OLCKLatic
   contracts; harden custom constructors and JSON parsing, align dispatch aliases
   with evidenced font weights, and correct the public evidence scope.
@@ -97,8 +100,9 @@
   encoding, strict-mode, and font-listing support.
 - Make strict mode consistently report leftover ASCII bytes across script
   converters and preserve already-Unicode script text.
-- Resolve the final observed Sunuwar byte, `|`, as the Sikkim regional form of
-  U+11BC5 SUNUWAR LETTER UTTHI from labeled regional-glyph and corpus evidence.
+- Set the built-in project mapping for the Sunuwar byte `|` to U+11BC5
+  SUNUWAR LETTER UTTHI from project derivation informed by public regional-form
+  references; the underlying legacy corpus artifacts are not distributed.
 - Add a distinct converter for the globally permuted Sikkim Herald Kirat Rai
   layout. Exact outline-and-width matching resolves 43,037 of 43,148 audited
   characters; only one extracted `Z` remains unresolved.

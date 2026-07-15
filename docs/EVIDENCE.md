@@ -148,37 +148,49 @@ can produce valid Kirat Rai codepoints with the wrong semantics, even when none
 of those six bytes occurs. The regression string `udzdle` demonstrates the
 full-layout premap in the test suite.
 
-## Sunuwar UTTHI
+## Sunuwar project contract
 
-The final uncertain `kirat1` byte, `|`, occurs 2,748 times across eight distinct
-PDFs: 1,886 medial, 780 final, 75 initial, and 7 standalone.
+The project does not use or cite a published upstream byte-to-Unicode table for
+the legacy `koits` and `kirat1` layout. The built-in map is a project-derived
+contract. Its source PDFs, embedded legacy fonts, glyph crops, contact sheets,
+and intermediate comparison artifacts are not distributed by this package;
+their hashes, licenses, and public locations are therefore not claimed here.
+The legacy assignments cannot be independently reconstructed from this
+repository and are not presented as an upstream encoding standard.
 
-Richard Ishida's reviewed
+Public references establish the encoded Sunuwar characters and regional glyph
+forms, but not their legacy byte assignments. Richard Ishida's reviewed
 [Sunuwar orthography notes](https://r12a.github.io/scripts/sunu/suz.html#writingstyles)
-label separate Sikkim Herald forms for
+label separate Sikkim forms for
 [UTTHI](https://r12a.github.io/scripts/sunu/suz/sk-utthi.png) and
-[SHYELE](https://r12a.github.io/scripts/sunu/suz/sk-shyeli.png). A 600-dpi crop
-of legacy `|` from `sunuwar_01348c63.pdf`, page 1, bounding box
-`(94.0076, 229.58, 100.5176, 245.204)`, is the same flowing open-2 form as
-Sikkim UTTHI.
-
-Normalized largest-component raster comparison (height 160 on a 240-pixel
-canvas, grayscale threshold below 180, best translation within ±15 pixels):
-
-| Reference | IoU |
-|---|---:|
-| Sikkim UTTHI | 0.7395 |
-| Sikkim SHYELE | 0.3681 |
-| Nepal UTTHI | 0.5399 |
-| Nepal SHYELE | 0.4084 |
-
-The regional difference is documented in Unicode
-[`L2/24-022`](https://www.unicode.org/L2/L2024/24022-sunuwar-font-comp.pdf).
-The character proposal
+[SHYELE](https://r12a.github.io/scripts/sunu/suz/sk-shyeli.png). Unicode
+[`L2/24-022`](https://www.unicode.org/L2/L2024/24022-sunuwar-font-comp.pdf)
+documents the regional design differences, while
 [`L2/21-157R`](https://www.unicode.org/L2/L2021/21157r-sunuwar.pdf)
-confirms UTTHI `/u/`, SHYELE `/s/`, and SHYER `/ʃ/`. Corpus form `t|v|`, with
-independently confirmed `t→MA` and `v→REU`, consequently reads `m-u-r-u`.
-Together these establish `| → U+11BC5 SUNUWAR LETTER UTTHI`.
+documents UTTHI `/u/`, SHYELE `/s/`, and SHYER `/ʃ/`. Informed by those public
+references and the non-distributed project comparison, the built-in map assigns
+legacy `|` to U+11BC5 SUNUWAR LETTER UTTHI. This is a project mapping decision,
+not a byte assignment established by the public references alone.
+
+The effective contract contains 38 confirmed singleton mappings and no
+uncertain mapping: 28 letter sources and the ordered legacy digits `0` through
+`9`. All 38 targets are unique and assigned in the pinned Unicode 17 Sunuwar
+repertoire. Twenty printable punctuation characters pass through literally.
+Six assigned non-digit positions have no legacy source in this contract:
+U+11BC6, U+11BCA, U+11BD2, U+11BD7, U+11BDD, and U+11BE1. The contract therefore
+does not claim complete legacy coverage of the assigned Unicode repertoire.
+
+The pinned functional payload is compact sorted-key ASCII JSON with three
+fields: `confirmed` contains sorted integer `[source, target]` pairs,
+`passthrough` contains sorted source codepoints, and `uncertain` is an empty
+array. Its 549 bytes have SHA-256
+`d64f76e20aa9aa9a0d58469212235ad63cdfb11fea9ce692762ab06b77296d0b`.
+Tests execute every mapping and classify all 256 byte values as 38 mapped, four
+structural-whitespace, 20 literal passthrough, and 194 preserved-but-diagnosed
+values. They also verify strict passthrough of all 44 assigned Unicode Sunuwar
+characters and strict rejection of all 20 reserved block positions. Public
+mapping constants and converter snapshots are immutable, and the retained
+`apply_uncertain` compatibility option accepts only a Boolean.
 
 ## Sikkim Herald Lepcha
 

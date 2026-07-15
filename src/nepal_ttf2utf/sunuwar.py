@@ -1,99 +1,70 @@
-"""Sunuwar / Jenticha (Koĩts) legacy display font -> Unicode Sunuwar (U+11BC0-U+11BFF).
+"""Sunuwar / Jenticha (Koĩts) legacy display font -> Unicode Sunuwar.
 
-The Sunuwar edition of the Sikkim Herald ("Mukhia") is typeset in a legacy display
-font that ships under two BaseFont names — ``koits`` (the 2021 edition, a Type0/
-Identity-H CID font) and ``kirat1`` (the 2023/2024 editions, byte-encoded TrueType,
-WinAnsi). Each visible glyph is addressed by a single Latin byte, so the extractable
-text stream is the raw legacy byte sequence, not Unicode.
+The project-derived layout is routed for the legacy ``koits`` and ``kirat1``
+BaseFont names. Its 38 confirmed printable-ASCII sources map one-to-one to 28
+Sunuwar letters and ten Sunuwar digits; twenty punctuation sources pass through
+literally, and the contract contains no uncertain mapping entry.
 
-There is no published byte->Unicode table for this layout. The map here was derived by
-GLYPH-SHAPE IDENTITY: ``koits`` and ``kirat1`` were proven byte-for-byte identical
-outlines, so one map serves both. Each legacy byte's outline was rendered and matched
-against the 44 Sunuwar Unicode codepoints in Noto Sans Sunuwar; the Sunuwar block is a
-33-letter alphabet + one auspicious sign + 10 digits with NO dependent vowel signs, so
-every legacy byte is a full letter, digit, or punctuation mark. A first pass fixed the
-digits + 19 letter bytes by printed-crop visual match; a second bijective pass resolved
-8 more (``v q x r u g h j``) by shape (IoU + chamfer) with a hole-count constraint,
-adjudicated against the L2/21-157R Unicode proposal chart and validated by a printed-ink
-single-glyph round-trip.
-
-The final observed byte, ``|``, is U+11BC5 SUNUWAR LETTER UTTHI. The Sikkim form in
-Richard Ishida's reviewed orthography notes is the same flowing open-2 shape as the
-legacy glyph: a 600-dpi corpus crop has normalized largest-component IoU 0.7395 with
-the labeled Sikkim UTTHI image, versus 0.3681 with Sikkim SHYELE. This regional form
-explains why comparison against Noto's Nepal-style glyph originally left it uncertain.
-All observed Sunuwar letter and digit bytes are now confirmed.
-
-Provenance / evidence: ocr-tech ``outputs/sunuwar-map-derivation/`` (contact sheets,
-printed-crop verification, round-trip panels).
+The project does not use or cite a public upstream byte-to-Unicode table for
+this legacy layout. The source PDFs, embedded fonts, crops, and intermediate
+comparison artifacts used for the project derivation are not distributed by
+this package. Public orthography and Unicode-proposal references document the
+encoded characters and their regional forms, but do not independently define
+the legacy byte assignments. The exact project contract and this evidence
+boundary are recorded in ``docs/EVIDENCE.md``.
 """
 
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from ._controls import codepoint_labels
 from .unicode_span import _is_assigned_script_codepoint
 
-# --- Digits: validated, byte '0'..'9' -> U+11BF0..U+11BF9 in order. ---
-SUNUWAR_DIGITS: dict[str, str] = {str(i): chr(0x11BF0 + i) for i in range(10)}
+# Digits: byte '0'..'9' -> U+11BF0..U+11BF9 in order.
+SUNUWAR_DIGITS: Mapping[str, str] = MappingProxyType({str(i): chr(0x11BF0 + i) for i in range(10)})
 
-# --- Letters: CONFIRMED tier (printed-crop and/or round-trip verified). ---
-# byte -> Unicode codepoint (Noto glyph name in comment).
-SUNUWAR_LETTERS_CONFIRMED: dict[str, str] = {
-    "{": chr(0x11BC3),  # imarsunuwar  (cross '+')    round-trip IoU 0.74, printed-crop match
-    "}": chr(0x11BC2),  # ekosunuwar   ('土')         round-trip IoU 0.55, printed-crop match
-    "z": chr(0x11BC9),  # pipsunuwar   (curl '9')     printed-crop match (curl), margin 0.20
-    "A": chr(0x11BD6),  # aalsunuwar   ('Z'/zigzag)   round-trip IoU 0.52, printed-crop match
-    "O": chr(0x11BD1),  # otthisunuwar               round-trip IoU 0.58, margin 0.14
-    "i": chr(0x11BCC),  # carmisunuwar ('<')          round-trip IoU 0.71, printed-crop match
-    "k": chr(0x11BDE),  # tentusunuwar ('E'-stack)    round-trip IoU 0.71, printed-crop match
-    "l": chr(0x11BDF),  # thelesunuwar               round-trip IoU 0.67, margin 0.17
-    "m": chr(0x11BC1),  # taslasunuwar               round-trip IoU 0.58, margin 0.08
-    "n": chr(0x11BD8),  # tharisunuwar               round-trip IoU 0.52, margin 0.07
-    "o": chr(0x11BC0),  # devisunuwar  ('刀' box)      round-trip IoU 0.50, printed-crop match
-    "p": chr(0x11BCD),  # nahsunuwar                 round-trip IoU 0.54, margin 0.10
-    "w": chr(0x11BD0),  # loachasunuwar('Ш' comb)     round-trip IoU 0.46, printed-crop match
-    "y": chr(0x11BDC),  # shyersunuwar ('U')          round-trip IoU 0.82, printed-crop match
-    "f": chr(0x11BDB),  # khasunuwar   ('Π' gate)      round-trip IoU 0.46, printed-crop match
-    "s": chr(0x11BCE),  # bursunuwar   (cross+hook)   round-trip IoU 0.54, printed-crop match
-    "a": chr(0x11BC8),  # apphosunuwar (rev-'3' curl) round-trip IoU 0.51, printed-crop match
-    "t": chr(0x11BC7),  # masunuwar    ('Ш' comb)      printed-crop match (comb=comb); n=1259
-    "e": chr(0x11BCB),  # hamsosunuwar (cross+foot)   printed-crop match (cross+hook); n=1006
-    # The 8 bytes resolved by the second derivation pass — bijective assignment of the
-    # uncertain bytes to the still-free codepoints, scored by Kirat1-glyph-vs-Noto-glyph
-    # shape (IoU + chamfer) with a topological hole-count constraint, adjudicated against
-    # the L2/21-157R proposal chart and validated by a printed-ink single-glyph round-trip.
-    "v": chr(
-        0x11BC4
-    ),  # reusunuwar   (N+diagonal)   shape 0.545>=floor; bijection+context-match; n=765
-    "q": chr(
-        0x11BE0
-    ),  # klokosunuwar (bowl+stem)    shape 0.567>=floor; bijection+context-match; n=579
-    "x": chr(
-        0x11BD3
-    ),  # varcasunuwar (N+hook)       shape 0.522>=floor; bijection+context-match; n=97
-    "r": chr(0x11BD9),  # pharsunuwar  ('alpha')      shape 0.521>=floor; hole-match 1=1; n=40
-    "u": chr(
-        0x11BD4
-    ),  # yatsunuwar   (looped 'e')   topology-locked (1 hole=loop); printed-ink 7/8 vote
-    "g": chr(
-        0x11BD5
-    ),  # avasunuwar   (forked vert)  embedded-glyph 0.454 decisive over gil; printed-ink
-    "h": chr(0x11BDA),  # ngarsunuwar  ('3')          printed-ink 7/8 vote over donga('5'); n=180
-    "j": chr(
-        0x11BCF
-    ),  # jyahsunuwar  (dagger '+')   embedded-glyph 0.504 decisive (dagger=dagger); n=198
-    # Sikkim UTTHI has a regional flowing open-2 form. It matches the Sikkim-labeled
-    # reference glyph at IoU 0.7395 (versus 0.3681 for SHYELE); n=1079.
-    "|": chr(0x11BC5),  # utthisunuwar /u/
-}
+# Confirmed byte -> Unicode letter assignments.
+SUNUWAR_LETTERS_CONFIRMED: Mapping[str, str] = MappingProxyType(
+    {
+        "{": chr(0x11BC3),  # SUNUWAR LETTER IMAR
+        "}": chr(0x11BC2),  # SUNUWAR LETTER EKO
+        "z": chr(0x11BC9),  # SUNUWAR LETTER PIP
+        "A": chr(0x11BD6),  # SUNUWAR LETTER AAL
+        "O": chr(0x11BD1),  # SUNUWAR LETTER OTTHI
+        "i": chr(0x11BCC),  # SUNUWAR LETTER CARMI
+        "k": chr(0x11BDE),  # SUNUWAR LETTER TENTU
+        "l": chr(0x11BDF),  # SUNUWAR LETTER THELE
+        "m": chr(0x11BC1),  # SUNUWAR LETTER TASLA
+        "n": chr(0x11BD8),  # SUNUWAR LETTER THARI
+        "o": chr(0x11BC0),  # SUNUWAR LETTER DEVI
+        "p": chr(0x11BCD),  # SUNUWAR LETTER NAH
+        "w": chr(0x11BD0),  # SUNUWAR LETTER LOACHA
+        "y": chr(0x11BDC),  # SUNUWAR LETTER SHYER
+        "f": chr(0x11BDB),  # SUNUWAR LETTER KHA
+        "s": chr(0x11BCE),  # SUNUWAR LETTER BUR
+        "a": chr(0x11BC8),  # SUNUWAR LETTER APPHO
+        "t": chr(0x11BC7),  # SUNUWAR LETTER MA
+        "e": chr(0x11BCB),  # SUNUWAR LETTER HAMSO
+        "v": chr(0x11BC4),  # SUNUWAR LETTER REU
+        "q": chr(0x11BE0),  # SUNUWAR LETTER KLOKO
+        "x": chr(0x11BD3),  # SUNUWAR LETTER VARCA
+        "r": chr(0x11BD9),  # SUNUWAR LETTER PHAR
+        "u": chr(0x11BD4),  # SUNUWAR LETTER YAT
+        "g": chr(0x11BD5),  # SUNUWAR LETTER AVA
+        "h": chr(0x11BDA),  # SUNUWAR LETTER NGAR
+        "j": chr(0x11BCF),  # SUNUWAR LETTER JYAH
+        "|": chr(0x11BC5),  # SUNUWAR LETTER UTTHI
+    }
+)
 
-# Kept as a public compatibility constant. No observed bytes remain uncertain.
-SUNUWAR_LETTERS_UNCERTAIN: dict[str, str] = {}
+# Kept as a public compatibility constant. No uncertain mapping entry exists.
+SUNUWAR_LETTERS_UNCERTAIN: Mapping[str, str] = MappingProxyType({})
 
-# Punctuation / danda-like bytes: passed through unchanged (not Sunuwar letters).
+# Literal punctuation sources: passed through unchanged.
 SUNUWAR_PASSTHROUGH: frozenset[str] = frozenset(
     {
         ",",
@@ -123,11 +94,53 @@ _SUNUWAR_BLOCK_LO = 0x11BC0
 _SUNUWAR_BLOCK_HI = 0x11BFF
 
 
-def _build_default_table() -> dict[str, str]:
-    table: dict[str, str] = {}
-    table.update(SUNUWAR_DIGITS)
-    table.update(SUNUWAR_LETTERS_CONFIRMED)
-    return table
+def _validate_contract_section(entries: Mapping[str, str], label: str) -> None:
+    for source, target in entries.items():
+        if not isinstance(source, str) or len(source) != 1 or not (0x21 <= ord(source) <= 0x7E):
+            raise ValueError(f"invalid Sunuwar {label} source {source!r}")
+        if (
+            not isinstance(target, str)
+            or len(target) != 1
+            or not _is_assigned_script_codepoint(ord(target), "Sunuwar")
+        ):
+            raise ValueError(f"invalid Sunuwar {label} target {target!r} for {source!r}")
+
+
+def _freeze_default_contract() -> tuple[Mapping[str, str], Mapping[str, str], frozenset[str]]:
+    digit_sources = set(SUNUWAR_DIGITS)
+    letter_sources = set(SUNUWAR_LETTERS_CONFIRMED)
+    if digit_sources & letter_sources:
+        raise ValueError("Sunuwar digit and letter sources overlap")
+
+    confirmed = {**SUNUWAR_DIGITS, **SUNUWAR_LETTERS_CONFIRMED}
+    uncertain = dict(SUNUWAR_LETTERS_UNCERTAIN)
+    if not confirmed:
+        raise ValueError("SunuwarConverter requires a non-empty confirmed map")
+    overlap = set(confirmed) & set(uncertain)
+    if overlap:
+        labels = " ".join(repr(source) for source in sorted(overlap))
+        raise ValueError(f"Sunuwar confirmed and uncertain sources overlap: {labels}")
+
+    _validate_contract_section(confirmed, "confirmed")
+    _validate_contract_section(uncertain, "uncertain")
+    targets = list(confirmed.values()) + list(uncertain.values())
+    if len(targets) != len(set(targets)):
+        raise ValueError("Sunuwar confirmed and uncertain targets must be one-to-one")
+
+    passthrough = frozenset(SUNUWAR_PASSTHROUGH)
+    mapping_sources = set(confirmed) | set(uncertain)
+    if mapping_sources & passthrough:
+        raise ValueError("Sunuwar mapping and passthrough sources overlap")
+    if any(
+        not isinstance(source, str) or len(source) != 1 or not (0x21 <= ord(source) <= 0x7E)
+        for source in passthrough
+    ):
+        raise ValueError("invalid Sunuwar passthrough source")
+
+    return MappingProxyType(confirmed), MappingProxyType(uncertain), passthrough
+
+
+_DEFAULT_CONFIRMED, _DEFAULT_UNCERTAIN, _DEFAULT_PASSTHROUGH = _freeze_default_contract()
 
 
 @dataclass(frozen=True)
@@ -144,17 +157,21 @@ class SunuwarConversion:
 class SunuwarConverter:
     """Apply the derived Sunuwar legacy byte -> Unicode map.
 
-    All observed letter and digit bytes are confirmed. ``apply_uncertain`` remains an
-    accepted compatibility argument but currently has no effect.
+    The built-in contract contains no uncertain mapping entry.
+    ``apply_uncertain`` remains an accepted compatibility argument but currently
+    has no effect.
     """
 
     def __init__(self, apply_uncertain: bool = False) -> None:
-        table = _build_default_table()
+        if not isinstance(apply_uncertain, bool):
+            raise ValueError("Sunuwar apply_uncertain must be a bool")
+        self._confirmed = _DEFAULT_CONFIRMED
+        self._uncertain = _DEFAULT_UNCERTAIN
+        self._passthrough = _DEFAULT_PASSTHROUGH
+        table = dict(self._confirmed)
         if apply_uncertain:
-            table.update(SUNUWAR_LETTERS_UNCERTAIN)
-        if not table:
-            raise ValueError("SunuwarConverter requires a non-empty map")
-        self._table = table
+            table.update(self._uncertain)
+        self._table = MappingProxyType(table)
         self._apply_uncertain = apply_uncertain
 
     def convert(self, text: str) -> SunuwarConversion:
@@ -171,14 +188,14 @@ class SunuwarConverter:
             if mapped is not None:
                 out.append(mapped)
                 replacements += 1
-                if ch in SUNUWAR_LETTERS_CONFIRMED or ch in SUNUWAR_DIGITS:
+                if ch in self._confirmed:
                     confirmed += 1
                 continue
-            if ch in SUNUWAR_LETTERS_UNCERTAIN:
+            if ch in self._uncertain:
                 uncertain_seen.add(ch)
                 out.append(ch)  # left untouched when not applying uncertain
                 continue
-            if ch in SUNUWAR_PASSTHROUGH:
+            if ch in self._passthrough:
                 out.append(ch)
                 continue
             out.append(ch)
@@ -202,12 +219,14 @@ def convert_sunuwar(
 ) -> SunuwarConversion:
     """Convert Sunuwar/Jenticha legacy font text to Unicode Sunuwar (NFC).
 
-    Returns a :class:`SunuwarConversion`. All observed script bytes are confirmed;
-    ``apply_uncertain`` is retained for API compatibility and is currently a no-op.
-    Input values that are neither mapped bytes, known punctuation, nor assigned
-    Unicode Sunuwar are surfaced in ``unmapped_bytes``. With ``strict=True`` any
-    such value raises ``ValueError``.
+    Returns a :class:`SunuwarConversion`. The built-in contract contains no
+    uncertain mapping entry; ``apply_uncertain`` is retained for API
+    compatibility and is currently a no-op. Input values that are neither mapped
+    bytes, known punctuation, nor assigned Unicode Sunuwar are surfaced in
+    ``unmapped_bytes``. With ``strict=True`` any such value raises ``ValueError``.
     """
+    if not isinstance(apply_uncertain, bool):
+        raise ValueError("Sunuwar apply_uncertain must be a bool")
     result = SunuwarConverter(apply_uncertain=apply_uncertain).convert(text)
     if strict and (result.uncertain_bytes or result.unmapped_bytes):
         flagged = result.uncertain_bytes + result.unmapped_bytes

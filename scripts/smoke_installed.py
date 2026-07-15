@@ -16,6 +16,7 @@ from nepal_ttf2utf import (
     convert_limbu,
     convert_olchiki,
     convert_olchiki_latic,
+    convert_sunuwar,
     convert_tibetanmachine,
 )
 
@@ -70,6 +71,8 @@ def main() -> int:
         raise AssertionError("strict TibetanMachine conversion accepted defined-empty input")
     assert convert_olchiki("a", strict=True).unicode_text == "ᱟ"
     assert convert_olchiki_latic(".", strict=True).unicode_text == "ᱹ"
+    assert convert_sunuwar("A", strict=True).unicode_text == "𑯖"
+    assert nepal_ttf2utf.convert("A", font="kirat1", strict=True) == "𑯖"
     assert convert_lepcha("A", strict=True).unicode_text == "ᰀ"
     assert convert_devanagari("g]kfn", strict=True).unicode_text == "नेपाल"
     assigned_devanagari = "\u0903\U00011b00"
