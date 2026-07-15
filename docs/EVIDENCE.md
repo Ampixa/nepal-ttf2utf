@@ -265,11 +265,58 @@ the source table's U+25CC output and replacement counts while recording the
 source values in `uncertain_codepoints`; strict conversion rejects them. No
 replacement mapping is inferred.
 
+## OLCKOptimum Ol Chiki
+
+The public source is [*AALE CHHATKA Pdf
+e-Magazine-2023*](https://archive.org/details/aale-chhatka-pdf-e-magazine-2023),
+archive filename `AALE CHHATKA Pdf e-Magazine-2023.pdf`, exact PDF SHA-256
+`7588dae38adb5533e5692bf6cf6148cb5e411afa32c4f24dfe7cd1db1b9ec9b8`.
+The Internet Archive item carries a publisher/uploader-applied
+[Creative Commons Public Domain Mark
+1.0](https://creativecommons.org/publicdomain/mark/1.0/); the mark is not CC0
+and is not itself a license.
+
+The embedded OLCKOptimum-Medium and OLCKOptimum-ExtraBlack fonts have
+SHA-256 `6261843567686c67d83a508388c59e7cc4e812b8ac512cf5aace8406b5f7fd43`
+and `ac77c7a64137699cafb16018e09da691439841c849033f35823cb8b133f19a04`.
+Their ASCII-keyed glyph outlines, script structure, and corpus context
+establish the bundled mapping. Supporting derivation artifacts are not
+distributed by this package; the resulting project mapping is not presented
+as an upstream encoding standard.
+
+The 2,707-byte, 76-line
+[`olck_optimum.json`](../src/nepal_ttf2utf/maps/olck_optimum.json) resource has
+SHA-256
+`ded27e2a142a04d086d6031b2583b8ae4306ed540f591aa8fac8a71a89e04ce7`.
+It contains 63 confirmed singleton mappings and no uncertain mapping: 52
+letter or modifier sources, ten digit sources, and one punctuation source.
+The table has 43 unique targets; its twenty repeated targets are the documented
+uppercase/lowercase outline-identical pairs.
+
+The Optimum effective-map payload is a compact ASCII JSON array of sorted
+`[source-byte, [target-codepoint]]` rows. Its 781 bytes have SHA-256
+`91355469f4c726923f5b4618aaced072cf6589b0a9ee59733400b52874fcbda3`.
+The corresponding 67-row Latic effective map is 830 bytes with SHA-256
+`3f0337524ddf766289416bd303725e797d3a14a99c3beddb5af4c3dd56fd81c4`.
+A combined sorted-key contract records the nine declared Latic overrides and,
+for each layout, its sorted confirmed and uncertain pairs plus passthrough
+codepoints. Compact separators `(",", ":")` produce a 1,675-byte ASCII payload
+with SHA-256
+`0b7aa84e70c42100fcbc517ea238038e2c4f670684cf0148152cda89fd99a3ef`.
+
+Tests execute every effective mapping, classify all 256 byte values for both
+layouts, and verify strict passthrough of all 48 assigned Unicode Ol Chiki
+characters. Optimum classifies 63 mapped, four structural-whitespace, 13
+byte-range passthrough, and 176 unmapped values. Latic classifies 67 mapped,
+four structural-whitespace, nine byte-range passthrough, and 176 unmapped
+values. Custom constructors and JSON files fail closed on unsafe sources,
+unassigned targets, ambiguous confirmed/uncertain state, noncanonical or
+duplicate keys, inconsistent uncertainty metadata, and unbounded iterables.
+
 ## OLCKLatic Ol Chiki
 
-OLCKLatic is a distinct legacy layout, not an alias for OLCKOptimum. Three
-embedded family members establish the mapping through paired ASCII and Ol Chiki
-cmaps:
+OLCKLatic is a distinct legacy layout, not an alias for OLCKOptimum. The public
+2023 source contains three embedded family members:
 
 | Embedded family | Font SHA-256 |
 |---|---|
@@ -277,17 +324,24 @@ cmaps:
 | OLCKLatic-Normal | `7289595f7cfce81ade5063d9e668bf9517ae2fc216c7e065b24f8421a92485e2` |
 | OLCKLatic-Bold | `43c138a8ed911b3e9cd8b09dc87b676341495715a4d99a31ee8cc142385cf6c0` |
 
+Comparison of their ASCII-keyed and Unicode-keyed glyph outlines, rather than
+cmap aliases alone, establishes the crosswalk. Exact outline-plus-metric
+equality covers 45 of 67 UltraBlack pairs and 55 of 67 Normal and Bold pairs;
+normalized outline comparison covers the remaining correspondences. The
+intermediate comparison artifacts and normalization script are not distributed,
+so these counts document project derivation evidence rather than a reproducible
+upstream crosswalk.
+
 Most letters and digits retain the Optimum semantics. Latic swaps the Optimum
 `v`/`V` and `w`/`W` assignments: `v` maps to U+1C76 and `w` maps to U+1C63.
 Its punctuation layer maps `.`, `-`, `:`, `~`, and `|` to U+1C79, U+1C7C,
 U+1C7A, U+1C7B, and U+1C7E respectively.
 
-The two audited Aale Chhatka PDFs have SHA-256
-`7588dae38adb5533e5692bf6cf6148cb5e411afa32c4f24dfe7cd1db1b9ec9b8`
-and `e22a72b483ff2fe5c196946832df3f3543bb81e3e986c19caed2d14e5a2f0ae2`.
-Their 234 OLCKLatic spans contain 2,089 characters: 70 UltraBlack, 272 Normal,
-and 1,747 Bold. The separate Latic converter maps the complete observed set
-without an unresolved character.
+Using PyMuPDF `page.get_text("dict")`, selecting spans whose `font` value starts
+with `OLCKLatic-`, and summing `len(span["text"])` produces 111 spans and 980
+characters: 30 UltraBlack, 129 Normal, and 821 Bold. The separate Latic converter
+accepts that observed set without an unmapped value. Evidence currently
+establishes only the UltraBlack, Normal, and Bold weight names.
 
 ## Videha Janaki Tirhuta
 

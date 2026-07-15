@@ -238,16 +238,20 @@ _LEPCHA_UNICODE_FONTS = {
     "notosanslepcha-regular",
     "unicode-lepcha",
 }
-# Santali Ol Chiki 'Optimum' legacy display font (OLCKOptimum-Medium/-ExtraBlack).
-_OLCHIKI_FONTS = {"olck-optimum", "olchiki-optimum", "olchiki", "aale-chhatka"}
+# Santali Ol Chiki Optimum legacy display fonts evidenced by embedded outlines.
+_OLCHIKI_FONTS = {
+    "aale-chhatka",
+    "olck-optimum",
+    "olckoptimum-extrablack",
+    "olckoptimum-medium",
+    "olchiki",
+    "olchiki-optimum",
+}
 # OLCKLatic shares the semantic letters/digits but has different punctuation.
 _OLCHIKI_LATIC_FONTS = {
     "olck-latic",
     "olcklatic",
-    "olcklatic-black",
     "olcklatic-bold",
-    "olcklatic-extrablack",
-    "olcklatic-medium",
     "olcklatic-normal",
     "olcklatic-ultrablack",
     "olchiki-latic",

@@ -54,6 +54,7 @@ PINNED_RESOURCE_HASHES = {
     "maps/kiratraifontnew.map": (
         "1750a51d4c40156ed49a57105d5d83905f263b7c084b7d7539ab7055a931a3c4"
     ),
+    "maps/olck_optimum.json": ("ded27e2a142a04d086d6031b2583b8ae4306ed540f591aa8fac8a71a89e04ce7"),
     "maps/sikkim_herald_lepcha.json": (
         "29f55542cf67d230a6bb2f1474f85e6688b0e30e36271251a2f24af2f6d78bb1"
     ),

@@ -1,66 +1,48 @@
 """Ol Chiki Optimum/Latic legacy fonts -> Unicode Ol Chiki (U+1C50-U+1C7F).
 
-The Aale Chhatka Santali e-magazine (self-published, archive.org) is typeset in the
-'Ol Chiki Optimum' font family (BaseFont ``OLCKOptimum-Medium`` / ``OLCKOptimum-
-ExtraBlack``; foundry Sengellabs, marketed as "unicoded"). Despite that marketing
-claim, the embedded font's own cmap keys each Ol Chiki glyph OUTLINE to a Latin ASCII
-codepoint: the font renders correctly on screen (an Ol Chiki reader sees real Ol Chiki
-shapes) but the extractable PDF text is Latin garbage, e.g. the string
-``CaDokiya. SanTazi savheD`` -- an identity-Latin encoding, the same class of problem
-as the Sikkim Herald live-text Lepcha font (see ``lepcha.py``), not a rendering bug.
+The public evidence source is the 2023 Aale Chhatka Santali e-magazine archived
+as Internet Archive item ``aale-chhatka-pdf-e-magazine-2023``. Its embedded
+OLCKOptimum display fonts address Ol Chiki glyph outlines with printable ASCII
+source codes, so extracted PDF text requires a legacy-byte conversion.
 
-The map (``maps/olck_optimum.json``) was derived by GLYPH-SHAPE IDENTITY: each byte's
-glyph was rendered (via the extracted embedded TTF) and shape-matched (IoU on
-centered/scaled binary renders) against Noto Sans Ol Chiki, refined with a Hungarian
-optimal-assignment pass across all 32 distinct legacy glyphs and the 38 Ol Chiki
-base-letter + modifier-sign codepoints. Two corrections were applied on top of the raw
-shape score: corpus byte FREQUENCY (the single most-frequent byte was anchored to LA,
-the alphabet's first/most fundamental letter, overriding a marginally cheaper
-shape-only optimum that would have given LA to a much rarer byte) and the alphabet's
-own STRUCTURE (the 6 Latin-vowel-family bytes landed exactly on Ol Chiki's 6
-row-starter letters LAA/LE/LI/LA/LU/LO -- a sanity check a wrong mapping would not
-pass). Two entries were confirmed by corpus POSITION rather than shape alone: ``N``
-(rare, always immediately after a vowel and before a consonant, e.g. ``hoN``) is the
-MU TTUDDAG nasalization mark; ``|`` (206 occurrences, always sentence-final) is the OL
-CHIKI PUNCTUATION MUCAAD danda-equivalent, whose raw pixel IoU against Noto's glyph was
-misleadingly 0.0 (a 1-2px vertical bar shifted by a few pixels nets zero overlap) but
-whose shape and position are unambiguous.
+The bundled Optimum table was derived from normalized rendered-outline
+comparison against Unicode Ol Chiki references, constrained by script structure
+and corpus context. It contains 52 letter or modifier sources, ten digit sources,
+and one punctuation source. Twenty uppercase/lowercase pairs intentionally share
+targets because their font outlines are identical; no Optimum source remains
+uncertain.
 
-Coverage: 53 letter/mark bytes + 10 digits are CONFIRMED; no OLCKOptimum
-bytes remain uncertain. The formerly uncertain bytes were promoted on 2026-07-13:
-``n`` maps to U+1C71 OL CHIKI LETTER EN and ``T`` maps to U+1C5B OL CHIKI LETTER
-AT, based on combined glyph, corpus-context, and lexicon evidence in ocr-tech
-``outputs/olchiki-uncertain-bytes-2026-07-13/``. Twenty of the 26 upper/lowercase
-byte pairs share an IDENTICAL glyph outline in the font (verified IoU=1.000
-against each other, not guessed) and so map to the same codepoint as their
-lowercase twin; only ``d/D h/H m/M n/N o/O t/T`` have genuinely different
-per-case outlines and were derived independently. Uppercase ``W``/``X`` never
-occur in the source corpus but their outline-identity with lowercase ``w``/``x``
-was confirmed directly from the font file, so they are mapped on that basis
-alone.
-
-The 'Ol Chiki Latic' display family mostly shares the semantic letter and digit
-assignments. Its different visual design made cross-family raster similarity a poor
-test, but within each Latic font its ASCII and Unicode cmaps establish the identity.
-Latic swaps Optimum's ``v/V`` and ``w/W`` assignments and has a distinct punctuation
-layer: ``. - : ~ |`` map to U+1C79, U+1C7C, U+1C7A, U+1C7B, and U+1C7E. It
-therefore has a separate converter.
-
-Provenance / evidence: ocr-tech data/external-language-resources/native-script-real-
-2026-07-06/ol-chiki/ (aale-chhatka-2023.pdf, aale-chhatka-september-2023.pdf).
+OLCKLatic is a separate evidenced layout. It retains most Optimum semantics,
+swaps the ``v/V`` and ``w/W`` assignments, and maps ``. - : ~ |`` to U+1C79,
+U+1C7C, U+1C7A, U+1C7B, and U+1C7E. Exact PDF and embedded-font hashes,
+derivation limits, and the pinned functional contracts are documented in
+``docs/EVIDENCE.md``.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
+from collections.abc import Iterable, Mapping, Set
 from dataclasses import dataclass, field
 from importlib import resources
+from itertools import islice
 from pathlib import Path
+from types import MappingProxyType
 
 from ._controls import codepoint_labels
+from .unicode_span import _is_assigned_script_codepoint
 
 OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
+_BYTE_KEY_RE = re.compile(r"[0-9A-F]{2}")
+_TARGET_KEY_RE = re.compile(r"[0-9A-F]{4}")
+_MAX_MAP_FILE_BYTES = 1_000_000
+_MAX_MAP_ENTRIES = 128
+_MAX_PASSTHROUGH = 128
+_MAP_FIELDS = frozenset(
+    {"_doc", "_derivation", "_confidence", "_uncertain_bytes", "map", "uncertain_map"}
+)
 
 # ASCII punctuation the font renders as literal, unmodified glyphs (verified by
 # rendering each candidate byte and comparing against a plain ASCII reference --
@@ -69,59 +51,182 @@ OLCHIKI_PASSTHROUGH: frozenset[str] = frozenset(
     {",", ".", "-", "'", "(", ")", '"', ":", ";", "?", "!", "~", "“", "”", "+"}
 )
 
-OLCHIKI_LATIC_OVERRIDES: dict[int, int] = {
-    ord("v"): 0x1C76,
-    ord("V"): 0x1C76,
-    ord("w"): 0x1C63,
-    ord("W"): 0x1C63,
-    ord("."): 0x1C79,
-    ord("-"): 0x1C7C,
-    ord(":"): 0x1C7A,
-    ord("~"): 0x1C7B,
-    ord("|"): 0x1C7E,
-}
+OLCHIKI_LATIC_OVERRIDES: Mapping[int, int] = MappingProxyType(
+    {
+        ord("v"): 0x1C76,
+        ord("V"): 0x1C76,
+        ord("w"): 0x1C63,
+        ord("W"): 0x1C63,
+        ord("."): 0x1C79,
+        ord("-"): 0x1C7C,
+        ord(":"): 0x1C7A,
+        ord("~"): 0x1C7B,
+        ord("|"): 0x1C7E,
+    }
+)
 OLCHIKI_LATIC_PASSTHROUGH: frozenset[str] = OLCHIKI_PASSTHROUGH - frozenset(".-:~")
+
+
+def _bounded_tuple(values: object, limit: int, label: str) -> tuple[object, ...]:
+    if isinstance(values, (str, bytes, Mapping)):
+        raise ValueError(f"invalid Ol Chiki {label}")
+    try:
+        result = tuple(islice(iter(values), limit + 1))  # type: ignore[arg-type]
+    except TypeError as error:
+        raise ValueError(f"invalid Ol Chiki {label}") from error
+    if len(result) > limit:
+        raise ValueError(f"Ol Chiki {label} exceeds {limit} entries")
+    return result
+
+
+def _validate_source_byte(source: object, label: str) -> int:
+    if isinstance(source, bool) or not isinstance(source, int) or not (0x21 <= source <= 0x7E):
+        raise ValueError(
+            f"invalid Ol Chiki {label} source {source!r}; expected printable ASCII 0x21..0x7E"
+        )
+    return source
+
+
+def _validate_target_codepoint(target: object, source: int, label: str) -> int:
+    if (
+        isinstance(target, bool)
+        or not isinstance(target, int)
+        or not _is_assigned_script_codepoint(target, "Ol Chiki")
+    ):
+        raise ValueError(
+            f"invalid or unassigned Ol Chiki {label} target {target!r} for source 0x{source:02X}"
+        )
+    return target
+
+
+def _normalize_map(entries: object, label: str) -> dict[int, int]:
+    if not isinstance(entries, Mapping):
+        raise ValueError(f"Ol Chiki {label} must be a mapping")
+    items = _bounded_tuple(entries.items(), _MAX_MAP_ENTRIES, f"{label} item sequence")
+    table: dict[int, int] = {}
+    for raw_item in items:
+        if isinstance(raw_item, (str, bytes, Mapping, Set)):
+            raise ValueError(f"invalid Ol Chiki {label} entry: {raw_item!r}")
+        try:
+            raw_source, raw_target = raw_item  # type: ignore[misc]
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"invalid Ol Chiki {label} entry: {raw_item!r}") from error
+        source = _validate_source_byte(raw_source, label)
+        if source in table:
+            raise ValueError(f"duplicate Ol Chiki {label} source: 0x{source:02X}")
+        table[source] = _validate_target_codepoint(raw_target, source, label)
+    return table
+
+
+def _normalize_passthrough(values: object) -> frozenset[str]:
+    members = _bounded_tuple(values, _MAX_PASSTHROUGH, "passthrough sequence")
+    normalized: set[str] = set()
+    for member in members:
+        if (
+            not isinstance(member, str)
+            or len(member) != 1
+            or member.isspace()
+            or unicodedata.category(member).startswith("C")
+        ):
+            raise ValueError(f"invalid Ol Chiki passthrough character: {member!r}")
+        if member in normalized:
+            raise ValueError(f"duplicate Ol Chiki passthrough character: {member!r}")
+        normalized.add(member)
+    return frozenset(normalized)
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key in Ol Chiki map: {key!r}")
+        result[key] = value
+    return result
 
 
 def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
     map_path = Path(path)
     if not map_path.is_file():
         raise FileNotFoundError(f"Ol Chiki legacy map does not exist: {map_path}")
-    raw = json.loads(map_path.read_text(encoding="utf-8"))
+    with map_path.open("rb") as map_file:
+        map_bytes = map_file.read(_MAX_MAP_FILE_BYTES + 1)
+    if len(map_bytes) > _MAX_MAP_FILE_BYTES:
+        raise ValueError(f"Ol Chiki map exceeds {_MAX_MAP_FILE_BYTES} bytes: {map_path}")
+    try:
+        map_text = map_bytes.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"invalid UTF-8 in Ol Chiki map {map_path}") from error
+    try:
+        raw = json.loads(map_text, object_pairs_hook=_unique_json_object)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"invalid JSON in Ol Chiki map {map_path}: {error.msg}") from error
+    except RecursionError as error:
+        raise ValueError(f"invalid nested JSON in Ol Chiki map {map_path}") from error
     if not isinstance(raw, dict):
         raise ValueError(f"Ol Chiki map must be a JSON object: {map_path}")
+    unexpected_fields = set(raw) - _MAP_FIELDS
+    if unexpected_fields:
+        fields = ", ".join(repr(field) for field in sorted(unexpected_fields))
+        raise ValueError(f"unexpected Ol Chiki map field(s) {fields}: {map_path}")
+    for metadata_name in ("_doc", "_derivation", "_confidence"):
+        if metadata_name in raw and not isinstance(raw[metadata_name], str):
+            raise ValueError(
+                f"Ol Chiki map {metadata_name!r} metadata must be a string: {map_path}"
+            )
     confirmed = _parse_map_section(raw.get("map"), "map", map_path)
     uncertain = _parse_map_section(raw.get("uncertain_map"), "uncertain_map", map_path)
+    overlap = set(confirmed) & set(uncertain)
+    if overlap:
+        labels = " ".join(f"0x{source:02X}" for source in sorted(overlap))
+        raise ValueError(f"Ol Chiki confirmed and uncertain map sources overlap: {labels}")
+
+    if "_uncertain_bytes" in raw:
+        uncertain_inventory = raw["_uncertain_bytes"]
+        if not isinstance(uncertain_inventory, list):
+            raise ValueError(f"Ol Chiki map '_uncertain_bytes' must be a list: {map_path}")
+        if len(uncertain_inventory) > _MAX_MAP_ENTRIES:
+            raise ValueError(
+                f"Ol Chiki uncertain-byte inventory exceeds {_MAX_MAP_ENTRIES} entries"
+            )
+        inventory: set[int] = set()
+        for byte_hex in uncertain_inventory:
+            if not isinstance(byte_hex, str) or _BYTE_KEY_RE.fullmatch(byte_hex) is None:
+                raise ValueError(
+                    f"invalid uncertain Ol Chiki byte {byte_hex!r}; "
+                    "expected two uppercase hex digits"
+                )
+            source = _validate_source_byte(int(byte_hex, 16), "uncertain inventory")
+            if source in inventory:
+                raise ValueError(f"duplicate uncertain Ol Chiki byte: {byte_hex}")
+            inventory.add(source)
+        if inventory != set(uncertain):
+            raise ValueError("Ol Chiki '_uncertain_bytes' must exactly match uncertain_map sources")
     return confirmed, uncertain
 
 
 def _parse_map_section(entries: object, section_name: str, map_path: Path) -> dict[int, int]:
     if not isinstance(entries, dict):
         raise ValueError(f"Ol Chiki map missing '{section_name}' object: {map_path}")
+    if len(entries) > _MAX_MAP_ENTRIES:
+        raise ValueError(f"Ol Chiki {section_name} exceeds {_MAX_MAP_ENTRIES} entries")
     table: dict[int, int] = {}
     for byte_hex, target in entries.items():
-        try:
-            byte = int(byte_hex, 16)
-        except ValueError as exc:
-            raise ValueError(f"invalid byte key in Ol Chiki map: {byte_hex!r}") from exc
-        if not (0 <= byte <= 0x7F):
-            raise ValueError(f"byte key out of ASCII range in Ol Chiki map: {byte_hex!r}")
+        if _BYTE_KEY_RE.fullmatch(byte_hex) is None:
+            raise ValueError(
+                f"invalid byte key in Ol Chiki map: {byte_hex!r}; expected two uppercase hex digits"
+            )
+        byte = _validate_source_byte(int(byte_hex, 16), section_name)
         if not isinstance(target, list) or len(target) != 1 or not isinstance(target[0], str):
             raise ValueError(
                 f"Ol Chiki map target for byte {byte_hex} must be a single hexadecimal-codepoint "
                 "list"
             )
-        try:
-            cp = int(target[0], 16)
-        except ValueError as exc:
+        if _TARGET_KEY_RE.fullmatch(target[0]) is None:
             raise ValueError(
-                f"invalid Ol Chiki codepoint target for byte {byte_hex}: {target[0]!r}"
-            ) from exc
-        if not (OLCHIKI_LO <= cp <= OLCHIKI_HI):
-            raise ValueError(
-                f"Ol Chiki map target U+{cp:04X} outside Ol Chiki block for byte {byte_hex}"
+                f"invalid Ol Chiki codepoint target for byte {byte_hex}: {target[0]!r}; "
+                "expected four uppercase hex digits"
             )
-        table[byte] = cp
+        table[byte] = _validate_target_codepoint(int(target[0], 16), byte, section_name)
     return table
 
 
@@ -147,22 +252,34 @@ class OLChikiConverter:
 
     def __init__(
         self,
-        confirmed_map: dict[int, int],
-        uncertain_map: dict[int, int] | None = None,
+        confirmed_map: Mapping[int, int],
+        uncertain_map: Mapping[int, int] | None = None,
         *,
         apply_uncertain: bool = False,
-        passthrough: frozenset[str] = OLCHIKI_PASSTHROUGH,
+        passthrough: Iterable[str] = OLCHIKI_PASSTHROUGH,
     ) -> None:
-        if not confirmed_map:
+        """Freeze a validated custom contract; explicit map entries precede passthrough."""
+        if not isinstance(apply_uncertain, bool):
+            raise ValueError("Ol Chiki apply_uncertain must be a bool")
+        confirmed = _normalize_map(confirmed_map, "confirmed map")
+        uncertain = _normalize_map(
+            uncertain_map if uncertain_map is not None else {}, "uncertain map"
+        )
+        if not confirmed:
             raise ValueError("OLChikiConverter requires a non-empty confirmed map")
-        self._confirmed = dict(confirmed_map)
-        self._uncertain = dict(uncertain_map or {})
+        overlap = set(confirmed) & set(uncertain)
+        if overlap:
+            labels = " ".join(f"0x{source:02X}" for source in sorted(overlap))
+            raise ValueError(f"Ol Chiki confirmed and uncertain map sources overlap: {labels}")
+        normalized_passthrough = _normalize_passthrough(passthrough)
+        self._confirmed = MappingProxyType(confirmed)
+        self._uncertain = MappingProxyType(uncertain)
         self._apply_uncertain = apply_uncertain
-        self._passthrough = passthrough
-        table = dict(self._confirmed)
+        self._passthrough = normalized_passthrough
+        table = dict(confirmed)
         if apply_uncertain:
-            table.update(self._uncertain)
-        self._table = table
+            table.update(uncertain)
+        self._table = MappingProxyType(table)
 
     @classmethod
     def from_map_file(
@@ -233,22 +350,35 @@ class OLChikiLaticConverter(OLChikiConverter):
     remaining base-map bytes.
     """
 
-    @classmethod
-    def from_map_file(
-        cls, path: str | Path, *, apply_uncertain: bool = False
-    ) -> "OLChikiLaticConverter":
-        confirmed, uncertain = _load_map_file(path)
+    def __init__(
+        self,
+        confirmed_map: Mapping[int, int],
+        uncertain_map: Mapping[int, int] | None = None,
+        *,
+        apply_uncertain: bool = False,
+    ) -> None:
+        confirmed = _normalize_map(confirmed_map, "confirmed map")
+        uncertain = _normalize_map(
+            uncertain_map if uncertain_map is not None else {}, "uncertain map"
+        )
         if not confirmed:
             raise ValueError("OLChikiConverter requires a non-empty confirmed map")
-        for byte, target in OLCHIKI_LATIC_OVERRIDES.items():
-            uncertain.pop(byte, None)
-            confirmed[byte] = target
-        return cls(
+        for source, target in OLCHIKI_LATIC_OVERRIDES.items():
+            uncertain.pop(source, None)
+            confirmed[source] = target
+        super().__init__(
             confirmed,
             uncertain,
             apply_uncertain=apply_uncertain,
             passthrough=OLCHIKI_LATIC_PASSTHROUGH,
         )
+
+    @classmethod
+    def from_map_file(
+        cls, path: str | Path, *, apply_uncertain: bool = False
+    ) -> "OLChikiLaticConverter":
+        confirmed, uncertain = _load_map_file(path)
+        return cls(confirmed, uncertain, apply_uncertain=apply_uncertain)
 
     @classmethod
     def default(cls, *, apply_uncertain: bool = False) -> "OLChikiLaticConverter":
@@ -271,6 +401,8 @@ def convert_olchiki(
     the presence of any uncertain or unmapped byte raises ``ValueError`` instead of
     passing silently.
     """
+    if not isinstance(apply_uncertain, bool):
+        raise ValueError("Ol Chiki apply_uncertain must be a bool")
     global _DEFAULT
     if _DEFAULT is None or apply_uncertain:
         converter = OLChikiConverter.default(apply_uncertain=apply_uncertain)
@@ -292,6 +424,8 @@ def convert_olchiki_latic(
     text: str, *, apply_uncertain: bool = False, strict: bool = False
 ) -> OLChikiConversion:
     """Convert an OLCKLatic legacy span to Unicode Ol Chiki (NFC)."""
+    if not isinstance(apply_uncertain, bool):
+        raise ValueError("Ol Chiki apply_uncertain must be a bool")
     global _LATIC_DEFAULT
     if _LATIC_DEFAULT is None or apply_uncertain:
         converter = OLChikiLaticConverter.default(apply_uncertain=apply_uncertain)

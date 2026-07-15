@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin and exhaust the 63-source OLCKOptimum and derived 67-source OLCKLatic
+  contracts; harden custom constructors and JSON parsing, align dispatch aliases
+  with evidenced font weights, and correct the public evidence scope.
 - Pin and exhaust SIL's complete JG Lepcha forward and reorder contract; reject
   zero-progress, deleting, malformed, ambiguous, or unsupported custom rules
   without changing the three upstream U+25CC placeholder assignments.
