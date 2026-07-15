@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Freeze and pin the complete distributed two-profile Videha recovery contract;
+  reject coercible metadata, codepoints, glyph IDs, flags, malformed containers,
+  and unbounded inputs without adding profiles or semantic glyph assignments.
 - Correct eight Magar Akkha dependent-vowel targets to the semantically matching
   Brahmi characters; pin and freeze the 69-pair reversible project contract and
   its eight explicit lossy folds. Earlier generated dependent-vowel output may

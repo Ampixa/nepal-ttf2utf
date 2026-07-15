@@ -357,8 +357,9 @@ establishes only the UltraBlack, Normal, and Bold weight names.
 
 ## Videha Janaki Tirhuta
 
-The audited source is the 152-page Videha issue
-`videha_01_01_08_tirhuta.pdf` from Internet Archive item
+The first audited source is the 152-page Videha issue
+[`videha_01_01_08_tirhuta.pdf`](https://archive.org/download/videha_15_04_2008_tirhuta/videha_01_01_08_tirhuta.pdf)
+from Internet Archive item
 [`videha_15_04_2008_tirhuta`](https://archive.org/details/videha_15_04_2008_tirhuta),
 whose metadata marks the item
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The PDF has
@@ -370,7 +371,7 @@ Tirhuta glyphs, but the Type0 font's incomplete `ToUnicode` table emits U+FFFD
 for many precomposed conjuncts. PyMuPDF retains the glyph ID for each failed
 character. The `videha-issue-001` profile in
 [`videha.py`](../src/nepal_ttf2utf/videha.py) compares caller-supplied PDF hash,
-page count, and complete embedded-font hash set with pinned values before
+page count, and complete embedded Janaki font hash set with pinned values before
 recovering a glyph. The profile recovered all 3,306 U+FFFD occurrences across
 164 glyph IDs:
 
@@ -394,16 +395,37 @@ its metadata credits Madan Puraskar Pustakalaya and states “All rights
 reserved.” It is decode-only evidence and is not distributed by this package.
 The functional map contains no font binary, glyph outline, cmap, or GSUB table.
 
-The profile's canonical functional-map digest is
+The distributed base functional table contains 164 unique GID-to-Devanagari
+entries and 491 target codepoints. Target-length counts are 13 two-codepoint,
+142 three-codepoint, six four-codepoint, and three five-codepoint sequences.
+Its compact sorted-key UTF-8 JSON payload is 2,918 bytes with SHA-256
 `ef23c410aeb6f75dedb3dffd255f00ba9da7ab66e9d4c76bc7b5ccf1af9cb963`.
-The independent 300-page `videha-2008-04-15` profile is pinned to PDF SHA-256
+
+The same Internet Archive item also contains the separate 300-page
+[`videha_15_04_2008_tirhuta.pdf`](https://archive.org/download/videha_15_04_2008_tirhuta/videha_15_04_2008_tirhuta.pdf),
+which supplies the `videha-2008-04-15` profile pinned to PDF SHA-256
 `740782ecf5bfa9466727029bcb7733d9c8b046c36d848b598ddc60efc1c51bd2`
-and embedded-font SHA-256 values
+and embedded Janaki font SHA-256 values
 `c64600a4edc0fa153717d66d2524c1665562eee47dd489848578e3cec1c56861`
 and `d8863d057541d5cecb862fd43e93114a9a20c6d5de519fc30f3c990962a8b18b`.
-It contributes 34 additional evidenced glyph IDs for a 198-entry combined map,
-whose digest is
+It contributes 34 disjoint GID entries and 104 target codepoints, with target
+length counts of three two-codepoint, 27 three-codepoint, three four-codepoint,
+and one five-codepoint sequence. The extension's 617-byte compact sorted-key
+UTF-8 JSON payload has SHA-256
+`ff8d10751fb8ea49836e48184cd8734d85071aec423ca1ec21469d97503bc4ec`.
+The resulting 198-entry combined map has 595 target codepoints, 198 unique
+targets, and a 3,534-byte payload with SHA-256
 `28ad7cf9b34f5da6c0d3d2cd03d2af2fbd159fdc1bd46dee905f2ccfe50ba326`.
+
+Both functional maps and the two-profile registry are immutable runtime
+snapshots. A compact sorted-key ASCII JSON registry payload maps each profile
+name to `pdf_sha256`, `page_count`, sorted `janaki_font_sha256`, and
+`gid_map_sha256` fields. Its 720 bytes have SHA-256
+`51a00c27f5e48fbef1c4d0e8814bfbb2058ec613dce1acadce9a4205d91488b8`.
+Tests execute every mapped GID individually and in aggregate, require exact
+profile separation for all 34 extension entries, pin the exact map payloads,
+and require every absent 16-bit GID to raise `UnknownJanakiGlyphError` through
+the public recovery API.
 
 `recover_videha_janaki_trace()` accepts PyMuPDF character tuples only after all
 supplied profile metadata matches. Callers are responsible for securely
@@ -416,6 +438,26 @@ Tirhuta residuals and returns their sorted unique values in
 `unmapped_codepoints`; `strict=True` raises `ValueError` if any residual remains.
 This gate adds no glyph recovery and does not establish whole-document or
 linguistic completeness.
+
+Profile metadata requires exact built-in types and syntactically valid
+64-character hexadecimal hashes; uppercase hashes normalize compatibly. Each
+profile accepts exactly two unique Janaki font fingerprints. Ordered trace
+input is bounded to 1,000,000 characters and two to 16 fields per character.
+Codepoints and glyph IDs must be exact integers, codepoints must be Unicode
+scalars, glyph IDs must be in the 16-bit domain, and `strict` must be Boolean.
+Numeric strings, floats, Boolean integers, surrogates, generators, and mappings,
+unordered containers, over-limit sequences, and sequences whose declared and
+observed lengths differ fail closed with `VidehaProfileError`.
+
+The package distributes the two profile definitions and their 164-entry base
+plus 34-entry extension functional tables. It does not distribute the source
+PDF bytes, embedded or reference fonts, PyMuPDF trace corpus, glyph outlines,
+cmap or GSUB tables, HarfBuzz comparison artifacts, or the scripts, trace-level
+result files, and intermediate artifacts used to derive corpus aggregates. The
+public Internet Archive files permit independent hash and page-count checks,
+but the repository alone cannot reconstruct or independently prove the semantic
+GID assignments or occurrence and fragment totals. Those totals are external
+audit observations, not packaged fixtures or whole-corpus coverage claims.
 
 These are aggregate text-fragment diagnostics, not audited line labels or an
 OCR evaluation. The U+25CC cases still require pixel review or exclusion.

@@ -35,7 +35,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka`, and the evidenced `olckoptimum-` names `extrablack` and `medium` | Hash-pinned Optimum letter, modifier, digit, and punctuation map with a fail-closed custom-map schema. |
 | Ol Chiki | `olck-latic`, `olcklatic`, `olchiki-latic`, and the evidenced `olcklatic-` names `bold`, `normal`, and `ultrablack` | Separate OLCKLatic mapping, including its swapped `v`/`w` assignments and distinct punctuation. The [public 2023 source](docs/EVIDENCE.md#olckoptimum-ol-chiki), whose Public Domain Mark status is documented with the evidence, contributes 980 strictly converted characters across 111 spans. |
 | Ol Chiki | Noto Sans Ol Chiki and `ol-chiki-unicode` | Unicode Ol Chiki validation without a legacy-byte pass. |
-| Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. Hash-pinned Videha profiles can also recover broken U+FFFD text from PyMuPDF glyph IDs. |
+| Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. Two hash-pinned Videha profiles use immutable 164-entry base and 34-entry extension maps to recover broken U+FFFD text from caller-supplied PyMuPDF glyph IDs. |
 | Tirhuta / Mithilakshar | Noto Sans Tirhuta and `tirhuta-unicode` | Unicode Tirhuta validation, kept separate from Janaki's Devanagari-coded layout. |
 | Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's hash-pinned 217-row Apache-2.0 TibetanMachine table expands to a pinned 244-entry post-alias lookup snapshot. Custom tables are bounded to a 250-value project-permitted raw-byte and CP1252 source domain and assigned Tibetan targets. Every byte class and ordered two-entry NFC boundary is checked; thirteen effective empty inputs and two corpus-observed source PUA `.notdef` selectors fail strict conversion. |
 | Tibetan | Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, CTRC-HT and aliases | NFC normalization and assigned Tibetan-repertoire validation for already-Unicode spans. |
@@ -170,7 +170,13 @@ supplied tuples. Lenient mode preserves downstream Tirhuta residuals and lists
 their unique values in `unmapped_codepoints`. `strict=True` raises `ValueError`
 when any such residual remains. Profile mismatches and unknown replacement
 glyph IDs fail in both modes. `janaki_gid_map_sha256()` exposes the canonical
-functional-map digest for reproducibility.
+functional-map digest for reproducibility. Metadata and trace fields require
+their documented built-in types: hashes are 64 hexadecimal characters, page
+counts, Unicode scalars, and glyph IDs are exact integers, and `strict` is a
+Boolean. Font fingerprints are bounded to exactly two unique values. Trace
+input is a finite ordered sequence of at most 1,000,000 characters, with two to
+16 fields per character; generators, mappings, unordered containers,
+surrogates, and numeric coercion are rejected.
 
 Available detailed entry points are `convert_devanagari`, `convert_limbu`,
 `convert_kiratrai`, `convert_kiratrai_herald`, `convert_sunuwar`,
