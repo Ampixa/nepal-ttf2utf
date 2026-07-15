@@ -76,6 +76,11 @@ def main() -> int:
     assert hashlib.sha256(limbu_map).hexdigest() == (
         "2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58"
     )
+    jg_lepcha_map = (map_package / "JGLepcha.map").read_bytes()
+    assert len(jg_lepcha_map) == 11_600
+    assert hashlib.sha256(jg_lepcha_map).hexdigest() == (
+        "179d172b4bd4223f40b1ddc1a0daeb6547b5ad97dc1be7df2b09f2bf45ff6b2d"
+    )
 
     assert convert_limbu("k", strict=True) == "ᤐ"
     limbu = LimbuConverter.default()
@@ -155,6 +160,12 @@ def main() -> int:
     assert convert_kiratrai(kirat_overlap, strict=True).unicode_text == "\U00016d6a"
     assert convert_kiratrai_herald(kirat_overlap, strict=True).unicode_text == "\U00016d6a"
     assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
+    contextual_jg_start = convert_jg_lepcha("a", strict=True)
+    assert contextual_jg_start.unicode_text == "ᰦ"
+    assert contextual_jg_start.replacement_count == 1
+    contextual_jg_vowel = convert_jg_lepcha("Oa", strict=True)
+    assert contextual_jg_vowel.unicode_text == "ᰨᰨ"
+    assert contextual_jg_vowel.replacement_count == 2
     native_jg_lepcha = "\u1c27\u1c00"
     native_jg_result = convert_jg_lepcha(native_jg_lepcha, strict=True)
     assert native_jg_result.unicode_text == native_jg_lepcha
@@ -162,6 +173,63 @@ def main() -> int:
     mixed_jg_result = convert_jg_lepcha("i\u1c00", strict=True)
     assert mixed_jg_result.unicode_text == native_jg_lepcha
     assert mixed_jg_result.replacement_count == 1
+    mixed_jg_suffix = convert_jg_lepcha("\u1c27k", strict=True)
+    assert mixed_jg_suffix.unicode_text == native_jg_lepcha
+    assert mixed_jg_suffix.replacement_count == 1
+    legacy_jg_reorder = convert_jg_lepcha("ik", strict=True)
+    assert legacy_jg_reorder.unicode_text == "\u1c00\u1c27"
+    assert legacy_jg_reorder.replacement_count == 2
+    uncertain_jg = convert_jg_lepcha("<=>")
+    assert uncertain_jg.unicode_text == "\u25cc\u25cc\u25cc"
+    assert uncertain_jg.replacement_count == 3
+    assert uncertain_jg.unmapped_codepoints == []
+    assert uncertain_jg.uncertain_codepoints == ["U+003C", "U+003D", "U+003E"]
+    try:
+        convert_jg_lepcha("<=>", strict=True)
+    except ValueError as error:
+        assert "U+003C U+003D U+003E" in str(error)
+        assert "U+25CC" in str(error)
+    else:
+        raise AssertionError("strict JG Lepcha conversion accepted uncertain placeholders")
+    ordered_jg = convert_jg_lepcha("".join(chr(value) for value in range(256)))
+    assert len(ordered_jg.unicode_text) == 319
+    assert len(ordered_jg.unicode_text.encode("utf-8")) == 784
+    assert ordered_jg.lepcha_char_count == 186
+    assert ordered_jg.replacement_count == 160
+    assert len(ordered_jg.unmapped_codepoints) == 125
+    assert len(ordered_jg.uncertain_codepoints) == 3
+    assert hashlib.sha256(ordered_jg.unicode_text.encode("utf-8")).hexdigest() == (
+        "2f9413d6d9a14c8f2c4f76aa2585094bb711d25a9c5c14297a8ad5b1be3568c2"
+    )
+    jg_unmapped_diagnostics = json.dumps(
+        [int(label[2:], 16) for label in ordered_jg.unmapped_codepoints],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(jg_unmapped_diagnostics) == 459
+    assert hashlib.sha256(jg_unmapped_diagnostics).hexdigest() == (
+        "93f28b95392eae866f7ca5be24259e297852e15da2ea69818a015a78522950bf"
+    )
+    jg_uncertain_diagnostics = json.dumps(
+        [int(label[2:], 16) for label in ordered_jg.uncertain_codepoints],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(jg_uncertain_diagnostics) == 10
+    assert hashlib.sha256(jg_uncertain_diagnostics).hexdigest() == (
+        "e1f8c6585e46e58a491c74d684740d52ef5a5a372db7505c77fa031685b8cb7f"
+    )
+    jg_strict_diagnostics = json.dumps(
+        sorted(
+            {
+                int(label[2:], 16)
+                for label in (ordered_jg.unmapped_codepoints + ordered_jg.uncertain_codepoints)
+            }
+        ),
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(jg_strict_diagnostics) == 468
+    assert hashlib.sha256(jg_strict_diagnostics).hexdigest() == (
+        "f71586ce507965104547a0b0d42b7f999d4016ba63331256b94540a37409c8a3"
+    )
     assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
     assert nepal_ttf2utf.convert("!", font="tibetan-machine", strict=True) == "ཀ"
     try:

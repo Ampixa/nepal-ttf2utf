@@ -14,10 +14,54 @@ from types import MappingProxyType
 import pytest
 
 import nepal_ttf2utf as package_module
+import nepal_ttf2utf.jg_lepcha as jg_lepcha_module
 from nepal_ttf2utf import convert, convert_jg_lepcha
 from nepal_ttf2utf._controls import DIAGNOSTIC_C0
 from nepal_ttf2utf.jg_lepcha import JGLepchaConverter, _ReorderRule
 from nepal_ttf2utf.unicode_span import _is_assigned_script_codepoint
+
+_MINIMAL_UNICODE_PASS = """Pass(Unicode)
+Class[Cons] = (U+1C00)
+[Cons]=c <> @c
+"""
+
+
+def _valid_two_pass_map(byte_body: str = "0x41 > U+1C00", *, unicode_body: str = "") -> str:
+    if not unicode_body:
+        unicode_body = _MINIMAL_UNICODE_PASS
+    return f"Pass(Byte_Unicode)\n{byte_body}\n{unicode_body}"
+
+
+def _pad_map_to_exact_bytes(map_text: str, total_bytes: int) -> str:
+    encoded_length = len(map_text.encode("utf-8"))
+    if encoded_length > total_bytes:
+        raise AssertionError("base JG Lepcha fixture exceeds requested byte size")
+    remaining = total_bytes - encoded_length
+    chunks: list[str] = []
+    while remaining:
+        chunk_bytes = min(remaining, jg_lepcha_module._MAX_MAP_LINE_CODEPOINTS + 1)
+        if chunk_bytes == 1:
+            chunks.append("\n")
+        else:
+            chunks.append(";" * (chunk_bytes - 1) + "\n")
+        remaining -= chunk_bytes
+    padded = map_text + "".join(chunks)
+    assert len(padded.encode("utf-8")) == total_bytes
+    return padded
+
+
+def _continued_byte_class(logical_length: int) -> str:
+    prefix = "ByteClass [Padding] = (0x41"
+    first_suffix = "0x42"
+    second_line = "0x43)"
+    inserted_separator = 1
+    padding = logical_length - (
+        len(prefix) + len(first_suffix) + inserted_separator + len(second_line)
+    )
+    if padding < 1:
+        raise AssertionError("requested logical line is too short")
+    first_line = prefix + " " * padding + first_suffix + " \\\n"
+    return first_line + second_line
 
 
 class _InfiniteItemsMapping(Mapping):
@@ -81,6 +125,43 @@ def test_jg_lepcha_map_matches_the_pinned_sil_source_and_parser_inventory():
         "179d172b4bd4223f40b1ddc1a0daeb6547b5ad97dc1be7df2b09f2bf45ff6b2d"
     )
 
+    headers: list[str] = []
+    pass_order: list[str] = []
+    unicode_lines: list[str] = []
+    current_pass = ""
+    for raw_line in map_bytes.decode("utf-8-sig").splitlines():
+        line = raw_line.split(";", 1)[0].strip()
+        if not line:
+            continue
+        pass_match = jg_lepcha_module._PASS_RE.fullmatch(line)
+        if pass_match is not None:
+            current_pass = pass_match.group(1).casefold()
+            pass_order.append(current_pass)
+            continue
+        normalized = " ".join(line.split())
+        if not current_pass:
+            headers.append(normalized)
+        elif current_pass == "unicode":
+            unicode_lines.append(normalized)
+
+    assert headers == [
+        'EncodingName "JG Lepcha Text Conversion to Unicode"',
+        "DescriptiveName \"Text conversion mapping file for Jason Glavy's JG Lepcha "
+        'Custom encoded font. Does not roundtrip."',
+        'Version "1.1"',
+        'Contact "mailto:evans@sil.org"',
+        'RegistrationAuthority "SIL International"',
+        'RegistrationName "JGLepcha_Text_Conversion"',
+        "RHSFlags (ExpectsNFC)",
+    ]
+    assert pass_order == ["byte_unicode", "unicode"]
+    assert len(unicode_lines) == 83
+    unicode_payload = json.dumps(unicode_lines, separators=(",", ":")).encode("ascii")
+    assert len(unicode_payload) == 4459
+    assert hashlib.sha256(unicode_payload).hexdigest() == (
+        "07bdf31de43fd30e5ac9bb9d802fb71a18678b13bb38cfa9123a669575c1b7c4"
+    )
+
     converter = JGLepchaConverter.default()
     assert len(converter._byte_rules) == 160
     assert len({source for source, _target in converter._byte_rules}) == 160
@@ -127,6 +208,13 @@ def test_jg_lepcha_map_matches_the_pinned_sil_source_and_parser_inventory():
     assert isinstance(converter._reorder_rules, tuple)
     assert isinstance(converter._unicode_classes, MappingProxyType)
     assert converter._contract.reorder_provenance == "legacy-byte-derived-only"
+    assert converter._contract.byte_precedence == ("context-first-then-longest-source-first-stable")
+    assert converter._contract.reorder_precedence == "longest-pattern-first-stable"
+    assert converter._contract.source_domain == "byte-scalars"
+    assert converter._contract.pass_order == ("byte_unicode", "unicode")
+    reachable = {codepoint for _source, target in converter._byte_rules for codepoint in target}
+    reachable.add(converter._context_rule[2])  # type: ignore[index]
+    assert all(members <= reachable for members in converter._unicode_classes.values())
     payload = _functional_payload(converter)
     assert len(payload) == 8730
     assert hashlib.sha256(payload).hexdigest() == (
@@ -222,12 +310,42 @@ def test_complete_byte_aggregate_retains_the_pinned_legacy_output():
     source = "".join(chr(codepoint) for codepoint in range(0x100))
     result = JGLepchaConverter.default().convert(source)
     assert len(result.unicode_text) == 319
+    assert len(result.unicode_text.encode("utf-8")) == 784
     assert result.lepcha_char_count == 186
     assert result.replacement_count == 160
     assert len(result.unmapped_codepoints) == 125
     assert result.uncertain_codepoints == ["U+003C", "U+003D", "U+003E"]
     assert hashlib.sha256(result.unicode_text.encode("utf-8")).hexdigest() == (
         "2f9413d6d9a14c8f2c4f76aa2585094bb711d25a9c5c14297a8ad5b1be3568c2"
+    )
+    unmapped_payload = json.dumps(
+        [int(label[2:], 16) for label in result.unmapped_codepoints],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(unmapped_payload) == 459
+    assert hashlib.sha256(unmapped_payload).hexdigest() == (
+        "93f28b95392eae866f7ca5be24259e297852e15da2ea69818a015a78522950bf"
+    )
+    uncertain_payload = json.dumps(
+        [int(label[2:], 16) for label in result.uncertain_codepoints],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(uncertain_payload) == 10
+    assert hashlib.sha256(uncertain_payload).hexdigest() == (
+        "e1f8c6585e46e58a491c74d684740d52ef5a5a372db7505c77fa031685b8cb7f"
+    )
+    strict_payload = json.dumps(
+        sorted(
+            {
+                int(label[2:], 16)
+                for label in result.unmapped_codepoints + result.uncertain_codepoints
+            }
+        ),
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(strict_payload) == 468
+    assert hashlib.sha256(strict_payload).hexdigest() == (
+        "f71586ce507965104547a0b0d42b7f999d4016ba63331256b94540a37409c8a3"
     )
 
 
@@ -523,6 +641,36 @@ def test_jg_lepcha_constructor_accepts_the_pinned_special_target_policies():
     assert converter.convert("<").uncertain_codepoints == ["U+003C"]
 
 
+def test_custom_jg_lepcha_rules_preserve_unmatched_structural_whitespace_cleanly():
+    converter = JGLepchaConverter([((0x41,), (0x1C00,))], [], {}, None)
+    result = converter.convert(" \t\r\n")
+    assert result.unicode_text == " \t\r\n"
+    assert result.replacement_count == 0
+    assert result.unmapped_codepoints == []
+    assert result.uncertain_codepoints == []
+
+
+def test_custom_jg_lepcha_rules_allow_only_structural_identities_and_pinned_slash_space():
+    structural = (0x09, 0x0A, 0x0D, 0x20)
+    converter = JGLepchaConverter(
+        [((codepoint,), (codepoint,)) for codepoint in structural],
+        [],
+        {},
+        None,
+    )
+    result = converter.convert("\t\n\r ")
+    assert result.unicode_text == "\t\n\r "
+    assert result.replacement_count == 4
+    assert result.unmapped_codepoints == []
+
+    unsafe_rules = [[((codepoint,), (0x1C00,))] for codepoint in structural] + [
+        [((0x41,), (codepoint,))] for codepoint in structural
+    ]
+    for rules in unsafe_rules:
+        with pytest.raises(ValueError, match="C0|SPACE"):
+            JGLepchaConverter(rules, [], {}, None)
+
+
 def test_jg_lepcha_constructor_freezes_mutable_and_one_shot_inputs():
     source = [0x41]
     target = [0x1C00]
@@ -570,6 +718,21 @@ def test_jg_lepcha_constructor_freezes_mutable_and_one_shot_inputs():
 
 
 @pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("byte_precedence", "source-order"),
+        ("reorder_precedence", "source-order"),
+        ("source_domain", "unicode-scalars"),
+        ("pass_order", ("unicode", "byte_unicode")),
+    ],
+)
+def test_jg_lepcha_runtime_metadata_is_frozen(field, replacement):
+    converter = JGLepchaConverter.default()
+    with pytest.raises(FrozenInstanceError):
+        setattr(converter._contract, field, replacement)
+
+
+@pytest.mark.parametrize(
     "factory",
     [
         lambda: JGLepchaConverter(repeat(((0x41,), (0x1C00,))), [], {}, None),
@@ -604,6 +767,7 @@ UniClass [Letters] = (U+1C00 U+1C01)
 [Bytes] <> [Letters]
 ByteClass [Vowels] = (0x4F)
 0x4F > U+1C28
+0x49 > U+1C27
 0x61 > U+1C28
 0x61 / ^[Vowels] _ > U+1C26
 0x3C > U+25CC ; ??? fixture placeholder
@@ -624,6 +788,92 @@ def test_jg_lepcha_parser_accepts_the_exact_supported_two_pass_subset(tmp_path):
     assert converter.convert("Oa").unicode_text == "ᰨᰨ"
     assert converter.convert("<").uncertain_codepoints == ["U+003C"]
     assert converter._reorder_pass("ᰧᰀ") == "ᰀᰧ"
+
+
+@pytest.mark.parametrize(
+    ("map_text", "message"),
+    [
+        (
+            "Pass(Byte_Unicode)\n0x41 > U+1C00\n",
+            r"missing Pass\(Unicode\)|pass order",
+        ),
+        (
+            "Pass(Unicode)\nClass[Cons] = (U+1C00)\n[Cons]=c <> @c\n",
+            r"missing Pass\(Byte_Unicode\)|must precede",
+        ),
+        (
+            _valid_two_pass_map() + "Pass(Unicode)\n",
+            "duplicate JG Lepcha pass",
+        ),
+        (
+            "Pass(Byte_Unicode)\nPass(Unicode)\n",
+            "byte rule|at least one byte rule",
+        ),
+        (
+            "Pass(Byte_Unicode)\n0x41 > U+1C00\nPass(Unicode)\n",
+            "Unicode.*class|reorder class",
+        ),
+        (
+            "Pass(Byte_Unicode)\n0x41 > U+1C00\nPass(Unicode)\nClass[Cons] = (U+1C00)\n",
+            "reorder rule",
+        ),
+    ],
+)
+def test_jg_lepcha_parser_requires_exact_nonempty_two_pass_structure(tmp_path, map_text, message):
+    map_path = tmp_path / "pass-contract.map"
+    map_path.write_text(map_text, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        JGLepchaConverter.from_map_file(map_path)
+
+
+@pytest.mark.parametrize(
+    "map_text",
+    [
+        _valid_two_pass_map("ByteClass [Bé] = (0x42)\n0x41 > U+1C00"),
+        _valid_two_pass_map("UniClass [Lé] = (U+1C01)\n0x41 > U+1C00"),
+        _valid_two_pass_map(
+            unicode_body="Pass(Unicode)\nClass[Consé] = (U+1C00)\n[Consé]=c <> @c\n"
+        ),
+        _valid_two_pass_map(
+            unicode_body="Pass(Unicode)\nClass[Cons] = (U+1C00)\n[Cons]=cé <> @cé\n"
+        ),
+    ],
+)
+def test_jg_lepcha_parser_rejects_non_ascii_identifiers(tmp_path, map_text):
+    map_path = tmp_path / "identifier.map"
+    map_path.write_text(map_text, encoding="utf-8")
+    with pytest.raises(ValueError, match="identifier|class name|rule"):
+        JGLepchaConverter.from_map_file(map_path)
+
+
+def test_jg_lepcha_reorder_classes_must_be_reachable_from_the_byte_or_context_pass(
+    tmp_path,
+):
+    unreachable = tmp_path / "unreachable.map"
+    unreachable.write_text(
+        _valid_two_pass_map(
+            unicode_body="Pass(Unicode)\nClass[Unreachable] = (U+1C01)\n[Unreachable]=u <> @u\n"
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=r"unreachable.*U\+1C01"):
+        JGLepchaConverter.from_map_file(unreachable)
+
+    context_reachable = tmp_path / "context-reachable.map"
+    context_reachable.write_text(
+        _valid_two_pass_map(
+            "ByteClass [Previous] = (0x41)\n"
+            "0x41 > U+1C00\n"
+            "0x61 > U+1C28\n"
+            "0x61 / ^[Previous] _ > U+1C26",
+            unicode_body="Pass(Unicode)\n"
+            "Class[ContextTarget] = (U+1C26)\n"
+            "[ContextTarget]=a <> @a\n",
+        ),
+        encoding="utf-8",
+    )
+    converter = JGLepchaConverter.from_map_file(context_reachable)
+    assert converter.convert("a").unicode_text == "ᰦ"
 
 
 @pytest.mark.parametrize(
@@ -784,10 +1034,121 @@ def test_jg_lepcha_parser_rejects_invalid_utf8_with_context(tmp_path):
         JGLepchaConverter.from_map_file(map_path)
 
 
+def test_jg_lepcha_parser_enforces_exact_file_byte_boundaries(tmp_path):
+    exact = tmp_path / "exact-bytes.map"
+    exact.write_text(
+        _pad_map_to_exact_bytes(_valid_two_pass_map(), jg_lepcha_module._MAX_MAP_FILE_BYTES),
+        encoding="utf-8",
+    )
+    assert exact.stat().st_size == jg_lepcha_module._MAX_MAP_FILE_BYTES
+    assert JGLepchaConverter.from_map_file(exact).convert("A").unicode_text == "ᰀ"
+
+    oversized = tmp_path / "oversized.map"
+    oversized.write_bytes(b";" * (jg_lepcha_module._MAX_MAP_FILE_BYTES + 1))
+    with pytest.raises(ValueError, match="map exceeds 1000000 bytes"):
+        JGLepchaConverter.from_map_file(oversized)
+
+
+def test_jg_lepcha_parser_enforces_exact_physical_line_boundaries(tmp_path):
+    base_map = _valid_two_pass_map()
+    base_line_count = len(base_map.splitlines())
+
+    exact_lines = tmp_path / "exact-lines.map"
+    exact_lines.write_text(
+        base_map + ";\n" * (jg_lepcha_module._MAX_MAP_LINES - base_line_count),
+        encoding="utf-8",
+    )
+    assert len(exact_lines.read_text(encoding="utf-8").splitlines()) == (
+        jg_lepcha_module._MAX_MAP_LINES
+    )
+    assert JGLepchaConverter.from_map_file(exact_lines).convert("A").unicode_text == "ᰀ"
+
+    too_many_lines = tmp_path / "too-many-lines.map"
+    too_many_lines.write_text(
+        base_map + ";\n" * (jg_lepcha_module._MAX_MAP_LINES + 1 - base_line_count),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="map exceeds 4096 physical lines"):
+        JGLepchaConverter.from_map_file(too_many_lines)
+
+    exact_line = tmp_path / "exact-physical-line.map"
+    exact_line.write_text(
+        base_map + ";" * jg_lepcha_module._MAX_MAP_LINE_CODEPOINTS + "\n",
+        encoding="utf-8",
+    )
+    assert max(len(line) for line in exact_line.read_text(encoding="utf-8").splitlines()) == (
+        jg_lepcha_module._MAX_MAP_LINE_CODEPOINTS
+    )
+    assert JGLepchaConverter.from_map_file(exact_line).convert("A").unicode_text == "ᰀ"
+
+    oversized_line = tmp_path / "oversized-physical-line.map"
+    oversized_line.write_text(
+        base_map + ";" * (jg_lepcha_module._MAX_MAP_LINE_CODEPOINTS + 1) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="physical line exceeds 4096 codepoints"):
+        JGLepchaConverter.from_map_file(oversized_line)
+
+
+def test_jg_lepcha_parser_enforces_exact_reconstructed_logical_line_boundaries(tmp_path):
+    def code_fixture(logical_length: int) -> str:
+        byte_body = (
+            _continued_byte_class(logical_length)
+            + "\nUniClass [PaddingTargets] = (U+1C00 U+1C01 U+1C02)\n"
+            "[Padding] > [PaddingTargets]"
+        )
+        return _valid_two_pass_map(byte_body)
+
+    def comment_fixture(logical_length: int) -> str:
+        code = "0x41 > U+1C00"
+        # The reconstructed pair is ``code + ' ' + comment1 + ' ' + comment2``.
+        comment_length = logical_length - len(code) - 2
+        first_length = comment_length // 2
+        second_length = comment_length - first_length
+        byte_body = code + " \\" + ";" + "x" * first_length + "\n;" + "y" * second_length
+        return _valid_two_pass_map(byte_body)
+
+    exact = tmp_path / "exact-logical-line.map"
+    exact.write_text(
+        code_fixture(jg_lepcha_module._MAX_LOGICAL_LINE_CODEPOINTS),
+        encoding="utf-8",
+    )
+    converter = JGLepchaConverter.from_map_file(exact)
+    assert converter.convert("ABC").unicode_text == "ᰀᰁᰂ"
+
+    oversized = tmp_path / "oversized-logical-line.map"
+    oversized.write_text(
+        code_fixture(jg_lepcha_module._MAX_LOGICAL_LINE_CODEPOINTS + 1),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="logical line exceeds 4096 codepoints"):
+        JGLepchaConverter.from_map_file(oversized)
+
+    exact_comments = tmp_path / "exact-logical-comments.map"
+    exact_comments.write_text(
+        comment_fixture(jg_lepcha_module._MAX_LOGICAL_LINE_CODEPOINTS),
+        encoding="utf-8",
+    )
+    assert JGLepchaConverter.from_map_file(exact_comments).convert("A").unicode_text == "ᰀ"
+
+    oversized_comments = tmp_path / "oversized-logical-comments.map"
+    oversized_comments.write_text(
+        comment_fixture(jg_lepcha_module._MAX_LOGICAL_LINE_CODEPOINTS + 1),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="logical line exceeds 4096 codepoints"):
+        JGLepchaConverter.from_map_file(oversized_comments)
+
+
 def test_jg_lepcha_parser_does_not_let_inline_comment_backslashes_swallow_rules(tmp_path):
     map_path = tmp_path / "comment-backslash.map"
     map_path.write_text(
-        "Pass(Byte_Unicode)\n0x41 > U+1C00 ; comment ending in backslash \\\n0x42 > U+1C01\n",
+        "Pass(Byte_Unicode)\n"
+        "0x41 > U+1C00 ; comment ending in backslash \\\n"
+        "0x42 > U+1C01\n"
+        "Pass(Unicode)\n"
+        "Class[Cons] = (U+1C00 U+1C01)\n"
+        "[Cons]=c <> @c\n",
         encoding="utf-8",
     )
     converter = JGLepchaConverter.from_map_file(map_path)

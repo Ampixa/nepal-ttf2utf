@@ -26,6 +26,10 @@ from .unicode_span import _is_assigned_script_codepoint
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
 _DOTTED_CIRCLE = 0x25CC
 
+_MAX_MAP_FILE_BYTES = 1_000_000
+_MAX_MAP_LINES = 4_096
+_MAX_MAP_LINE_CODEPOINTS = 4_096
+_MAX_LOGICAL_LINE_CODEPOINTS = 4_096
 _MAX_BYTE_RULES = 512
 _MAX_BYTE_CLASSES = 128
 _MAX_BYTE_CLASS_MEMBERS = 256
@@ -35,16 +39,17 @@ _MAX_REORDER_RULES = 512
 _MAX_REORDER_SLOTS = 16
 _MAX_UNICODE_CLASSES = 128
 _MAX_CLASS_MEMBERS = 1024
+_STRUCTURAL_TEXT = frozenset(" \t\r\n")
 
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
 _UNI_TOKEN_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
-_NAME = r"[A-Za-z]\w*"
+_NAME = r"[A-Za-z][A-Za-z0-9_]*"
 _BYTECLASS_RE = re.compile(rf"^ByteClass\s*\[({_NAME})\]\s*=\s*\((.*)\)\s*$")
 _UNICLASS_RE = re.compile(rf"^UniClass\s*\[({_NAME})\]\s*=\s*\((.*)\)\s*$")
 _PLAINCLASS_RE = re.compile(rf"^Class\s*\[({_NAME})\]\s*=\s*\((.*)\)\s*$")
 _CLASS_RULE_RE = re.compile(rf"^\[({_NAME})\]\s*(?:<>|>)\s*\[({_NAME})\]\s*$")
 _BOUND_CLASS_RE = re.compile(rf"\[({_NAME})\]\s*=\s*({_NAME})")
-_VAR_REF_RE = re.compile(r"@([A-Za-z]\w*)")
+_VAR_REF_RE = re.compile(rf"@({_NAME})")
 _PASS_RE = re.compile(r"^Pass\(\s*(Byte_Unicode|Unicode)\s*\)$", re.IGNORECASE)
 _PASS_PREFIX_RE = re.compile(r"^Pass\b", re.IGNORECASE)
 _HEADER_STRING_RE = re.compile(
@@ -220,6 +225,10 @@ class _JGLepchaContract:
     unicode_classes: Mapping[str, frozenset[int]]
     context_rule: tuple[int, frozenset[int], int] | None
     uncertain_source_codepoints: frozenset[int]
+    byte_precedence: str
+    reorder_precedence: str
+    source_domain: str
+    pass_order: tuple[str, str]
     reorder_provenance: str
 
 
@@ -487,6 +496,10 @@ class JGLepchaConverter:
             unicode_classes=MappingProxyType(dict(normalized_classes)),
             context_rule=normalized_context,
             uncertain_source_codepoints=uncertain,
+            byte_precedence="context-first-then-longest-source-first-stable",
+            reorder_precedence="longest-pattern-first-stable",
+            source_domain="byte-scalars",
+            pass_order=("byte_unicode", "unicode"),
             reorder_provenance="legacy-byte-derived-only",
         )
 
@@ -515,16 +528,27 @@ class JGLepchaConverter:
         map_path = Path(path)
         if not map_path.is_file():
             raise FileNotFoundError(f"JG Lepcha map does not exist: {map_path}")
+        with map_path.open("rb") as stream:
+            map_bytes = stream.read(_MAX_MAP_FILE_BYTES + 1)
+        if len(map_bytes) > _MAX_MAP_FILE_BYTES:
+            raise ValueError(f"JG Lepcha map exceeds {_MAX_MAP_FILE_BYTES} bytes")
         try:
-            map_text = map_path.read_text(encoding="utf-8-sig")
+            map_text = map_bytes.decode("utf-8-sig")
         except UnicodeDecodeError as error:
             raise ValueError(f"invalid UTF-8 in JG Lepcha map {map_path}") from error
+        physical_lines = map_text.splitlines()
+        if len(physical_lines) > _MAX_MAP_LINES:
+            raise ValueError(f"JG Lepcha map exceeds {_MAX_MAP_LINES} physical lines")
+        if any(len(line) > _MAX_MAP_LINE_CODEPOINTS for line in physical_lines):
+            raise ValueError(
+                f"JG Lepcha physical line exceeds {_MAX_MAP_LINE_CODEPOINTS} codepoints"
+            )
 
         logical_lines: list[tuple[str, str]] = []
         continued_code = ""
         continued_comments: list[str] = []
         continuation_pending = False
-        for physical_line in map_text.splitlines():
+        for physical_line in physical_lines:
             code, separator, comment = physical_line.partition(";")
             stripped_code = code.rstrip()
             continues = stripped_code.endswith("\\")
@@ -533,6 +557,14 @@ class JGLepchaConverter:
             continued_code = f"{continued_code} {stripped_code}".strip()
             if separator:
                 continued_comments.append(comment)
+            logical_length = len(continued_code) + sum(map(len, continued_comments))
+            logical_length += max(0, len(continued_comments) - 1)
+            logical_length += bool(continued_code and continued_comments)
+            if logical_length > _MAX_LOGICAL_LINE_CODEPOINTS:
+                raise ValueError(
+                    "JG Lepcha reconstructed logical line exceeds "
+                    f"{_MAX_LOGICAL_LINE_CODEPOINTS} codepoints"
+                )
             if continues:
                 continuation_pending = True
                 continue
@@ -550,7 +582,7 @@ class JGLepchaConverter:
         reorder_rules: list[_ReorderRule] = []
         uncertain_source_codepoints: set[int] = set()
         current_pass = ""
-        seen_passes: set[str] = set()
+        seen_passes: list[str] = []
         seen_headers: set[str] = set()
         context_rule: tuple[int, frozenset[int], int] | None = None
 
@@ -565,9 +597,11 @@ class JGLepchaConverter:
                 pass_name = pass_match.group(1).casefold()
                 if pass_name in seen_passes:
                     raise ValueError(f"duplicate JG Lepcha pass declaration: {line!r}")
-                if pass_name == "byte_unicode" and "unicode" in seen_passes:
+                if pass_name == "unicode" and seen_passes != ["byte_unicode"]:
                     raise ValueError("JG Lepcha Byte_Unicode pass must precede Unicode pass")
-                seen_passes.add(pass_name)
+                if pass_name == "byte_unicode" and seen_passes:
+                    raise ValueError("JG Lepcha Byte_Unicode pass must precede Unicode pass")
+                seen_passes.append(pass_name)
                 current_pass = pass_name
                 continue
             if not current_pass:
@@ -699,13 +733,33 @@ class JGLepchaConverter:
         if "byte_unicode" not in seen_passes:
             raise ValueError("JG Lepcha map is missing Pass(Byte_Unicode)")
 
-        return cls(
+        # Normalize and validate the parsed byte/reorder structures before
+        # reporting a later missing pass. This keeps a malformed active rule
+        # from being masked by an independently truncated map file.
+        converter = cls(
             byte_rules,
             reorder_rules,
             unicode_classes,
             context_rule,
             frozenset(uncertain_source_codepoints),
         )
+
+        if seen_passes != ["byte_unicode", "unicode"]:
+            raise ValueError("JG Lepcha map is missing Pass(Unicode)")
+        if not unicode_classes:
+            raise ValueError("JG Lepcha Unicode pass requires at least one class")
+        if not reorder_rules:
+            raise ValueError("JG Lepcha Unicode pass requires at least one reorder rule")
+
+        reachable_targets = {codepoint for _source, target in byte_rules for codepoint in target}
+        if context_rule is not None:
+            reachable_targets.add(context_rule[2])
+        unreachable = set().union(*unicode_classes.values()) - reachable_targets
+        if unreachable:
+            labels = " ".join(f"U+{codepoint:04X}" for codepoint in sorted(unreachable))
+            raise ValueError(f"unreachable JG Lepcha Unicode reorder class member: {labels}")
+
+        return converter
 
     @classmethod
     def default(cls) -> "JGLepchaConverter":
@@ -785,7 +839,9 @@ class JGLepchaConverter:
                 output.append(char)
                 derived.append(False)
                 codepoint = ord(char)
-                if not _is_assigned_script_codepoint(codepoint, "Lepcha"):
+                if char not in _STRUCTURAL_TEXT and not _is_assigned_script_codepoint(
+                    codepoint, "Lepcha"
+                ):
                     unmapped.add(f"U+{codepoint:04X}")
                 index += 1
         return (

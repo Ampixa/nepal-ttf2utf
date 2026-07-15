@@ -450,7 +450,7 @@ The package vendors SIL's exact
 [`JGLepcha.map`](https://github.com/silnrsi/wsresources/blob/2a39449d20420fe7259f9ce5231c347432840075/scripts/Lepc/legacy/jg-lepcha/mappings/JGLepcha.map)
 from `wsresources` revision
 `2a39449d20420fe7259f9ce5231c347432840075`. The file is version 1.1, contains
-272 lines, and has SHA-256
+11,600 bytes and 272 lines, and has SHA-256
 `179d172b4bd4223f40b1ddc1a0daeb6547b5ad97dc1be7df2b09f2bf45ff6b2d`.
 It parses to 160 flattened byte-table rules, one contextual byte rule, 72
 Unicode reorder rules, and 11 Unicode reorder classes.
@@ -474,13 +474,49 @@ Serialization uses sorted keys and separators `(",", ":")`. The resulting
 8,730-byte payload has SHA-256
 `18b020ec8f679ae35f00b0354610a8f41391e5da19d5fbcc6ab727c041bfc2a1`.
 
+The native reader implements a bounded JG-specific subset rather than general
+TECkit syntax. A map is limited to 1,000,000 bytes, 4,096 physical lines, and
+4,096 codepoints in either a physical line or a logical line assembled through
+continuations. Class and variable identifiers use the strict ASCII form
+`[A-Za-z][A-Za-z0-9_]*`. Exactly one `Pass(Byte_Unicode)` must precede exactly
+one nonempty `Pass(Unicode)`.
+Within those passes, the supported class, explicit, contextual, and reorder
+forms remain dynamic rather than being restricted to the vendored class names,
+but malformed, ambiguous, unsupported, unreachable, or over-limit structures
+fail closed. Every Unicode reorder-class member must be reachable from a byte
+or contextual-rule target; a class member that can never carry legacy
+provenance is therefore rejected during map parsing.
+
+Each parsed converter holds an immutable runtime snapshot. It records a
+byte-scalar source domain, contextual-rule-before-byte-rule precedence, stable
+longest-source-first byte matching, stable longest-slot-first Unicode matching,
+the `Byte_Unicode` then `Unicode` pass order, and the
+`legacy-byte-derived-only` reorder policy. Structural SPACE, TAB, CR, and LF
+remain clean when no custom rule matches them. C0 and SPACE source rules remain
+protected, while the vendored map's evidenced blank `0x2F`-to-SPACE rule is
+retained.
+
 Tests execute every flattened byte rule and every declared reorder rule, exhaust
 all 256 possible preceding bytes for the contextual rule, and classify every
 single-byte input. The classification is 128 mapped and strict-clean values,
 29 mapped C0 diagnostics, three mapped-but-uncertain placeholders, and 96
 preserved unmapped values. Converting the ordered U+0000–U+00FF aggregate
-produces 319 output characters with UTF-8 SHA-256
+produces 319 output characters and 784 UTF-8 bytes, including 186 Lepcha
+characters and 160 matched replacements. It reports 125 unmapped diagnostics
+and three separate uncertain-placeholder diagnostics. The UTF-8 output has
+SHA-256
 `2f9413d6d9a14c8f2c4f76aa2585094bb711d25a9c5c14297a8ad5b1be3568c2`.
+
+Diagnostic digest payloads are compact ASCII JSON arrays of decimal codepoints
+parsed from their ordered `U+NNNN` labels. The 125-value
+`unmapped_codepoints` payload is 459 bytes with SHA-256
+`93f28b95392eae866f7ca5be24259e297852e15da2ea69818a015a78522950bf`.
+The three-value `uncertain_codepoints` payload is ten bytes with SHA-256
+`e1f8c6585e46e58a491c74d684740d52ef5a5a372db7505c77fa031685b8cb7f`.
+Sorting the union of both lists, as strict conversion does, produces a
+128-value, 468-byte payload with SHA-256
+`f71586ce507965104547a0b0d42b7f999d4016ba63331256b94540a37409c8a3`.
+
 The public constructor freezes finite rule and class inputs and rejects empty,
 deleting, invalid-scalar, duplicate,
 prefix-conflicting, or ambiguous rules. The source reader accepts only the
@@ -502,8 +538,9 @@ legacy-reachable member vector per rule, conversion also covers all 1,260
 non-all-derived provenance masks plus the 72 fully derived cases. The immutable
 runtime snapshot stores byte rules and reorder rules as tuples and Unicode
 classes as a read-only mapping. These safeguards do not change the 8,730-byte
-parsed-structure payload or its digest, add a mapping, or claim that SIL's
-legacy reorder rules apply to already-Unicode Lepcha.
+parsed-structure payload or its digest, the vendored map, aggregate output,
+diagnostics, or placeholder semantics. They add no mapping and do not claim
+that SIL's legacy reorder rules apply to already-Unicode Lepcha.
 
 Three forward rules map legacy `0x3C`, `0x3D`, and `0x3E` to U+25CC DOTTED
 CIRCLE. SIL annotates their source glyphs as uncertain circled `v`, `c`, and

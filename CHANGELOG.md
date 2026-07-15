@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bound the SIL JG Lepcha source reader by file, physical-line, and continued
+  logical-line size; require the byte-to-Unicode pass before a nonempty Unicode
+  pass; and reject unreachable reorder classes. Record immutable context-first
+  and stable longest-match precedence, byte-scalar input, pass order, and
+  legacy-derived reorder provenance. The vendored map, parsed digest, legacy
+  output, diagnostics, and three upstream U+25CC placeholders are unchanged.
 - Harden the pinned SIL Limbu two-pass parser and runtime contract: require the
   canonical defaults and pass order, validate the two supported Unicode reorder
   forms, bound map and direct-constructor structures, protect C0 and SPACE
