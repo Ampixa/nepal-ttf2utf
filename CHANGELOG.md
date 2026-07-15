@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Exhaustively verify SIL's 131-rule Limbu map contract and reject malformed
+  forward-pass syntax, invalid Unicode scalars, empty or duplicate classes,
+  ambiguous sources, and unsafe direct-constructor rules.
 - Pin SIL's canonical Kirat Rai map and exhaustively verify its 115 unique
   source rules; reject malformed tokens, invalid Unicode scalars, duplicate
   classes or sources, and unsupported active-pass syntax in custom maps.

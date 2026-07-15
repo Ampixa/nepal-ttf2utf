@@ -17,7 +17,10 @@ The following mapping resources originate in
 [`silnrsi/wsresources`](https://github.com/silnrsi/wsresources), which is
 licensed under the MIT License:
 
-- `src/nepal_ttf2utf/maps/Limbu.map` — copyright 2007 SIL International.
+- `src/nepal_ttf2utf/maps/Limbu.map` — copyright 2007 SIL International;
+  exact file from revision `2a39449d20420fe7259f9ce5231c347432840075`;
+  SHA-256
+  `2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58`.
 - `src/nepal_ttf2utf/maps/kiratraifontnew.map` — copyright 2021 SIL
   International; exact file from revision
   `2a39449d20420fe7259f9ce5231c347432840075`; SHA-256

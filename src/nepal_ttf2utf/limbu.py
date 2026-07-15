@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -22,6 +23,16 @@ _UNICODE_RULE_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
 _BYTECLASS_RE = re.compile(r"^ByteClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _UNICLASS_RE = re.compile(r"^UniClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
 _CLASS_RULE_RE = re.compile(r"^\[([^\]]+)\]\s*<?>\s*\[([^\]]+)\]\s*$")
+_PASS_RE = re.compile(r"^Pass\(\s*(Byte_Unicode|Unicode)\s*\)$", re.IGNORECASE)
+_PASS_PREFIX_RE = re.compile(r"^Pass\b", re.IGNORECASE)
+_BYTE_DEFAULT_RE = re.compile(r"^ByteDefault\s+0x[0-9A-Fa-f]{2}$", re.IGNORECASE)
+_UNI_DEFAULT_RE = re.compile(r"^UniDefault\s+replacement_character$", re.IGNORECASE)
+_DEFAULT_PREFIX_RE = re.compile(r"^(?:ByteDefault|UniDefault)\b", re.IGNORECASE)
+_EXPLICIT_RULE_RE = re.compile(
+    r"^(?P<source>0x[0-9A-Fa-f]{2}(?:\s+0x[0-9A-Fa-f]{2})*)\s*"
+    r"(?:<>|>)\s*"
+    r"(?P<target>U\+[0-9A-Fa-f]{4,6}(?:\s+U\+[0-9A-Fa-f]{4,6})*)$"
+)
 _LIMBU_CODEPOINT_RE = re.compile(r"[ᤀ-᥏]")
 _VOWEL_RANGE = range(0x1920, 0x1929)
 _SUBJOINED_RANGE = range(0x1929, 0x192C)
@@ -31,6 +42,17 @@ _KEMPHRENG = "᤺"
 def _tokens(body: str) -> list[str]:
     body = re.sub(r"\s*\.\.\s*", " .. ", body)
     return [token for token in body.split() if token]
+
+
+def _validate_unicode_scalar(codepoint: int) -> int:
+    if (
+        isinstance(codepoint, bool)
+        or not isinstance(codepoint, int)
+        or not (0 <= codepoint <= 0x10FFFF)
+        or 0xD800 <= codepoint <= 0xDFFF
+    ):
+        raise ValueError(f"invalid Unicode scalar in Limbu map: {codepoint!r}")
+    return codepoint
 
 
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
@@ -56,6 +78,8 @@ def _expand_byte_tokens(body: str) -> tuple[int, ...]:
             raise ValueError(f"unparseable byte token in Limbu map: {token!r}")
         values.append(int(match.group(1), 16))
         index += 1
+    if not values:
+        raise ValueError("empty byte class in Limbu map")
     return tuple(values)
 
 
@@ -72,11 +96,15 @@ def _expand_unicode_tokens(body: str) -> tuple[int, ...]:
                 raise ValueError(
                     f"invalid Unicode range in Limbu map: {token}..{tokens[index + 2]}"
                 )
-            start = int(start_match.group(1), 16)
-            end = int(end_match.group(1), 16)
+            start = _validate_unicode_scalar(int(start_match.group(1), 16))
+            end = _validate_unicode_scalar(int(end_match.group(1), 16))
             if end < start:
                 raise ValueError(
                     f"invalid Unicode range in Limbu map: {token}..{tokens[index + 2]}"
+                )
+            if start <= 0xDFFF and end >= 0xD800:
+                raise ValueError(
+                    f"invalid Unicode scalar range in Limbu map: {token}..{tokens[index + 2]}"
                 )
             values.extend(range(start, end + 1))
             index += 3
@@ -84,9 +112,23 @@ def _expand_unicode_tokens(body: str) -> tuple[int, ...]:
         match = _UNICODE_RULE_RE.fullmatch(token)
         if match is None:
             raise ValueError(f"unparseable Unicode token in Limbu map: {token!r}")
-        values.append(int(match.group(1), 16))
+        values.append(_validate_unicode_scalar(int(match.group(1), 16)))
         index += 1
+    if not values:
+        raise ValueError("empty Unicode class in Limbu map")
     return tuple(values)
+
+
+def _parse_explicit_rule(line: str) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    match = _EXPLICIT_RULE_RE.fullmatch(line)
+    if match is None:
+        raise ValueError(f"invalid explicit Limbu rule: {line!r}")
+    source = tuple(int(value, 16) for value in _BYTE_RULE_RE.findall(match.group("source")))
+    target = tuple(
+        _validate_unicode_scalar(int(value, 16))
+        for value in _UNICODE_RULE_RE.findall(match.group("target"))
+    )
+    return source, target
 
 
 @dataclass(frozen=True)
@@ -101,11 +143,27 @@ class LimbuConversion:
 class LimbuConverter:
     """Forward ``Byte_Unicode`` reader for the SIL Namdhinggo Limbu legacy map."""
 
-    def __init__(self, rules: list[tuple[tuple[int, ...], tuple[int, ...]]]) -> None:
-        if not rules:
+    def __init__(self, rules: Iterable[tuple[Iterable[int], Iterable[int]]]) -> None:
+        normalized_rules = [(tuple(source), tuple(target)) for source, target in rules]
+        if not normalized_rules:
             raise ValueError("LimbuConverter requires at least one mapping rule")
-        # longest source sequences first so multi-byte rules win.
-        self._rules = sorted(rules, key=lambda item: len(item[0]), reverse=True)
+        seen: set[tuple[int, ...]] = set()
+        for source, target in normalized_rules:
+            if not source or any(
+                isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 0xFF)
+                for value in source
+            ):
+                raise ValueError(f"invalid Limbu source rule: {source!r}")
+            if not target:
+                raise ValueError(f"empty Limbu target rule for source: {source!r}")
+            for codepoint in target:
+                _validate_unicode_scalar(codepoint)
+            if source in seen:
+                label = " ".join(f"0x{value:02X}" for value in source)
+                raise ValueError(f"duplicate Limbu source rule: {label}")
+            seen.add(source)
+        # Longest source sequences first so multi-byte rules win.
+        self._rules = sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True)
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "LimbuConverter":
@@ -116,26 +174,50 @@ class LimbuConverter:
         unicode_classes: dict[str, tuple[int, ...]] = {}
         rules: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
         in_byte_pass = False
+        seen_passes: set[str] = set()
+        seen_defaults: set[str] = set()
         rule_lines: list[str] = []
         for raw_line in map_path.read_text(encoding="utf-8-sig").splitlines():
             line = raw_line.split(";", 1)[0].strip()
             if not line:
                 continue
-            lowered = line.lower()
-            if lowered.startswith("pass("):
-                in_byte_pass = lowered == "pass(byte_unicode)"
+            if _PASS_PREFIX_RE.match(line):
+                pass_match = _PASS_RE.fullmatch(line)
+                if pass_match is None:
+                    raise ValueError(f"invalid Limbu pass declaration: {line!r}")
+                pass_name = pass_match.group(1).casefold()
+                if pass_name in seen_passes:
+                    raise ValueError(f"duplicate Limbu pass declaration: {line!r}")
+                seen_passes.add(pass_name)
+                in_byte_pass = pass_name == "byte_unicode"
                 continue
             if not in_byte_pass:
                 continue
+            if _DEFAULT_PREFIX_RE.match(line):
+                if _BYTE_DEFAULT_RE.fullmatch(line) or _UNI_DEFAULT_RE.fullmatch(line):
+                    default_name = line.split(None, 1)[0].casefold()
+                    if default_name in seen_defaults:
+                        raise ValueError(f"duplicate Limbu default declaration: {line!r}")
+                    seen_defaults.add(default_name)
+                    continue
+                raise ValueError(f"invalid Limbu default declaration: {line!r}")
             byte_match = _BYTECLASS_RE.match(line)
             if byte_match:
-                byte_classes[byte_match.group(1).strip()] = _expand_byte_tokens(byte_match.group(2))
+                name = byte_match.group(1).strip()
+                if not name:
+                    raise ValueError("empty Limbu byte class name")
+                if name in byte_classes:
+                    raise ValueError(f"duplicate Limbu byte class: {name!r}")
+                byte_classes[name] = _expand_byte_tokens(byte_match.group(2))
                 continue
             unicode_match = _UNICLASS_RE.match(line)
             if unicode_match:
-                unicode_classes[unicode_match.group(1).strip()] = _expand_unicode_tokens(
-                    unicode_match.group(2)
-                )
+                name = unicode_match.group(1).strip()
+                if not name:
+                    raise ValueError("empty Limbu Unicode class name")
+                if name in unicode_classes:
+                    raise ValueError(f"duplicate Limbu Unicode class: {name!r}")
+                unicode_classes[name] = _expand_unicode_tokens(unicode_match.group(2))
                 continue
             rule_lines.append(line)
 
@@ -143,6 +225,8 @@ class LimbuConverter:
             class_match = _CLASS_RULE_RE.match(line)
             if class_match:
                 byte_name, unicode_name = (name.strip() for name in class_match.groups())
+                if not byte_name or not unicode_name:
+                    raise ValueError(f"empty Limbu class reference: {line!r}")
                 byte_values = byte_classes.get(byte_name)
                 unicode_values = unicode_classes.get(unicode_name)
                 if byte_values is None:
@@ -163,13 +247,7 @@ class LimbuConverter:
                     for byte_value, codepoint in zip(byte_values, unicode_values)
                 )
                 continue
-            if "<>" not in line and ">" not in line:
-                continue
-            left, right = line.split("<>", 1) if "<>" in line else line.split(">", 1)
-            source = tuple(int(value, 16) for value in _BYTE_RULE_RE.findall(left))
-            target = tuple(int(value, 16) for value in _UNICODE_RULE_RE.findall(right))
-            if source and target:
-                rules.append((source, target))
+            rules.append(_parse_explicit_rule(line))
         return cls(rules)
 
     @classmethod

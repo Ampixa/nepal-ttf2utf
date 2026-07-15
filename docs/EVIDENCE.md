@@ -60,11 +60,27 @@ The bundled `Limbu.map` has SHA-256
 and matches
 [`scripts/Limb/legacy/limbu-dc/mappings/Limbu.map`](https://github.com/silnrsi/wsresources/blob/2a39449d20420fe7259f9ce5231c347432840075/scripts/Limb/legacy/limbu-dc/mappings/Limbu.map)
 at SIL `wsresources` revision
-`2a39449d20420fe7259f9ce5231c347432840075`. Its forward byte pass contains 99
-literal rules and a positional 32-member C0 class, producing 131 flattened
-forward rules after class expansion. The native reader does not implement the
-map's reverse conversion or its default-substitution directives; undefined
-legacy input therefore retains the package's preserve-and-diagnose behavior.
+`2a39449d20420fe7259f9ce5231c347432840075`. The byte-identical 5,981-byte
+vendored file has 146 lines. Its forward byte pass contains 99 literal rules
+and a positional 32-member C0 class, producing 131 unique flattened rules after
+class expansion: 129 single-byte sources and two double-byte sources. Tests
+exercise every flattened rule through Unicode-order repair and NFC.
+
+The native reader requires exact pass, default-directive, token, and rule
+syntax; valid Unicode scalar targets; and nonempty, unique class names and
+source sequences in the supported forward `Byte_Unicode` subset. Pass and
+default declarations must also be unique. Malformed or ambiguous rules in that
+subset fail closed. The two default-substitution
+directives are recognized but deliberately not applied, so undefined legacy
+input retains the package's preserve-and-diagnose behavior. The map's two
+Unicode reorder patterns remain implemented directly rather than interpreted
+as a general `Pass(Unicode)` grammar. Reverse conversion is not implemented.
+
+The functional-digest payload is an outer JSON array of
+`[source-byte-array, target-codepoint-array]` pairs, sorted lexicographically by
+source and target, serialized with separators `(",", ":")`, and encoded as
+ASCII. The resulting 1,741-byte payload has SHA-256
+`31c47c252d2c82e9ab0d05619e80e1e0d1897a2b55f581edf8f987897e97956e`.
 
 ## Sikkim Herald Kirat Rai
 
