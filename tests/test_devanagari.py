@@ -26,10 +26,12 @@ def test_nayanepal_output_is_clean_devanagari():
 
 
 def test_devanagari_preserves_structural_whitespace_but_cleans_other_c0_controls():
-    res = convert_devanagari("g]kfn\t\r\n\x03du/", font="preeti", strict=True)
+    res = convert_devanagari("g]kfn\t\r\n\x03du/", font="preeti")
     assert res.unicode_text == "नेपाल\t\r\nमगर"
-    assert res.clean
-    assert res.leftover == []
+    assert not res.clean
+    assert res.leftover == ["\x03"]
+    with pytest.raises(ValueError, match=r"U\+0003"):
+        convert_devanagari("g]kfn\t\r\n\x03du/", font="preeti", strict=True)
 
 
 def test_strict_mode_surfaces_leftovers():

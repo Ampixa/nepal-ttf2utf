@@ -45,7 +45,8 @@ complete upstream license is bundled as
 ## Unicode Character Database
 
 The assigned ranges, Script-property ranges, block boundaries, and canonical
-compositions in `src/nepal_ttf2utf/unicode_span.py` are derived from Unicode
-17.0 `DerivedAge.txt`, `Scripts.txt`, `Blocks.txt`, and `UnicodeData.txt`.
-Copyright © 1991-2026 Unicode, Inc. The complete Unicode License V3 is bundled
-as `src/nepal_ttf2utf/maps/LICENSE.unicode-data.txt`.
+compositions are derived from Unicode 17.0 `DerivedAge.txt`, `Scripts.txt`,
+`Blocks.txt`, and `UnicodeData.txt`. The Script_Extensions policy documented in
+`docs/EVIDENCE.md` was reviewed against Unicode 17.0 `ScriptExtensions.txt` and
+UAX #24. Copyright © 1991-2026 Unicode, Inc. The complete Unicode License V3 is
+bundled as `src/nepal_ttf2utf/maps/LICENSE.unicode-data.txt`.

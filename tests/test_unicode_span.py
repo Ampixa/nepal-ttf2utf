@@ -142,6 +142,25 @@ def test_common_tibetan_block_symbols_are_not_attributed_to_tibetan_script():
         validate_unicode_span("\u0fd5", script="Tibetan", strict=True)
 
 
+SCX_POLICY_SAMPLES = "\u02bc\u0300\u0951\u0952\u0965\u1cd1\u20f0\u3008\u300b"
+
+
+def test_script_extensions_are_not_a_negative_script_allowlist():
+    # U+1CD1 has the singleton Script_Extensions value Deva; other samples have
+    # target-omitting or multi-script associations. None is exclusive ownership.
+    for script, base in (("Newa", "𑐣"), ("Tibetan", "ཀ")):
+        result = validate_unicode_span(base + SCX_POLICY_SAMPLES, script=script, strict=True)
+        assert result.script_char_count == 1
+        assert result.unexpected_script_codepoints == []
+
+
+def test_script_extensions_do_not_anchor_native_script_presence():
+    result = validate_unicode_span(SCX_POLICY_SAMPLES, script="Newa")
+    assert result.script_char_count == 0
+    with pytest.raises(ValueError, match="contains no Newa"):
+        validate_unicode_span(SCX_POLICY_SAMPLES, script="Newa", strict=True)
+
+
 def test_runtime_unassigned_detection_remains_strict_outside_pinned_blocks():
     source = "𑐣\u0378"
     result = validate_unicode_span(source, script="Newa")

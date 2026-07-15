@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Diagnose all 29 C0 values outside the structural allowlist across every
+  legacy route and reject them in strict mode without changing lenient output.
 - Add an opt-in strict residual gate to hash-pinned Videha Janaki trace
   recovery while retaining lenient residual diagnostics by default.
 - Preserve space, TAB, CR, and LF exactly across every legacy converter and

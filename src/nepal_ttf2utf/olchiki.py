@@ -58,6 +58,8 @@ from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 
+from ._controls import codepoint_labels
+
 OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
 
 # ASCII punctuation the font renders as literal, unmodified glyphs (verified by
@@ -255,7 +257,8 @@ def convert_olchiki(
     if strict and (result.uncertain_bytes or result.unmapped_bytes):
         flagged = result.uncertain_bytes + result.unmapped_bytes
         raise ValueError(
-            "unmapped/uncertain bytes after Ol Chiki conversion: " + " ".join(sorted(set(flagged)))
+            "unmapped/uncertain bytes after Ol Chiki conversion: "
+            + " ".join(codepoint_labels(flagged))
         )
     return result
 
@@ -276,6 +279,6 @@ def convert_olchiki_latic(
         flagged = result.uncertain_bytes + result.unmapped_bytes
         raise ValueError(
             "unmapped/uncertain bytes after Ol Chiki Latic conversion: "
-            + " ".join(sorted(set(flagged)))
+            + " ".join(codepoint_labels(flagged))
         )
     return result

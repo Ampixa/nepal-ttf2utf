@@ -19,8 +19,10 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-# Strip non-layout C0 controls while preserving document structure. TAB, LF,
-# and CR are data boundaries for multiline conversion, not font bytes.
+from ._controls import DIAGNOSTIC_C0
+
+# Strip C0 values outside the package's structural allowlist. TAB, LF, and CR
+# are data boundaries for multiline conversion, not font bytes.
 _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 # nayanepal/Gorkhapatra extension glyphs not present in the base Preeti map.
 _NAYANEPAL_EXT = {"ƒ": "र", "†": "्"}
@@ -95,11 +97,15 @@ def convert_devanagari(
     out = unicodedata.normalize("NFC", out)
 
     leftover = sorted(
-        {
-            c
-            for c in out
-            if not (0x0900 <= ord(c) <= 0x097F) and c not in " \t\r\n।॥,.?!:;'\"()[]-/0123456789"
-        }
+        (
+            {
+                c
+                for c in out
+                if not (0x0900 <= ord(c) <= 0x097F)
+                and c not in " \t\r\n।॥,.?!:;'\"()[]-/0123456789"
+            }
+        )
+        | (set(text) & DIAGNOSTIC_C0)
     )
     clean = not leftover
     if strict and not clean:

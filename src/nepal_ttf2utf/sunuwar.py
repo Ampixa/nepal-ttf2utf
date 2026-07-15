@@ -33,6 +33,8 @@ from __future__ import annotations
 import unicodedata
 from dataclasses import dataclass, field
 
+from ._controls import codepoint_labels
+
 # --- Digits: validated, byte '0'..'9' -> U+11BF0..U+11BF9 in order. ---
 SUNUWAR_DIGITS: dict[str, str] = {str(i): chr(0x11BF0 + i) for i in range(10)}
 
@@ -208,6 +210,7 @@ def convert_sunuwar(
     if strict and (result.uncertain_bytes or result.unmapped_bytes):
         flagged = result.uncertain_bytes + result.unmapped_bytes
         raise ValueError(
-            "unmapped/uncertain bytes after Sunuwar conversion: " + " ".join(sorted(set(flagged)))
+            "unmapped/uncertain bytes after Sunuwar conversion: "
+            + " ".join(codepoint_labels(flagged))
         )
     return result

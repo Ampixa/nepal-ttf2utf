@@ -92,11 +92,17 @@ unicode_text = convert(legacy_text, font="kiratrai", strict=True)
 fonts_by_script = supported_fonts()
 ```
 
-Lenient mode preserves unresolved input. `strict=True` raises `ValueError` if
-anything remains unresolved, making it suitable as a corpus-cleanliness gate.
+Lenient mode generally preserves unresolved input. `strict=True` raises
+`ValueError` if anything remains unresolved, making it suitable as a
+corpus-cleanliness gate. The legacy Devanagari control-cleanup exception is
+described below.
 Every converter preserves ASCII space, TAB, CR, and LF exactly, including CRLF
 and lone-CR input. CLI file conversion decodes and encodes bytes explicitly so
 the host language runtime cannot normalize line endings during I/O.
+The other 29 C0 control values are always diagnostics and fail strict legacy
+conversion. Most routes preserve them in lenient output. Legacy Devanagari
+routes retain their established lenient cleanup but now include every removed
+control in `DevanagariConversion.leftover` instead of reporting a clean result.
 
 Detailed converters expose counts and unresolved values:
 
@@ -178,8 +184,8 @@ uvx twine check dist/*
 The test suite checks known mappings, multi-byte rules, visual-to-logical
 reordering, strict-mode failures, already-Unicode routing, hash-pinned glyph-ID
 recovery, version-stable assigned-repertoire validation, cross-script routing,
-exact structural-whitespace preservation, CLI behavior, and mapping-resource
-validation.
+exact structural-whitespace preservation, exhaustive diagnostic C0 rejection,
+CLI behavior, and mapping-resource validation.
 
 ## Licenses
 

@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from ._controls import diagnostic_c0_codepoints
+
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
 
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
@@ -300,6 +302,9 @@ class JGLepchaConverter:
     def convert(self, text: str) -> JGLepchaConversion:
         mapped, replacements, unmapped = self._byte_pass(text)
         converted = unicodedata.normalize("NFC", self._reorder_pass(mapped))
+        # The source CTL class maps every C0 value to itself. Preserve that
+        # output/count behavior while diagnosing values outside the allowlist.
+        unmapped = sorted(set(unmapped) | diagnostic_c0_codepoints(converted))
         return JGLepchaConversion(
             legacy_text=text,
             unicode_text=converted,

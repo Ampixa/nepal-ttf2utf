@@ -21,9 +21,21 @@ the routes that previously rejected a structural separator. CLI file tests use
 byte-level assertions because text-mode file APIs may apply universal-newline
 translation before conversion or platform newline translation afterward.
 
-This policy does not assign a meaning to other C0 control values. Existing
-font-specific handling for those values remains separate from structural
-whitespace preservation.
+The 29 C0 values outside the package's TAB/LF/CR structural allowlist are
+diagnostics under the policy for the currently evidenced legacy routes. Every
+legacy route reports them and rejects them in strict mode. Most routes preserve
+the source value in lenient output. Legacy Devanagari conversion retains its
+established lenient removal of those controls for corpus compatibility but
+records each unique removed value in `leftover`, so the result is no longer
+marked clean. The canonical Kirat Rai and JG Lepcha source tables contain
+identity rules for the full C0 range; those rules still determine lenient
+output and replacement counts, while the package now reports all 29 diagnostic
+values after conversion. Unicode format controls outside the C0 range are not
+reclassified by this policy.
+
+An exhaustive dispatcher regression covers all 29 values across the eleven
+legacy routes. Detailed-result tests separately pin Preeti cleanup diagnostics,
+Kirat Rai/JG Lepcha identity output, and the existing TAB/CR/LF map counts.
 
 ## Sikkim Herald Kirat Rai
 
@@ -252,6 +264,16 @@ Unicode span validation is derived from Unicode 17.0
 [`DerivedAge.txt`](https://www.unicode.org/Public/17.0.0/ucd/DerivedAge.txt),
 [`Scripts.txt`](https://www.unicode.org/Public/17.0.0/ucd/Scripts.txt), and
 [`UnicodeData.txt`](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt).
+Unicode 17
+[`ScriptExtensions.txt`](https://www.unicode.org/Public/17.0.0/ucd/ScriptExtensions.txt)
+was also reviewed against
+[`UAX #24`](https://www.unicode.org/reports/tr24/), which defines the property
+as common script associations rather than exclusive ownership. This project
+treats Script_Extensions as advisory: the validator does not use it as a
+negative allowlist or a native script anchor. Common or Inherited combining
+marks and punctuation remain compatible with embedded text, while only the
+primary Script property contributes to `script_char_count`.
+
 Assigned-repertoire membership is independent of Python's bundled Unicode
 database: Python 3.9 predates the Unicode 16 encoding of Gurung Khema, Sunuwar,
 and Kirat Rai, but it can still validate their assigned codepoints without

@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from ._controls import diagnostic_c0_codepoints
+
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
 _UNI_TOKEN_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
@@ -278,6 +280,9 @@ class KiratRaiConverter:
                 unmapped.append(f"U+{code:04X}")
             index += 1
         converted = unicodedata.normalize("NFC", "".join(output))
+        # SIL's CTL class preserves every C0 value. Keep that exact lenient
+        # mapping/count behavior but diagnose values outside the allowlist.
+        unmapped.extend(diagnostic_c0_codepoints(converted))
         return KiratRaiConversion(
             legacy_text=text,
             unicode_text=converted,
