@@ -1,2 +1,3 @@
-# Preserve the byte-identical, hash-pinned upstream TECkit resource.
+# Preserve the byte-identical, hash-pinned upstream TECkit resources.
 src/nepal_ttf2utf/maps/JGLepcha.map -text whitespace=-blank-at-eol,-blank-at-eof
+src/nepal_ttf2utf/maps/Limbu.map -text whitespace=-blank-at-eol,-blank-at-eof

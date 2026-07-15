@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Smoke resource-backed routes from an installed wheel, outside the source tree."""
+
+from __future__ import annotations
+
+import subprocess
+from importlib import metadata, resources
+from pathlib import Path
+
+import nepal_ttf2utf
+from nepal_ttf2utf import (
+    convert_jg_lepcha,
+    convert_kiratrai,
+    convert_lepcha,
+    convert_limbu,
+    convert_olchiki,
+    convert_olchiki_latic,
+    convert_tibetanmachine,
+)
+
+EXPECTED_RESOURCES = {
+    "JGLepcha.map",
+    "LICENSE.magar-toolkit-MIT.txt",
+    "LICENSE.py-tiblegenc-APACHE-2.0.txt",
+    "LICENSE.unicode-data.txt",
+    "LICENSE.wsresources-MIT.txt",
+    "Limbu.map",
+    "TibetanMachine.csv",
+    "__init__.py",
+    "kiratraifontnew.map",
+    "olck_optimum.json",
+    "sikkim_herald_lepcha.json",
+}
+EXPECTED_LICENSE_FILES = {
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "src/nepal_ttf2utf/maps/LICENSE.magar-toolkit-MIT.txt",
+    "src/nepal_ttf2utf/maps/LICENSE.py-tiblegenc-APACHE-2.0.txt",
+    "src/nepal_ttf2utf/maps/LICENSE.unicode-data.txt",
+    "src/nepal_ttf2utf/maps/LICENSE.wsresources-MIT.txt",
+}
+
+
+def main() -> int:
+    repository_source = Path(__file__).resolve().parents[1] / "src"
+    imported_from = Path(nepal_ttf2utf.__file__).resolve()
+    try:
+        imported_from.relative_to(repository_source)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"smoke imported the source checkout: {imported_from}")
+
+    map_package = resources.files("nepal_ttf2utf.maps")
+    actual_resources = {entry.name for entry in map_package.iterdir() if entry.is_file()}
+    assert actual_resources == EXPECTED_RESOURCES
+    for name in EXPECTED_RESOURCES:
+        assert (map_package / name).read_bytes()
+
+    assert convert_limbu("k", strict=True) == "ᤐ"
+    assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
+    assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
+    assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
+    assert convert_olchiki("a", strict=True).unicode_text == "ᱟ"
+    assert convert_olchiki_latic(".", strict=True).unicode_text == "ᱹ"
+    assert convert_lepcha("A", strict=True).unicode_text == "ᰀ"
+
+    package_metadata = metadata.metadata("nepal-ttf2utf")
+    assert set(package_metadata.get_all("License-File") or ()) == EXPECTED_LICENSE_FILES
+    completed = subprocess.run(
+        ["nepal-ttf2utf", "--font", "jg-lepcha", "k"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == "ᰀ"
+    assert completed.stderr == ""
+    print(f"installed-wheel smoke passed from {imported_from}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

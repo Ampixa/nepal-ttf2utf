@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Declare the third-party notice and bundled license texts in wheel metadata;
+  verify source, wheel, and sdist package bytes, reject draft/AppleDouble/cache
+  leakage, validate wheel metadata/`RECORD`, and smoke installed resource-backed
+  routes.
 - Reject unknown generic-dispatcher font keys with a package-level error that
   reports the normalized key and directs discovery to `supported_fonts()` or
   `--list-fonts`; document the exact font-key normalization rules.

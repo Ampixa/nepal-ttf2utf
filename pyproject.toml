@@ -5,7 +5,11 @@ description = "Legacy-font conversion and Unicode span validation for scripts of
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
-license-files = ["LICENSE"]
+license-files = [
+  "LICENSE",
+  "THIRD_PARTY_NOTICES.md",
+  "src/nepal_ttf2utf/maps/LICENSE.*.txt",
+]
 authors = [{ name = "Ampixa" }]
 keywords = [
   "nepali",
@@ -73,12 +77,14 @@ packages = ["src/nepal_ttf2utf"]
 
 [tool.hatch.build.targets.sdist]
 include = [
+  "/.gitignore",
   "/src",
   "/tests",
   "/LICENSE",
   "/README.md",
   "/CHANGELOG.md",
   "/docs",
+  "/scripts",
   "/THIRD_PARTY_NOTICES.md",
   "/pyproject.toml",
 ]

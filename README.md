@@ -197,13 +197,17 @@ uvx ruff check .
 uvx ruff format --check .
 uv build
 uvx twine check dist/*
+uv run --no-project python scripts/verify_artifacts.py dist
 ```
 
-The test suite checks known mappings, multi-byte rules, visual-to-logical
-reordering, strict-mode failures, already-Unicode routing, hash-pinned glyph-ID
+The tests and artifact checks cover known mappings, multi-byte rules,
+visual-to-logical reordering, strict-mode failures, already-Unicode routing,
+hash-pinned glyph-ID
 recovery, version-stable assigned-repertoire validation, cross-script routing,
 exact structural-whitespace preservation, exhaustive diagnostic C0 and
-reserved-position rejection, CLI behavior, and mapping-resource validation.
+reserved-position rejection, CLI behavior, mapping-resource validation,
+source-to-wheel/sdist byte parity, and isolated installed-wheel resource
+loading.
 
 ## Licenses
 
@@ -212,3 +216,5 @@ mapping resources are MIT licensed and retain their notices. Devanagari support
 depends on GPL-3.0-licensed `npttf2utf`; the Magar Akkha transliteration map is
 adapted from MIT-licensed `magar-toolkit`. See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for distribution details.
+The main license, third-party notice, and bundled third-party license texts are
+also declared as wheel metadata license files.

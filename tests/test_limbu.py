@@ -1,5 +1,8 @@
 """Limbu/Sirijonga (Namdhinggo legacy) conversion tests."""
 
+import hashlib
+from importlib import resources
+
 import pytest
 
 from nepal_ttf2utf import convert, convert_limbu
@@ -8,6 +11,14 @@ from nepal_ttf2utf.limbu import LimbuConverter
 
 def _has_limbu(s: str) -> bool:
     return any(0x1900 <= ord(c) <= 0x194F for c in s)
+
+
+def test_limbu_map_matches_the_pinned_sil_source_and_parser_inventory():
+    map_resource = resources.files("nepal_ttf2utf.maps") / "Limbu.map"
+    assert hashlib.sha256(map_resource.read_bytes()).hexdigest() == (
+        "2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58"
+    )
+    assert len(LimbuConverter.default()._rules) == 131
 
 
 def test_namdhinggo_legacy_produces_unicode_limbu():

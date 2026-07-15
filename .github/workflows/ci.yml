@@ -31,3 +31,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv build
       - run: uvx twine check dist/*
+      - run: uv run --no-project python scripts/verify_artifacts.py dist
+      - name: Smoke installed wheel on Python 3.9
+        run: |
+          wheel=$(find dist -maxdepth 1 -name '*.whl' ! -name '._*' -print -quit)
+          uv run --isolated --no-project --python 3.9 --with "$wheel" \
+            python scripts/smoke_installed.py
