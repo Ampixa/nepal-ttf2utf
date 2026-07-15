@@ -23,6 +23,8 @@ surfaced instead of guessed.
 
 from __future__ import annotations
 
+import re
+
 from .devanagari import (
     DevanagariConversion,
     convert_devanagari,
@@ -118,7 +120,9 @@ _SUNUWAR_FONTS = {"sunuwar", "jenticha", "koits", "kirat1"}
 _TIBETAN_MACHINE_FONTS = {"tibetanmachine", "tibetan-machine"}
 # Tibetan font families observed with real Unicode text layers.
 _TIBETAN_UNICODE_FONTS = {
+    "ctrc-ht",
     "jomolhari",
+    "jomolhari-id",
     "microsoft himalaya",
     "microsoft-himalaya",
     "monlam unicode",
@@ -127,6 +131,18 @@ _TIBETAN_UNICODE_FONTS = {
     "qomolangma",
     "qomolangma-subtitle",
     "qomolangma-title",
+    "qomolangma-uchen-suring",
+}
+# Unicode Devanagari font spans that need identity routing, including the DU
+# encoding of Nithya Ranjana (Ranjana glyphs over Devanagari characters).
+_DEVANAGARI_UNICODE_FONTS = {
+    "annapurna sil nepal",
+    "annapurna-sil-nepal",
+    "annapurnasilnepal",
+    "nithya ranjana du",
+    "nithya-ranjana-du",
+    "nithyaranjanadu",
+    "nithyaranjanadu-regular",
 }
 # Unicode Newa/Prachalit font keys. These normalize and validate; they do not
 # apply a legacy-byte mapping.
@@ -135,6 +151,10 @@ _NEWA_UNICODE_FONTS = {
     "newa-unicode",
     "noto sans newa",
     "noto-sans-newa",
+    "nithya ranjana nu",
+    "nithya-ranjana-nu",
+    "nithyaranjananu",
+    "nithyaranjananu-regular",
     "prachalit-unicode",
 }
 # Sikkim Herald live-text Lepcha body font (TT*O00 named layout).
@@ -162,6 +182,7 @@ _TIRHUTA_FONTS = {"janaki", "tirhuta", "mithilakshar"}
 def supported_fonts() -> dict[str, str]:
     """Map of supported font keys -> script."""
     fonts = {f: "Devanagari" for f in supported_devanagari_fonts()}
+    fonts.update({f: "Devanagari" for f in sorted(_DEVANAGARI_UNICODE_FONTS)})
     fonts.update({f: "Limbu" for f in sorted(_LIMBU_FONTS)})
     fonts.update({f: "Kirat Rai" for f in sorted(_KIRATRAI_FONTS)})
     fonts.update({f: "Kirat Rai" for f in sorted(_KIRATRAI_HERALD_FONTS)})
@@ -175,6 +196,12 @@ def supported_fonts() -> dict[str, str]:
     fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_LATIC_FONTS)})
     fonts.update({f: "Tirhuta" for f in sorted(_TIRHUTA_FONTS)})
     return fonts
+
+
+def _normalize_font_key(font: str) -> str:
+    """Normalize a user/PDF font name while preserving meaningful family text."""
+    key = font.strip().lower().replace("_", "-")
+    return re.sub(r"^[a-z]{6}\+", "", key)
 
 
 def convert(text: str, font: str, *, strict: bool = False) -> str:
@@ -191,7 +218,9 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
     character. Lenient mode preserves that input. Use a format-specific
     ``convert_*`` function to inspect its detailed conversion result.
     """
-    key = font.strip().lower()
+    key = _normalize_font_key(font)
+    if key in _DEVANAGARI_UNICODE_FONTS:
+        return validate_unicode_span(text, script="Devanagari", strict=strict).unicode_text
     if key in _LIMBU_FONTS:
         return convert_limbu(text, strict=strict)
     if key in _KIRATRAI_FONTS:

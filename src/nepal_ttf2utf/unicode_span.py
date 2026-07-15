@@ -23,6 +23,12 @@ class UnicodeSpanConversion:
 
 
 _SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
+    "Devanagari": (
+        (0x0900, 0x097F),
+        (0x1CD0, 0x1CFF),
+        (0xA8E0, 0xA8FF),
+        (0x11B00, 0x11B5F),
+    ),
     "Newa": ((0x11400, 0x1147F),),
     "Tibetan": ((0x0F00, 0x0FFF),),
 }
@@ -59,7 +65,7 @@ def validate_unicode_span(
             script_count += 1
         category = unicodedata.category(char)
         if (
-            char == "\uFFFD"
+            char == "\ufffd"
             or category in {"Cs", "Cn"}
             or (category == "Cc" and char not in "\t\r\n")
         ):

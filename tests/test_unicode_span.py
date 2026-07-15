@@ -13,6 +13,9 @@ def test_unicode_tibetan_font_families_are_normalized_without_legacy_mapping():
         "microsoft-himalaya",
         "qomolangma-title",
         "jomolhari",
+        "Jomolhari-ID",
+        "Qomolangma-Uchen-Suring",
+        "CTRC-HT",
     ):
         assert convert(text, font=font, strict=True) == text
 
@@ -21,6 +24,18 @@ def test_unicode_newa_font_families_are_normalized_without_legacy_mapping():
     text = "𑐣𑐾𑐥𑐵𑐮"
     assert convert(text, font="newa-unicode", strict=True) == text
     assert convert(text, font="Noto Sans Newa", strict=True) == text
+    assert convert(text, font="Nithya Ranjana NU", strict=True) == text
+
+
+def test_unicode_devanagari_and_ranjana_du_fonts_are_identity_routed():
+    text = "मगर नेपाल"
+    assert convert(text, font="AnnapurnaSILNepal", strict=True) == text
+    assert convert(text, font="Nithya Ranjana DU", strict=True) == text
+
+
+def test_pdf_subset_prefix_is_removed_before_font_routing():
+    assert convert("བོད", font="ABCDEF+Jomolhari-ID", strict=True) == "བོད"
+    assert convert("नेपाल", font="ABCDEF+AnnapurnaSILNepal", strict=True) == "नेपाल"
 
 
 def test_unicode_span_reports_replacement_characters():
@@ -40,3 +55,6 @@ def test_unicode_fonts_are_discoverable():
     assert fonts["monlam-unicode"] == "Tibetan"
     assert fonts["microsoft-himalaya"] == "Tibetan"
     assert fonts["newa-unicode"] == "Newa"
+    assert fonts["annapurnasilnepal"] == "Devanagari"
+    assert fonts["nithyaranjanadu"] == "Devanagari"
+    assert fonts["nithyaranjananu"] == "Newa"
