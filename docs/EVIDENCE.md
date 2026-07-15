@@ -684,6 +684,8 @@ Unicode span validation is derived from Unicode 17.0
 [`DerivedAge.txt`](https://www.unicode.org/Public/17.0.0/ucd/DerivedAge.txt),
 [`Scripts.txt`](https://www.unicode.org/Public/17.0.0/ucd/Scripts.txt), and
 [`UnicodeData.txt`](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt).
+Normalization behavior is checked against Unicode 17
+[`NormalizationTest.txt`](https://www.unicode.org/Public/17.0.0/ucd/NormalizationTest.txt).
 Unicode 17
 [`ScriptExtensions.txt`](https://www.unicode.org/Public/17.0.0/ucd/ScriptExtensions.txt)
 was also reviewed against
@@ -711,12 +713,14 @@ Devanagari values and 17 assigned Tibetan values expand to two script-specific
 characters under NFC, so `script_char_count` is checked after normalization.
 
 The functional-contract payload is a JSON object with keys `version`,
-`assigned`, `scripts`, `blocks`, and `nfc`. The three range objects map each
-script name to arrays of inclusive `[start, end]` integer pairs. Each `nfc`
-entry is `[decomposed-codepoint-array, composed-codepoint-array]`. Serialization
-uses sorted keys, separators `(",", ":")`, and ASCII encoding. The resulting
-1,836-byte payload has SHA-256
-`b3afd8d2313f3f7b03975dcbd1ae058dc4f1a9977dba2d665f380a1fbb92404b`.
+`assigned`, `scripts`, `blocks`, `canonical_decompositions`, and
+`canonical_combining_classes`. The three range objects map each script name to
+arrays of inclusive `[start, end]` integer pairs. The normalization fields
+contain the eleven Unicode-16 immediate canonical decomposition pairs and
+U+1612F GURUNG KHEMA SIGN THOLHOMA's canonical combining class 9.
+Serialization uses sorted keys, separators `(",", ":")`, and ASCII encoding.
+The resulting 1,757-byte payload has SHA-256
+`b34edb816eafd1b66ae5911d7e4120df1fd4a3d0a737a55e5a4e4f3077e7f469`.
 
 Invalid-value coverage includes all 29 nonstructural C0 controls, DEL, all 32
 C1 controls, all 2,048 surrogate values, all 66 Unicode noncharacters, and the
@@ -750,11 +754,25 @@ representative CLI test requires the same visible diagnostic. Every assigned
 position in the same seven repertoires is also exhaustively tested as valid
 passthrough, including assigned Common or Inherited block values.
 
-Fifteen decomposition inputs producing eleven canonical compositions introduced
-with Gurung Khema and Kirat Rai are also pinned so validator output and both
-legacy Kirat Rai layouts have stable NFC output on older Python releases.
-Outside the eleven pinned script blocks, unassigned-codepoint detection
-continues to use the host Python Unicode database.
+Unicode 17 `NormalizationTest.txt` is 2,827,429 bytes with SHA-256
+`5019ffd530751a741900c849c0e010332f142a3612234639bd200b82138a87db`.
+The 58 source-ordered rows whose first five columns contain a Gurung Khema or
+Kirat Rai block value are stored as codepoint arrays in
+[`tests/unicode17_gurung_khema_kirat_rai_normalization.json`](../tests/unicode17_gurung_khema_kirat_rai_normalization.json).
+Compact JSON serialization of those rows is 5,277 ASCII bytes with SHA-256
+`dc014a9cd66314219defd47ac3a462f91c60597e7e464f50071f86d8d345115f`.
+Tests require all five NFC invariants for every row, totaling 290 equalities.
+
+Older Python Unicode databases do not know the eleven immediate canonical
+decompositions introduced for Gurung Khema and Kirat Rai or U+1612F's nonzero
+combining class. The fallback recursively supplies that bounded Unicode-16
+delta, applies stable canonical ordering, and performs canonical composition
+with the standard blocking rule. This covers overlapping composition closure
+and keeps validator output and both legacy Kirat Rai layouts stable on older
+supported Python releases. It does not claim complete Unicode-17 normalization
+conformance outside the selected 58-row subset. Outside the eleven pinned
+script blocks, unassigned-codepoint detection continues to use the host Python
+Unicode database.
 
 The validator covers Brahmi, Devanagari, Gurung Khema, Kirat Rai, Lepcha,
 Limbu, Newa, Ol Chiki, Sunuwar, Tibetan, and Tirhuta. It normalizes NFC and

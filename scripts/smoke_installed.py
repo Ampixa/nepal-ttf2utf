@@ -27,6 +27,7 @@ from nepal_ttf2utf import (
     janaki_gid_map_sha256,
     recover_videha_janaki_trace,
     transliterate_magar_akkha,
+    validate_unicode_span,
 )
 
 EXPECTED_RESOURCES = {
@@ -89,6 +90,21 @@ def main() -> int:
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
     assert convert_kiratrai_herald("fZ0", strict=True).unicode_text == "𖵈 𖵰"
     assert nepal_ttf2utf.convert("fZ0", font="kiratrai-herald", strict=True) == "𖵈 𖵰"
+    gurung_ordered = validate_unicode_span(
+        "\U00016100\u0300\U0001612f", script="Gurung Khema", strict=True
+    )
+    assert gurung_ordered.unicode_text == "\U00016100\U0001612f\u0300"
+    gurung_composed = validate_unicode_span(
+        "\U0001611e\U00016123", script="Gurung Khema", strict=True
+    )
+    assert gurung_composed.unicode_text == "\U00016126"
+    kirat_overlap = "\U00016d63\U00016d68"
+    assert (
+        validate_unicode_span(kirat_overlap, script="Kirat Rai", strict=True).unicode_text
+        == "\U00016d6a"
+    )
+    assert convert_kiratrai(kirat_overlap, strict=True).unicode_text == "\U00016d6a"
+    assert convert_kiratrai_herald(kirat_overlap, strict=True).unicode_text == "\U00016d6a"
     assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
     native_jg_lepcha = "\u1c27\u1c00"
     native_jg_result = convert_jg_lepcha(native_jg_lepcha, strict=True)

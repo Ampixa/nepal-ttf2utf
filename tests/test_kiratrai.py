@@ -350,6 +350,7 @@ def test_kiratrai_mapped_bytes_are_in_block_and_nfc():
         ("\U00016d63\U00016d67", "\U00016d69"),
         ("\U00016d69\U00016d67", "\U00016d6a"),
         ("\U00016d63\U00016d67\U00016d67", "\U00016d6a"),
+        ("\U00016d63\U00016d68", "\U00016d6a"),
     ],
 )
 def test_kiratrai_unicode16_nfc_is_version_stable(converter, source, expected, monkeypatch):
@@ -366,14 +367,16 @@ def test_kiratrai_unicode16_nfc_is_version_stable(converter, source, expected, m
 
 
 @pytest.mark.parametrize(
-    ("converter", "source"),
+    ("converter", "source", "expected"),
     [
-        (convert_kiratrai, "e\U00016d67"),
-        (convert_kiratrai_herald, "r\U00016d67"),
+        (convert_kiratrai, "e\U00016d67", "\U00016d68"),
+        (convert_kiratrai_herald, "r\U00016d67", "\U00016d68"),
+        (convert_kiratrai, "A\U00016d68", "\U00016d6a"),
+        (convert_kiratrai_herald, "b\U00016d68", "\U00016d6a"),
     ],
 )
 def test_kiratrai_unicode16_nfc_composes_across_legacy_unicode_boundary(
-    converter, source, monkeypatch
+    converter, source, expected, monkeypatch
 ):
     monkeypatch.setattr(
         "nepal_ttf2utf.unicode_span.unicodedata.normalize", lambda _form, text: text
@@ -381,20 +384,25 @@ def test_kiratrai_unicode16_nfc_composes_across_legacy_unicode_boundary(
 
     result = converter(source, strict=True)
 
-    assert result.unicode_text == "\U00016d68"
+    assert result.unicode_text == expected
     assert result.kiratrai_char_count == 1
     assert result.replacement_count == 1
     assert result.unmapped_codepoints == []
 
 
-def test_kiratrai_dispatchers_use_version_stable_unicode16_nfc(monkeypatch):
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("\U00016d67\U00016d67", "\U00016d68"),
+        ("\U00016d63\U00016d68", "\U00016d6a"),
+    ],
+)
+def test_kiratrai_dispatchers_use_version_stable_unicode16_nfc(source, expected, monkeypatch):
     monkeypatch.setattr(
         "nepal_ttf2utf.unicode_span.unicodedata.normalize", lambda _form, text: text
     )
-    source = "\U00016d67\U00016d67"
-
-    assert convert(source, font="kiratraifontnew", strict=True) == "\U00016d68"
-    assert convert(source, font="kiratraifont", strict=True) == "\U00016d68"
+    assert convert(source, font="kiratraifontnew", strict=True) == expected
+    assert convert(source, font="kiratraifont", strict=True) == expected
 
 
 def test_convert_dispatches_to_kiratrai():

@@ -96,6 +96,7 @@ EXPECTED_SDIST_DIRECTORY_FILES = {
         "test_tirhuta.py",
         "test_unicode_span.py",
         "test_videha.py",
+        "unicode17_gurung_khema_kirat_rai_normalization.json",
     },
 }
 FORBIDDEN_COMPONENTS = {".pytest_cache", ".ruff_cache", "__pycache__"}

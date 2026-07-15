@@ -4,6 +4,7 @@ import hashlib
 import json
 import unicodedata
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
@@ -18,9 +19,13 @@ from nepal_ttf2utf.limbu import convert_limbu
 from nepal_ttf2utf.tirhuta import convert_tirhuta
 from nepal_ttf2utf.unicode_span import (
     _ASSIGNED_BLOCK_RANGES,
-    _PINNED_NFC_COMPOSITIONS,
+    _PINNED_CANONICAL_COMBINING_CLASSES,
+    _PINNED_CANONICAL_DECOMPOSITIONS,
+    _PINNED_NORMALIZATION_PARTICIPANTS,
     _SCRIPT_BLOCK_RANGES,
     _SCRIPT_RANGES,
+    _normalize_nfc,
+    _pinned_combining_class,
 )
 
 _UNICODE17_SCRIPT_INVENTORY = {
@@ -114,15 +119,18 @@ def test_unicode17_contract_digest_and_complete_inventory():
             script: [list(item) for item in ranges]
             for script, ranges in _SCRIPT_BLOCK_RANGES.items()
         },
-        "nfc": [
-            [[ord(char) for char in decomposed], [ord(char) for char in composed]]
-            for decomposed, composed in _PINNED_NFC_COMPOSITIONS
+        "canonical_decompositions": [
+            [composed, list(decomposed)]
+            for composed, decomposed in _PINNED_CANONICAL_DECOMPOSITIONS.items()
+        ],
+        "canonical_combining_classes": [
+            list(item) for item in _PINNED_CANONICAL_COMBINING_CLASSES.items()
         ],
     }
     payload = json.dumps(contract, sort_keys=True, separators=(",", ":")).encode("ascii")
-    assert len(payload) == 1836
+    assert len(payload) == 1757
     assert hashlib.sha256(payload).hexdigest() == (
-        "b3afd8d2313f3f7b03975dcbd1ae058dc4f1a9977dba2d665f380a1fbb92404b"
+        "b34edb816eafd1b66ae5911d7e4120df1fd4a3d0a737a55e5a4e4f3077e7f469"
     )
 
     assert set(_ASSIGNED_BLOCK_RANGES) == set(_UNICODE17_SCRIPT_INVENTORY)
@@ -154,12 +162,17 @@ def test_unicode17_contract_digest_and_complete_inventory():
         244,
     )
     assert len(all_specific) == specific_total
-    assert len(_PINNED_NFC_COMPOSITIONS) == 15
-    assert Counter(len(decomposed) for decomposed, _composed in _PINNED_NFC_COMPOSITIONS) == {
-        2: 11,
-        3: 4,
-    }
-    assert len({composed for _decomposed, composed in _PINNED_NFC_COMPOSITIONS}) == 11
+    assert len(_PINNED_CANONICAL_DECOMPOSITIONS) == 11
+    assert Counter(map(len, _PINNED_CANONICAL_DECOMPOSITIONS.values())) == {2: 11}
+    assert _PINNED_CANONICAL_COMBINING_CLASSES == {0x1612F: 9}
+    assert _PINNED_NORMALIZATION_PARTICIPANTS == frozenset(
+        {
+            *range(0x1611E, 0x1612A),
+            0x1612F,
+            0x16D63,
+            *range(0x16D67, 0x16D6B),
+        }
+    )
 
 
 def test_every_assigned_unicode17_position_has_exact_validator_behavior():
@@ -338,8 +351,9 @@ def test_every_pinned_unicode16_composition_is_version_stable(monkeypatch):
     )
 
     seen_targets = set()
-    for decomposed, composed in _PINNED_NFC_COMPOSITIONS:
-        codepoint = ord(composed)
+    for codepoint, decomposition in _PINNED_CANONICAL_DECOMPOSITIONS.items():
+        decomposed = "".join(chr(value) for value in decomposition)
+        composed = chr(codepoint)
         script = "Gurung Khema" if 0x16100 <= codepoint <= 0x1613F else "Kirat Rai"
         result = validate_unicode_span(decomposed, script=script, strict=True)
 
@@ -351,6 +365,104 @@ def test_every_pinned_unicode16_composition_is_version_stable(monkeypatch):
         seen_targets.add(composed)
 
     assert len(seen_targets) == 11
+
+
+def test_unicode17_gurung_khema_kirat_rai_normalization_subset_is_exact():
+    fixture = Path(__file__).with_name("unicode17_gurung_khema_kirat_rai_normalization.json")
+    rows = json.loads(fixture.read_bytes())
+    payload = json.dumps(rows, ensure_ascii=True, separators=(",", ":")).encode("ascii")
+
+    assert len(rows) == 58
+    assert len(payload) == 5277
+    assert hashlib.sha256(payload).hexdigest() == (
+        "dc014a9cd66314219defd47ac3a462f91c60597e7e464f50071f86d8d345115f"
+    )
+    assert all(
+        type(row) is list
+        and len(row) == 5
+        and all(
+            type(column) is list
+            and column
+            and all(type(codepoint) is int and 0 <= codepoint <= 0x10FFFF for codepoint in column)
+            for column in row
+        )
+        for row in rows
+    )
+
+    equalities = 0
+    for row_index, row in enumerate(rows):
+        columns = ["".join(chr(codepoint) for codepoint in column) for column in row]
+        expected = (columns[1], columns[1], columns[1], columns[3], columns[3])
+        for column_index, (source, target) in enumerate(zip(columns, expected)):
+            assert _normalize_nfc(source) == target, (row_index, column_index)
+            assert _normalize_nfc(target) == target, (row_index, column_index)
+            equalities += 1
+
+    assert equalities == 290
+
+
+def test_pinned_unicode16_normalization_tables_are_immutable():
+    with pytest.raises(TypeError):
+        _PINNED_CANONICAL_DECOMPOSITIONS[0x16121] = (0x1611E, 0x1611F)
+    with pytest.raises(TypeError):
+        _PINNED_CANONICAL_COMBINING_CLASSES[0x1612F] = 0
+    with pytest.raises(AttributeError):
+        _PINNED_NORMALIZATION_PARTICIPANTS.add(0x16130)
+
+
+@pytest.mark.parametrize(
+    ("script", "source", "expected"),
+    [
+        (
+            "Gurung Khema",
+            "\U00016100\u0300\U0001612f",
+            "\U00016100\U0001612f\u0300",
+        ),
+        ("Gurung Khema", "\U0001611e\U00016123", "\U00016126"),
+        ("Kirat Rai", "\U00016d63\U00016d68", "\U00016d6a"),
+    ],
+)
+def test_unicode16_nfc_canonical_order_and_composition_closure(script, source, expected):
+    result = validate_unicode_span(source, script=script, strict=True)
+    assert result.unicode_text == expected
+    assert result.invalid_codepoints == []
+    assert result.unexpected_script_codepoints == []
+    assert _normalize_nfc(result.unicode_text) == result.unicode_text
+
+
+def test_tholhoma_uses_pinned_combining_class_and_unicode_blocking_rules():
+    assert unicodedata.combining("\U0001612f") in {0, 9}
+    assert _pinned_combining_class(0x1612F) == 9
+
+    source = "A\U0001612f\u030a"
+    assert _normalize_nfc(source) == "\u00c5\U0001612f"
+
+    blocked = "A\U0001612f\u0301\u030a"
+    assert _normalize_nfc(blocked) == "\u00c1\U0001612f\u030a"
+
+    source_order = (0x05B0, 0x1612F, 0x094D, 0x093C)
+    expected_order = (0x093C, 0x1612F, 0x094D, 0x05B0)
+    assert tuple(_pinned_combining_class(codepoint) for codepoint in expected_order) == (
+        7,
+        9,
+        9,
+        10,
+    )
+    mixed = "\U00016100" + "".join(chr(codepoint) for codepoint in source_order)
+    assert _normalize_nfc(mixed) == "\U00016100" + "".join(
+        chr(codepoint) for codepoint in expected_order
+    )
+
+
+def test_unicode16_fallback_retains_post_normalization_diagnostics():
+    source = "\U00016100\u0300\U0001612f\ud800\U0001613a\ue000\ufdd0"
+    result = validate_unicode_span(source, script="Gurung Khema")
+
+    assert result.unicode_text.startswith("\U00016100\U0001612f\u0300")
+    assert result.invalid_codepoints == ["U+1613A", "U+D800", "U+E000", "U+FDD0"]
+    assert result.unexpected_script_codepoints == []
+    with pytest.raises(ValueError, match=r"U\+1613A.*U\+D800.*U\+E000.*U\+FDD0"):
+        validate_unicode_span(source, script="Gurung Khema", strict=True)
 
 
 def test_reserved_codepoint_in_a_supported_block_is_rejected():

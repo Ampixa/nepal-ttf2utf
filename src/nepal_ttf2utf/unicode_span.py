@@ -10,7 +10,9 @@ Database bundled with a particular supported Python release.
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 
 UNICODE_REPERTOIRE_VERSION = "17.0.0"
 
@@ -103,24 +105,40 @@ _SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
     ),
 }
 
-# Canonical compositions added in Unicode 16.0. Older Python normalizers do
-# not know these pairs, so apply the pinned compositions after runtime NFC.
-_PINNED_NFC_COMPOSITIONS: tuple[tuple[str, str], ...] = (
-    ("\U0001611e\U0001611e\U0001611f", "\U00016126"),
-    ("\U0001611e\U00016129\U0001611f", "\U00016127"),
-    ("\U0001611e\U0001611e\U00016120", "\U00016128"),
-    ("\U00016d63\U00016d67\U00016d67", "\U00016d6a"),
-    ("\U0001611e\U0001611e", "\U00016121"),
-    ("\U0001611e\U00016129", "\U00016122"),
-    ("\U0001611e\U0001611f", "\U00016123"),
-    ("\U00016129\U0001611f", "\U00016124"),
-    ("\U0001611e\U00016120", "\U00016125"),
-    ("\U00016121\U0001611f", "\U00016126"),
-    ("\U00016122\U0001611f", "\U00016127"),
-    ("\U00016121\U00016120", "\U00016128"),
-    ("\U00016d67\U00016d67", "\U00016d68"),
-    ("\U00016d63\U00016d67", "\U00016d69"),
-    ("\U00016d69\U00016d67", "\U00016d6a"),
+# Canonical normalization data added in Unicode 16.0. Older Python runtimes do
+# not know these immediate decompositions or U+1612F's nonzero combining class.
+# The bounded fallback below supplies only this pinned delta, then delegates all
+# older decomposition and pair-composition knowledge to the runtime UCD.
+_PINNED_CANONICAL_DECOMPOSITIONS: Mapping[int, tuple[int, int]] = MappingProxyType(
+    {
+        0x16121: (0x1611E, 0x1611E),
+        0x16122: (0x1611E, 0x16129),
+        0x16123: (0x1611E, 0x1611F),
+        0x16124: (0x16129, 0x1611F),
+        0x16125: (0x1611E, 0x16120),
+        0x16126: (0x16121, 0x1611F),
+        0x16127: (0x16122, 0x1611F),
+        0x16128: (0x16121, 0x16120),
+        0x16D68: (0x16D67, 0x16D67),
+        0x16D69: (0x16D63, 0x16D67),
+        0x16D6A: (0x16D69, 0x16D67),
+    }
+)
+_PINNED_CANONICAL_COMBINING_CLASSES: Mapping[int, int] = MappingProxyType({0x1612F: 9})
+_PINNED_CANONICAL_COMPOSITIONS: Mapping[tuple[int, int], int] = MappingProxyType(
+    {
+        decomposition: composed
+        for composed, decomposition in _PINNED_CANONICAL_DECOMPOSITIONS.items()
+    }
+)
+_PINNED_NORMALIZATION_PARTICIPANTS = frozenset(
+    set(_PINNED_CANONICAL_DECOMPOSITIONS)
+    | set(_PINNED_CANONICAL_COMBINING_CLASSES)
+    | {
+        member
+        for decomposition in _PINNED_CANONICAL_DECOMPOSITIONS.values()
+        for member in decomposition
+    }
 )
 
 # Complete block boundaries are kept separately so reserved codepoints remain
@@ -192,11 +210,80 @@ def _is_noncharacter(codepoint: int) -> bool:
     return 0xFDD0 <= codepoint <= 0xFDEF or codepoint & 0xFFFF in {0xFFFE, 0xFFFF}
 
 
+def _pinned_combining_class(codepoint: int) -> int:
+    return _PINNED_CANONICAL_COMBINING_CLASSES.get(codepoint, unicodedata.combining(chr(codepoint)))
+
+
+def _decompose_codepoint(codepoint: int, output: list[int]) -> None:
+    pinned = _PINNED_CANONICAL_DECOMPOSITIONS.get(codepoint)
+    if pinned is not None:
+        for member in pinned:
+            _decompose_codepoint(member, output)
+        return
+    output.extend(ord(char) for char in unicodedata.normalize("NFD", chr(codepoint)))
+
+
+def _canonical_order(codepoints: list[int]) -> list[int]:
+    ordered: list[int] = []
+    pending_nonstarters: list[int] = []
+    for codepoint in codepoints:
+        if _pinned_combining_class(codepoint) == 0:
+            ordered.extend(sorted(pending_nonstarters, key=_pinned_combining_class))
+            pending_nonstarters.clear()
+            ordered.append(codepoint)
+        else:
+            pending_nonstarters.append(codepoint)
+    ordered.extend(sorted(pending_nonstarters, key=_pinned_combining_class))
+    return ordered
+
+
+def _compose_pair(starter: int, codepoint: int) -> int | None:
+    pinned = _PINNED_CANONICAL_COMPOSITIONS.get((starter, codepoint))
+    if pinned is not None:
+        return pinned
+    runtime_pair = unicodedata.normalize("NFC", chr(starter) + chr(codepoint))
+    if len(runtime_pair) == 1:
+        return ord(runtime_pair)
+    return None
+
+
+def _canonical_compose(codepoints: list[int]) -> str:
+    result: list[int] = []
+    starter_index: int | None = None
+    starter: int | None = None
+    last_combining_class = 0
+
+    for codepoint in codepoints:
+        current_class = _pinned_combining_class(codepoint)
+        composed = None
+        if starter is not None and (
+            last_combining_class == 0 or last_combining_class < current_class
+        ):
+            composed = _compose_pair(starter, codepoint)
+
+        if composed is not None:
+            assert starter_index is not None
+            result[starter_index] = composed
+            starter = composed
+            continue
+
+        if current_class == 0:
+            starter_index = len(result)
+            starter = codepoint
+        last_combining_class = current_class
+        result.append(codepoint)
+
+    return "".join(chr(codepoint) for codepoint in result)
+
+
 def _normalize_nfc(text: str) -> str:
-    normalized = unicodedata.normalize("NFC", text)
-    for decomposed, composed in _PINNED_NFC_COMPOSITIONS:
-        normalized = normalized.replace(decomposed, composed)
-    return normalized
+    if not any(ord(char) in _PINNED_NORMALIZATION_PARTICIPANTS for char in text):
+        return unicodedata.normalize("NFC", text)
+
+    decomposed: list[int] = []
+    for char in text:
+        _decompose_codepoint(ord(char), decomposed)
+    return _canonical_compose(_canonical_order(decomposed))
 
 
 def validate_unicode_span(

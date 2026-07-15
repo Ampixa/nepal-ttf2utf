@@ -57,16 +57,18 @@ such as Gurung Khema, Sunuwar, and Kirat Rai valid on Python 3.9 while still
 reporting reserved positions, private-use values, and characters assigned to a
 different supported script. `supported_unicode_scripts()` lists all eleven
 accepted validator names. The pinned contract exhaustively covers all 1,068
-assigned positions, 244 reserved positions, 10,150 cross-script cases, and 15
-fallback-normalization inputs across those scripts.
+assigned positions, 244 reserved positions, and 10,150 cross-script cases.
+The Unicode-16 normalization delta is checked against all 290 NFC equalities in
+the 58 Unicode 17 normalization-test rows involving Gurung Khema or Kirat Rai,
+including U+1612F canonical ordering and composition closure.
 
 The Devanagari, Limbu, Kirat Rai, Sunuwar, Lepcha, Tirhuta, and Tibetan legacy
 converters use the same pinned repertoire when native-script Unicode is mixed
 into a legacy span. Assigned characters remain valid passthrough text. The 194
 reserved positions in those output blocks are preserved in lenient output but
 reported and rejected in strict mode. Both legacy Kirat Rai layouts also apply
-the package's pinned Unicode 16 compositions, keeping NFC output stable on
-older supported Python releases.
+the package's pinned Unicode 16 normalization delta, keeping NFC output stable
+on older supported Python releases.
 
 ### Encoding boundaries
 

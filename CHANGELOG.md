@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Complete the Unicode-16 NFC fallback for Gurung Khema and Kirat Rai: pin
+  U+1612F's canonical combining class and the eleven immediate canonical
+  decompositions, apply canonical ordering and blocked composition closure, and
+  exhaust all 290 NFC equalities in the relevant Unicode 17 normalization rows.
 - Restrict SIL Limbu visual-order repair to complete windows wholly emitted by
   the legacy byte pass, preserving native Limbu and mixed-provenance windows.
   Freeze and pin the parsed rules, reorder state, and dispatcher alias sets
