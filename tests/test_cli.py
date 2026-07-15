@@ -74,6 +74,15 @@ def test_cli_strict_mode_has_clean_error(capsys):
     assert "U+007E" in capsys.readouterr().err
 
 
+def test_cli_strict_mode_reports_jg_lepcha_placeholder_source_and_output(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["--font", "jg-lepcha", "--strict", "="])
+    assert error.value.code == 2
+    message = capsys.readouterr().err
+    assert "U+003D" in message
+    assert "U+25CC" in message
+
+
 def test_cli_strict_mode_rejects_a_pinned_reserved_output_position(capsys):
     with pytest.raises(SystemExit) as error:
         main(["--font", "kiratraifontnew", "--strict", "\U00016d7a"])

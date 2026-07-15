@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Restore SIL's exact pinned JG Lepcha map and report its three explicitly
+  uncertain U+25CC placeholder mappings without changing lenient output or
+  replacement counts; strict conversion now rejects those source glyphs.
 - Expand the positional C0 class in SIL's Limbu TECkit map so detailed
   replacement counts reflect all matched control rules while strict mode still
   diagnoses the 29 non-structural C0 values; pin the map's upstream provenance

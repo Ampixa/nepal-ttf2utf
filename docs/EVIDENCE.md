@@ -152,6 +152,25 @@ and Limbu use different encodings and cannot supply these assignments. The map
 records the exact unresolved set in
 [`sikkim_herald_lepcha.json`](../src/nepal_ttf2utf/maps/sikkim_herald_lepcha.json).
 
+## JG Lepcha placeholders
+
+The package vendors SIL's exact
+[`JGLepcha.map`](https://github.com/silnrsi/wsresources/blob/2a39449d20420fe7259f9ce5231c347432840075/scripts/Lepc/legacy/jg-lepcha/mappings/JGLepcha.map)
+from `wsresources` revision
+`2a39449d20420fe7259f9ce5231c347432840075`. The file is version 1.1, contains
+272 lines, and has SHA-256
+`179d172b4bd4223f40b1ddc1a0daeb6547b5ad97dc1be7df2b09f2bf45ff6b2d`.
+It parses to 160 flattened byte-table rules, one contextual byte rule, 72
+Unicode reorder rules, and 11 Unicode reorder classes.
+
+Three forward rules map legacy `0x3C`, `0x3D`, and `0x3E` to U+25CC DOTTED
+CIRCLE. SIL annotates their source glyphs as uncertain circled `v`, `c`, and
+`cv` forms. The generic placeholder does not establish semantic Unicode
+assignments for those distinct glyphs. Lenient conversion therefore preserves
+the source table's U+25CC output and replacement counts while recording the
+source values in `uncertain_codepoints`; strict conversion rejects them. No
+replacement mapping is inferred.
+
 ## OLCKLatic Ol Chiki
 
 OLCKLatic is a distinct legacy layout, not an alias for OLCKOptimum. Three

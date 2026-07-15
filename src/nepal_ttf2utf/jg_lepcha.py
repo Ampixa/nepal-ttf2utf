@@ -3,14 +3,15 @@
 This converter applies SIL's two-pass TECkit map without requiring a TECkit
 runtime. The byte pass handles classes, composite glyphs, and conjunct glyphs;
 the Unicode pass reorders the font's visual-order vowel/final signs into Lepcha
-logical order.
+logical order. Three source rules explicitly marked uncertain by SIL emit the
+generic U+25CC placeholder; their source values remain separate diagnostics.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from ._controls import diagnostic_c0_codepoints
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
+_DOTTED_CIRCLE = 0x25CC
 
 _BYTE_TOKEN_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
 _UNI_TOKEN_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
@@ -104,6 +106,7 @@ class JGLepchaConversion:
     lepcha_char_count: int
     replacement_count: int
     unmapped_codepoints: list[str]
+    uncertain_codepoints: list[str] = field(default_factory=list)
 
 
 class JGLepchaConverter:
@@ -115,6 +118,7 @@ class JGLepchaConverter:
         reorder_rules: list[_ReorderRule],
         unicode_classes: dict[str, frozenset[int]],
         context_rule: tuple[int, frozenset[int], int] | None,
+        uncertain_source_codepoints: frozenset[int] = frozenset(),
     ) -> None:
         if not byte_rules:
             raise ValueError("JGLepchaConverter requires at least one byte rule")
@@ -128,6 +132,7 @@ class JGLepchaConverter:
         self._reorder_rules = sorted(reorder_rules, key=lambda rule: len(rule.slots), reverse=True)
         self._unicode_classes = unicode_classes
         self._context_rule = context_rule
+        self._uncertain_source_codepoints = uncertain_source_codepoints
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "JGLepchaConverter":
@@ -141,10 +146,12 @@ class JGLepchaConverter:
         unicode_classes: dict[str, frozenset[int]] = {}
         byte_rule_lines: list[str] = []
         reorder_rules: list[_ReorderRule] = []
+        uncertain_source_codepoints: set[int] = set()
         current_pass = ""
 
         for raw_line in raw.splitlines():
-            line = raw_line.split(";", 1)[0].strip()
+            code, _separator, comment = raw_line.partition(";")
+            line = code.strip()
             if not line:
                 continue
             lowered = line.lower()
@@ -152,6 +159,14 @@ class JGLepchaConverter:
                 current_pass = lowered
                 continue
             if current_pass == "pass(byte_unicode)":
+                if "???" in comment and ("<>" in line or ">" in line):
+                    left_text, right_text = (
+                        line.split("<>", 1) if "<>" in line else line.split(">", 1)
+                    )
+                    source = tuple(int(value, 16) for value in _BYTE_TOKEN_RE.findall(left_text))
+                    target = tuple(int(value, 16) for value in _UNI_TOKEN_RE.findall(right_text))
+                    if source and target == (_DOTTED_CIRCLE,):
+                        uncertain_source_codepoints.update(source)
                 byte_match = _BYTECLASS_RE.match(line)
                 if byte_match:
                     byte_classes[byte_match.group(1).strip()] = _expand_byte_tokens(
@@ -218,7 +233,13 @@ class JGLepchaConverter:
                 if source and target:
                     byte_rules.append((source, target))
 
-        return cls(byte_rules, reorder_rules, unicode_classes, context_rule)
+        return cls(
+            byte_rules,
+            reorder_rules,
+            unicode_classes,
+            context_rule,
+            frozenset(uncertain_source_codepoints),
+        )
 
     @classmethod
     def default(cls) -> "JGLepchaConverter":
@@ -245,9 +266,10 @@ class JGLepchaConverter:
             ord(text[index + offset]) == codepoint for offset, codepoint in enumerate(source)
         )
 
-    def _byte_pass(self, text: str) -> tuple[str, int, list[str]]:
+    def _byte_pass(self, text: str) -> tuple[str, int, list[str], list[str]]:
         output: list[str] = []
         unmapped: set[str] = set()
+        uncertain: set[str] = set()
         replacements = 0
         index = 0
         while index < len(text):
@@ -265,6 +287,11 @@ class JGLepchaConverter:
             for source, target in self._byte_rules:
                 if self._matches(text, index, source):
                     output.extend(chr(codepoint) for codepoint in target)
+                    uncertain.update(
+                        f"U+{codepoint:04X}"
+                        for codepoint in source
+                        if codepoint in self._uncertain_source_codepoints
+                    )
                     replacements += 1
                     index += len(source)
                     break
@@ -275,7 +302,7 @@ class JGLepchaConverter:
                 if not _is_assigned_script_codepoint(codepoint, "Lepcha"):
                     unmapped.add(f"U+{codepoint:04X}")
                 index += 1
-        return "".join(output), replacements, sorted(unmapped)
+        return "".join(output), replacements, sorted(unmapped), sorted(uncertain)
 
     def _reorder_pass(self, text: str) -> str:
         output: list[str] = []
@@ -301,7 +328,7 @@ class JGLepchaConverter:
         return "".join(output)
 
     def convert(self, text: str) -> JGLepchaConversion:
-        mapped, replacements, unmapped = self._byte_pass(text)
+        mapped, replacements, unmapped, uncertain = self._byte_pass(text)
         converted = unicodedata.normalize("NFC", self._reorder_pass(mapped))
         # The source CTL class maps every C0 value to itself. Preserve that
         # output/count behavior while diagnosing values outside the allowlist.
@@ -312,6 +339,7 @@ class JGLepchaConverter:
             lepcha_char_count=sum(LEPCHA_LO <= ord(char) <= LEPCHA_HI for char in converted),
             replacement_count=replacements,
             unmapped_codepoints=unmapped,
+            uncertain_codepoints=uncertain,
         )
 
 
@@ -324,6 +352,11 @@ def convert_jg_lepcha(text: str, *, strict: bool = False) -> JGLepchaConversion:
     if _DEFAULT is None:
         _DEFAULT = JGLepchaConverter.default()
     result = _DEFAULT.convert(text)
+    if strict and result.uncertain_codepoints:
+        flagged = sorted(set(result.unmapped_codepoints + result.uncertain_codepoints))
+        message = "unmapped/uncertain characters after JG Lepcha conversion: " + " ".join(flagged)
+        message += "; uncertain source glyphs map to placeholder U+25CC"
+        raise ValueError(message)
     if strict and result.unmapped_codepoints:
         raise ValueError(
             "unmapped/leftover characters after JG Lepcha conversion: "

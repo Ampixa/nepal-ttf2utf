@@ -29,7 +29,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Kirat Rai | Kanchenjunga family and `kirat-rai-unicode` | Unicode Kirat Rai validation for the modern Unicode font family. |
 | Sunuwar / Jenticha | `sunuwar`, `jenticha`, `koits`, `kirat1` | All observed script bytes are confirmed. The final `\|` byte is the Sikkim regional form of U+11BC5 UTTHI. |
 | Sunuwar / Jenticha | Noto Sans Sunuwar and `sunuwar-unicode` | Unicode Sunuwar validation, independent of the older `kirat1` layout. |
-| Lepcha / Róng | `jg-lepcha`, `jglepcha`, `lepcha-jg` | Complete native forward reader for SIL's two-pass [`JGLepcha.map`](src/nepal_ttf2utf/maps/JGLepcha.map). |
+| Lepcha / Róng | `jg-lepcha`, `jglepcha`, `lepcha-jg` | Native forward reader for SIL's exact two-pass [`JGLepcha.map`](src/nepal_ttf2utf/maps/JGLepcha.map). Legacy `<`, `=`, and `>` have only upstream U+25CC placeholders, so they remain uncertain and fail strict conversion. |
 | Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Corpus-derived Sikkim Herald layout. Legacy `]`, `%`, and `-` are resolved; only `*`, `(`, `)`, `+`, and `/` remain unmapped. |
 | Lepcha / Róng | Mingzat, Noto Sans Lepcha and `lepcha-unicode` | Unicode Lepcha assigned-repertoire validation; it does not apply either legacy layout. |
 | Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka` | Complete observed Optimum letter, mark, digit, and punctuation map. |
@@ -81,10 +81,12 @@ reported and rejected in strict mode.
   inventoried legacy `khema 2019` layout still lacks the completed semantic font
   audit and independent page review required for a byte converter.
 
-The deliberately unresolved inputs are the legacy Limbu `#`, five rare Sikkim
-Herald Lepcha bytes, unknown legacy Ranjana or Magar Akkha fonts, unknown Janaki
-glyph IDs, the Gurung Khema legacy layout, and the two TibetanMachine `.notdef`
-selectors. Lenient conversion preserves them; strict conversion reports them.
+The deliberately unresolved inputs are the legacy Limbu `#`, JG Lepcha `<`,
+`=`, and `>` placeholders, five rare Sikkim Herald Lepcha bytes, unknown legacy
+Ranjana or Magar Akkha fonts, unknown Janaki glyph IDs, the Gurung Khema legacy
+layout, and the two TibetanMachine `.notdef` selectors. Lenient conversion
+preserves or emits the documented placeholder for them; strict conversion
+reports them.
 
 ## Python API
 
@@ -139,6 +141,11 @@ print(result.script_char_count)
 
 print(supported_unicode_scripts())
 ```
+
+`JGLepchaConversion.uncertain_codepoints` lists source values whose SIL map
+contains an explicitly uncertain U+25CC placeholder rather than an established
+Unicode assignment. These values retain the upstream lenient output but fail
+strict conversion.
 
 `recover_videha_janaki_trace()` is the profile-gated companion API for PyMuPDF
 `get_texttrace()` character tuples. Callers must securely compute and supply a
