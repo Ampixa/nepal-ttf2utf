@@ -72,15 +72,41 @@ source sequences in the supported forward `Byte_Unicode` subset. Pass and
 default declarations must also be unique. Malformed or ambiguous rules in that
 subset fail closed. The two default-substitution
 directives are recognized but deliberately not applied, so undefined legacy
-input retains the package's preserve-and-diagnose behavior. The map's two
-Unicode reorder patterns remain implemented directly rather than interpreted
-as a general `Pass(Unicode)` grammar. Reverse conversion is not implemented.
+input retains the package's preserve-and-diagnose behavior. The map's Unicode
+pass declares exactly two reorder patterns: each product of nine vowels with
+three subjoined signs, and each corresponding product with U+193A LIMBU SIGN
+KEMPHRENG between them. These 27 pair and 27 triple products remain implemented
+directly rather than interpreted as a general `Pass(Unicode)` grammar. Every
+participating role is reachable from the legacy byte pass. Reverse conversion
+is not implemented.
+
+The converter records one provenance flag for every scalar emitted or
+preserved by the byte pass. A pair or triple is reordered only when every
+participating scalar was emitted by a matched legacy rule. This boundary is a
+package policy for mixed Python strings, not a rule asserted by the SIL map;
+native and mixed-provenance windows remain in post-mapping order before
+whole-output NFC normalization. The parsed rules, reorder classes, KEMPHRENG
+scalar, and provenance policy are stored as an immutable per-converter
+snapshot. Exhaustive tests cover all 54 fully derived products and all 270
+non-all-derived product/mask cases.
 
 The functional-digest payload is an outer JSON array of
 `[source-byte-array, target-codepoint-array]` pairs, sorted lexicographically by
 source and target, serialized with separators `(",", ":")`, and encoded as
 ASCII. The resulting 1,741-byte payload has SHA-256
 `31c47c252d2c82e9ab0d05619e80e1e0d1897a2b55f581edf8f987897e97956e`.
+The reorder-state payload is a sorted-key JSON object containing decimal
+`kemphreng`, the `legacy-byte-derived-only` provenance label, and sorted decimal
+`subjoined` and `vowels` arrays, serialized with the same compact separators and
+ASCII encoding. Its 143-byte representation has SHA-256
+`33e0df0d27fafe33b5fe6126dbe7074613b4c3e344b1d3595a9b03069bdb535e`.
+
+Conversion of the ordered U+0000..U+00FF input remains an aggregate
+compatibility pin: 258 output characters, 62 Limbu-block characters, 129
+matched replacements, and 156 unique diagnostics. The UTF-8 output SHA-256 is
+`f9f55d84875b4a73e5e324e95c0d97fb156d164c9f6d44fef9cf6ca08cc526ca`.
+This classifies the input inventory as 100 mapped-clean values, 29 mapped C0
+diagnostics, and 127 preserved diagnostics.
 
 ## Sikkim Herald Kirat Rai
 

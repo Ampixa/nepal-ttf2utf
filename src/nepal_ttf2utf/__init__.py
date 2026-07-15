@@ -120,24 +120,28 @@ __all__ = [
 __version__ = "0.3.0"
 
 # Limbu/Sirijonga legacy fonts that share the Namdhinggo SIL byte encoding.
-_LIMBU_FONTS = {"namdhinggo", "namdhinggosill", "sirijonga", "limbu"}
+_LIMBU_FONTS = frozenset({"namdhinggo", "namdhinggosill", "sirijonga", "limbu"})
 # Modern Unicode Limbu fonts. Bare ``namdhinggo`` remains the legacy route for
 # compatibility; use an explicit Regular/PostScript or Unicode key for v3.100.
-_LIMBU_UNICODE_FONTS = {
-    "limbu-unicode",
-    "namdhinggo-bold",
-    "namdhinggo-extrabold",
-    "namdhinggo-medium",
-    "namdhinggo regular",
-    "namdhinggo-regular",
-    "namdhinggo-semibold",
-    "namdhinggo-unicode",
-    "noto sans limbu",
-    "noto-sans-limbu",
-    "notosanslimbu",
-    "notosanslimbu-regular",
-    "unicode-limbu",
-}
+_LIMBU_UNICODE_FONTS = frozenset(
+    {
+        "limbu-unicode",
+        "namdhinggo-bold",
+        "namdhinggo-extrabold",
+        "namdhinggo-medium",
+        "namdhinggo regular",
+        "namdhinggo-regular",
+        "namdhinggo-semibold",
+        "namdhinggo-unicode",
+        "noto sans limbu",
+        "noto-sans-limbu",
+        "notosanslimbu",
+        "notosanslimbu-regular",
+        "unicode-limbu",
+    }
+)
+if _LIMBU_FONTS & _LIMBU_UNICODE_FONTS:
+    raise ValueError("Limbu legacy and Unicode font aliases overlap")
 # Canonical 2021 ``kirat rai font new`` encoding published with SIL's map.
 _KIRATRAI_FONTS = {"kiratrai", "kiratrai-new", "kiratraifontnew", "akrs", "akrs-new"}
 # Older, globally permuted layout extracted from Sikkim Herald PDF subsets.

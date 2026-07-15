@@ -2,8 +2,9 @@
 
 Applies the forward explicit assignments from the SIL TECkit ``Byte_Unicode`` pass,
 including positional class rules, in the vendored ``Limbu.map``. It also applies the
-vowel / subjoined-consonant reordering that Unicode logical order requires. Validated
-against real Gorkhapatra Limbu/Sirijonga newspaper pages.
+vowel / subjoined-consonant reordering that Unicode logical order requires, limited to
+scalars emitted by the legacy byte pass. Pre-existing Unicode Limbu and mixed-provenance
+windows are not custom reordered.
 """
 
 from __future__ import annotations
@@ -34,9 +35,9 @@ _EXPLICIT_RULE_RE = re.compile(
     r"(?P<target>U\+[0-9A-Fa-f]{4,6}(?:\s+U\+[0-9A-Fa-f]{4,6})*)$"
 )
 _LIMBU_CODEPOINT_RE = re.compile(r"[ᤀ-᥏]")
-_VOWEL_RANGE = range(0x1920, 0x1929)
-_SUBJOINED_RANGE = range(0x1929, 0x192C)
-_KEMPHRENG = "᤺"
+_VOWELS = frozenset(range(0x1920, 0x1929))
+_SUBJOINED = frozenset(range(0x1929, 0x192C))
+_KEMPHRENG = 0x193A
 
 
 def _tokens(body: str) -> list[str]:
@@ -140,6 +141,28 @@ class LimbuConversion:
     unmapped_codepoints: list[str]
 
 
+@dataclass(frozen=True)
+class _LimbuReorderContract:
+    vowels: frozenset[int]
+    subjoined: frozenset[int]
+    kemphreng: int
+    provenance: str
+
+
+_DEFAULT_REORDER_CONTRACT = _LimbuReorderContract(
+    vowels=_VOWELS,
+    subjoined=_SUBJOINED,
+    kemphreng=_KEMPHRENG,
+    provenance="legacy-byte-derived-only",
+)
+
+
+@dataclass(frozen=True)
+class _LimbuContract:
+    rules: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
+    reorder: _LimbuReorderContract
+
+
 class LimbuConverter:
     """Forward ``Byte_Unicode`` reader for the SIL Namdhinggo Limbu legacy map."""
 
@@ -163,7 +186,14 @@ class LimbuConverter:
                 raise ValueError(f"duplicate Limbu source rule: {label}")
             seen.add(source)
         # Longest source sequences first so multi-byte rules win.
-        self._rules = sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True)
+        self._contract = _LimbuContract(
+            rules=tuple(sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True)),
+            reorder=_DEFAULT_REORDER_CONTRACT,
+        )
+
+    @property
+    def _rules(self) -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
+        return self._contract.rules
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "LimbuConverter":
@@ -255,8 +285,9 @@ class LimbuConverter:
         with resources.as_file(resources.files("nepal_ttf2utf.maps") / "Limbu.map") as p:
             return cls.from_map_file(p)
 
-    def convert(self, text: str) -> LimbuConversion:
+    def _byte_pass_with_provenance(self, text: str) -> tuple[str, tuple[bool, ...], int, list[str]]:
         output: list[str] = []
+        derived: list[bool] = []
         unmapped: list[str] = []
         replacements = 0
         index = 0
@@ -266,6 +297,7 @@ class LimbuConverter:
             for source, target in self._rules:
                 if self._matches(text, index, source):
                     output.extend(chr(value) for value in target)
+                    derived.extend([True] * len(target))
                     replacements += 1
                     index += len(source)
                     matched = True
@@ -273,12 +305,17 @@ class LimbuConverter:
             if matched:
                 continue
             output.append(text[index])
+            derived.append(False)
             if text[index] not in STRUCTURAL_C0 and not _is_assigned_script_codepoint(
                 code, "Limbu"
             ):
                 unmapped.append(f"U+{code:04X}")
             index += 1
-        converted = _reorder_limbu(("".join(output)))
+        return "".join(output), tuple(derived), replacements, unmapped
+
+    def convert(self, text: str) -> LimbuConversion:
+        mapped, derived, replacements, unmapped = self._byte_pass_with_provenance(text)
+        converted = _reorder_limbu(mapped, derived, contract=self._contract.reorder)
         converted = unicodedata.normalize("NFC", converted)
         # SIL's CTL class preserves every C0 value. Keep that exact lenient
         # mapping/count behavior but diagnose values outside the allowlist.
@@ -298,25 +335,53 @@ class LimbuConverter:
         return all(ord(text[index + offset]) == code for offset, code in enumerate(source))
 
 
-def _reorder_limbu(text: str) -> str:
+def _reorder_limbu(
+    text: str,
+    derived: tuple[bool, ...] | None = None,
+    *,
+    contract: _LimbuReorderContract = _DEFAULT_REORDER_CONTRACT,
+) -> str:
+    if derived is None:
+        derived = (True,) * len(text)
+    if (
+        type(derived) is not tuple
+        or len(derived) != len(text)
+        or any(type(value) is not bool for value in derived)
+    ):
+        raise ValueError("invalid Limbu reorder provenance")
     chars = list(text)
+    provenance = list(derived)
     index = 0
     while index < len(chars) - 1:
         current = ord(chars[index])
         nxt = ord(chars[index + 1])
-        if current in _VOWEL_RANGE and nxt in _SUBJOINED_RANGE:
-            chars[index], chars[index + 1] = chars[index + 1], chars[index]
+        if current in contract.vowels and nxt in contract.subjoined:
+            if provenance[index] and provenance[index + 1]:
+                chars[index], chars[index + 1] = chars[index + 1], chars[index]
+                provenance[index], provenance[index + 1] = (
+                    provenance[index + 1],
+                    provenance[index],
+                )
             index += 2
             continue
         if (
             index < len(chars) - 2
-            and current in _VOWEL_RANGE
-            and chars[index + 1] == _KEMPHRENG
-            and ord(chars[index + 2]) in _SUBJOINED_RANGE
+            and current in contract.vowels
+            and ord(chars[index + 1]) == contract.kemphreng
+            and ord(chars[index + 2]) in contract.subjoined
         ):
-            vowel = chars[index]
-            subjoined = chars[index + 2]
-            chars[index : index + 3] = [subjoined, vowel, _KEMPHRENG]
+            if all(provenance[index : index + 3]):
+                vowel = chars[index]
+                subjoined = chars[index + 2]
+                chars[index : index + 3] = [subjoined, vowel, chr(contract.kemphreng)]
+                vowel_derived = provenance[index]
+                subjoined_derived = provenance[index + 2]
+                kemphreng_derived = provenance[index + 1]
+                provenance[index : index + 3] = [
+                    subjoined_derived,
+                    vowel_derived,
+                    kemphreng_derived,
+                ]
             index += 3
             continue
         index += 1

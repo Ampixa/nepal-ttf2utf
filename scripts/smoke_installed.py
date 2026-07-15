@@ -11,6 +11,7 @@ import nepal_ttf2utf
 from nepal_ttf2utf import (
     VIDEHA_2008_04_15,
     VIDEHA_ISSUE_001,
+    LimbuConverter,
     TirhutaConverter,
     convert_devanagari,
     convert_jg_lepcha,
@@ -68,6 +69,23 @@ def main() -> int:
         assert (map_package / name).read_bytes()
 
     assert convert_limbu("k", strict=True) == "ᤐ"
+    limbu = LimbuConverter.default()
+    legacy_limbu_pair = limbu.convert("H")
+    assert legacy_limbu_pair.unicode_text == "\u192a\u1922"
+    assert legacy_limbu_pair.replacement_count == 1
+    legacy_limbu_triple = limbu.convert("LJ")
+    assert legacy_limbu_triple.unicode_text == "\u192b\u1921\u193a"
+    assert legacy_limbu_triple.replacement_count == 2
+    native_limbu = "\u1922\u192a\u1922\u193a\u192a"
+    native_limbu_result = limbu.convert(native_limbu)
+    assert native_limbu_result.unicode_text == native_limbu
+    assert native_limbu_result.replacement_count == 0
+    mixed_limbu_pair = limbu.convert("'\u192a")
+    assert mixed_limbu_pair.unicode_text == "\u1922\u192a"
+    assert mixed_limbu_pair.replacement_count == 1
+    mixed_limbu_triple = limbu.convert("L\u192b")
+    assert mixed_limbu_triple.unicode_text == "\u1921\u193a\u192b"
+    assert mixed_limbu_triple.replacement_count == 1
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
     assert convert_kiratrai_herald("fZ0", strict=True).unicode_text == "𖵈 𖵰"
     assert nepal_ttf2utf.convert("fZ0", font="kiratrai-herald", strict=True) == "𖵈 𖵰"

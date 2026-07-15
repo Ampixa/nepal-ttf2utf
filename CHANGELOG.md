@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Restrict SIL Limbu visual-order repair to complete windows wholly emitted by
+  the legacy byte pass, preserving native Limbu and mixed-provenance windows.
+  Freeze and pin the parsed rules, reorder state, and dispatcher alias sets
+  without changing the SIL resource, legacy-only output, counts, diagnostics,
+  or unresolved legacy inputs.
 - Restrict JG Lepcha visual-order repair to output wholly derived from the legacy
   byte pass, preserving genuine Unicode Lepcha and mixed-provenance match windows.
   Store the parsed byte, reorder, and class state as immutable snapshots without
