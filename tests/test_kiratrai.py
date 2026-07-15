@@ -9,16 +9,44 @@ import json
 import unicodedata
 from collections import Counter
 from importlib import resources
+from itertools import product
 
 import pytest
 
+import nepal_ttf2utf.kiratrai as kiratrai_module
 from nepal_ttf2utf import convert, convert_kiratrai, convert_kiratrai_herald
 from nepal_ttf2utf._controls import DIAGNOSTIC_C0
-from nepal_ttf2utf.kiratrai import KIRATRAI_HERALD_PREMAP, KiratRaiConverter
+from nepal_ttf2utf.kiratrai import (
+    KIRATRAI_HERALD_BLANKS,
+    KIRATRAI_HERALD_PASSTHROUGH,
+    KIRATRAI_HERALD_PREMAP,
+    KiratRaiConverter,
+    KiratRaiHeraldConverter,
+)
 
 
 def _has_kiratrai(s: str) -> bool:
     return any(0x16D40 <= ord(c) <= 0x16D7F for c in s)
+
+
+def _herald_contract_payload(converter: KiratRaiHeraldConverter) -> bytes:
+    return json.dumps(
+        {
+            "blanks": sorted(ord(source) for source in converter._blanks),
+            "passthrough": sorted(ord(source) for source in converter._passthrough),
+            "premap": [
+                [ord(source), ord(target)] for source, target in sorted(converter._premap.items())
+            ],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("ascii")
+
+
+def _herald_projection(source: str, converter: KiratRaiHeraldConverter) -> str:
+    return "".join(
+        converter._premap.get(char, " " if char in converter._blanks else char) for char in source
+    )
 
 
 def test_kiratrai_map_matches_the_pinned_sil_source_and_parser_inventory():
@@ -42,6 +70,7 @@ def test_kiratrai_map_matches_the_pinned_sil_source_and_parser_inventory():
         2: 4,
         3: 1,
     }
+    assert isinstance(converter._rules, tuple)
     functional_payload = json.dumps(
         [[list(source), list(target)] for source, target in sorted(converter._rules)],
         separators=(",", ":"),
@@ -50,6 +79,103 @@ def test_kiratrai_map_matches_the_pinned_sil_source_and_parser_inventory():
     assert hashlib.sha256(functional_payload).hexdigest() == (
         "d83310902ddacc1a04ed11c10d8b8f5ebf3af374745ca2f3c23fe9f1c49c0a8a"
     )
+
+
+def test_kiratrai_herald_routing_and_effective_output_contracts_are_pinned():
+    converter = KiratRaiHeraldConverter.default()
+    assert len(converter._premap) == len(KIRATRAI_HERALD_PREMAP) == 38
+    assert len(converter._passthrough) == len(KIRATRAI_HERALD_PASSTHROUGH) == 21
+    assert len(converter._blanks) == len(KIRATRAI_HERALD_BLANKS) == 2
+    assert len(set(converter._premap.values())) == 38
+    assert not set(converter._premap) & converter._passthrough
+    assert not set(converter._premap) & converter._blanks
+    assert not converter._passthrough & converter._blanks
+
+    premap_payload = json.dumps(
+        [[ord(source), ord(target)] for source, target in sorted(converter._premap.items())],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(premap_payload) == 349
+    assert hashlib.sha256(premap_payload).hexdigest() == (
+        "49625e55234be5d752424ccf7ce9f3b2e1514d80d5268ab84cf7f42a42623f60"
+    )
+
+    payload = _herald_contract_payload(converter)
+    assert len(payload) == 455
+    assert hashlib.sha256(payload).hexdigest() == (
+        "096ab0ff7d78d25eb529af2041b11510e60f958e749b1cd92c11fa3a313ce14d"
+    )
+
+    effective_payload = json.dumps(
+        [
+            [ord(source), [ord(char) for char in converter.convert(source).unicode_text]]
+            for source in sorted(converter._premap)
+        ],
+        separators=(",", ":"),
+    ).encode("ascii")
+    assert len(effective_payload) == 518
+    assert hashlib.sha256(effective_payload).hexdigest() == (
+        "6c176c661b8af8a73f38d16a44f477edeee8ec9bfd987d9457ecedb5f2318eb8"
+    )
+
+
+def _invalid_herald_contract(case: str):
+    premap = dict(KIRATRAI_HERALD_PREMAP)
+    passthrough = set(KIRATRAI_HERALD_PASSTHROUGH)
+    blanks = set(KIRATRAI_HERALD_BLANKS)
+    if case == "premap-count":
+        premap.pop("D")
+    elif case == "passthrough-count":
+        passthrough.remove(";")
+    elif case == "blank-count":
+        blanks.remove("Z")
+    elif case == "source-type":
+        premap[68] = premap.pop("D")
+    elif case == "source-length":
+        premap["DD"] = premap.pop("D")
+    elif case == "target-length":
+        premap["D"] = "qq"
+    elif case == "target-domain":
+        premap["D"] = "\u2603"
+    elif case == "duplicate-target":
+        premap["D"] = premap["F"]
+    elif case == "overlap":
+        passthrough.remove(";")
+        passthrough.add("D")
+    elif case == "unsupported-target":
+        premap["f"] = "f"
+    elif case == "unclean-forward":
+        passthrough.remove(";")
+        passthrough.add("~")
+    else:  # pragma: no cover - test helper contract
+        raise AssertionError(case)
+    return premap, frozenset(passthrough), frozenset(blanks)
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("premap-count", "exactly 38"),
+        ("passthrough-count", "exactly 21"),
+        ("blank-count", "exactly two"),
+        ("source-type", "invalid Kirat Rai Herald premap entry"),
+        ("source-length", "invalid Kirat Rai Herald premap entry"),
+        ("target-length", "invalid Kirat Rai Herald premap entry"),
+        ("target-domain", "invalid Kirat Rai Herald premap entry"),
+        ("duplicate-target", "targets must be one-to-one"),
+        ("overlap", "routing sources overlap"),
+        ("unsupported-target", "unsupported Kirat Rai Herald canonical target"),
+        ("unclean-forward", "unclean Kirat Rai Herald canonical projection"),
+    ],
+)
+def test_kiratrai_herald_contract_validation_fails_closed(monkeypatch, case, message):
+    premap, passthrough, blanks = _invalid_herald_contract(case)
+    monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_PREMAP", premap)
+    monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_PASSTHROUGH", passthrough)
+    monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_BLANKS", blanks)
+
+    with pytest.raises(ValueError, match=message):
+        kiratrai_module._freeze_herald_contract()
 
 
 def test_every_kiratrai_source_rule_has_exact_output_and_counts():
@@ -339,6 +465,129 @@ def test_herald_full_observed_letter_premap_matches_exact_unicode_targets():
         assert convert_kiratrai_herald(byte, strict=True).unicode_text == chr(codepoint)
 
 
+def test_every_byte_has_an_exact_kiratrai_herald_classification():
+    converter = KiratRaiHeraldConverter.default()
+    categories: Counter[str] = Counter()
+    outcomes: Counter[str] = Counter()
+
+    for codepoint in range(0x100):
+        source = chr(codepoint)
+        result = converter.convert(source)
+        if source in converter._premap:
+            category = "premap"
+            expected = converter._canonical.convert(converter._premap[source])
+        elif source in converter._passthrough:
+            category = "passthrough"
+            expected = converter._canonical.convert(source)
+        elif source in converter._blanks:
+            category = "blank"
+            expected = converter._canonical.convert(" ")
+        else:
+            category = "diagnosed"
+            assert result.unicode_text == source
+            assert result.kiratrai_char_count == 0
+            assert result.replacement_count == 0
+            assert result.unmapped_codepoints == [f"U+{codepoint:04X}"]
+            with pytest.raises(ValueError, match=f"U\\+{codepoint:04X}"):
+                convert_kiratrai_herald(source, strict=True)
+            categories[category] += 1
+            outcomes[category] += 1
+            continue
+
+        assert result.unicode_text == expected.unicode_text, f"U+{codepoint:04X}"
+        assert result.kiratrai_char_count == expected.kiratrai_char_count
+        assert result.replacement_count == expected.replacement_count == 1
+        assert result.unmapped_codepoints == expected.unmapped_codepoints == []
+        assert convert_kiratrai_herald(source, strict=True) == result
+        categories[category] += 1
+        if category == "blank":
+            outcomes["blank-to-space"] += 1
+        elif result.kiratrai_char_count:
+            outcomes["assigned-kiratrai"] += 1
+        else:
+            outcomes["clean-literal"] += 1
+
+    assert categories == {
+        "premap": 38,
+        "passthrough": 21,
+        "blank": 2,
+        "diagnosed": 195,
+    }
+    assert outcomes == {
+        "assigned-kiratrai": 49,
+        "clean-literal": 10,
+        "blank-to-space": 2,
+        "diagnosed": 195,
+    }
+
+
+def test_every_supported_herald_pair_and_premap_triple_preserves_projection_state():
+    converter = KiratRaiHeraldConverter.default()
+    supported = sorted(set(converter._premap) | converter._passthrough | converter._blanks)
+    isolated = {source: converter.convert(source).unicode_text for source in supported}
+    pair_interactions = 0
+    for parts in product(supported, repeat=2):
+        source = "".join(parts)
+        result = converter.convert(source)
+        expected = converter._canonical.convert(_herald_projection(source, converter))
+        assert result.unicode_text == expected.unicode_text, repr(source)
+        assert result.kiratrai_char_count == expected.kiratrai_char_count, repr(source)
+        assert result.replacement_count == expected.replacement_count, repr(source)
+        assert result.unmapped_codepoints == expected.unmapped_codepoints == [], repr(source)
+        pair_interactions += result.unicode_text != "".join(isolated[part] for part in parts)
+
+    premap_sources = sorted(converter._premap)
+    triple_interactions = 0
+    for parts in product(premap_sources, repeat=3):
+        source = "".join(parts)
+        result = converter.convert(source)
+        expected = converter._canonical.convert(_herald_projection(source, converter))
+        assert result.unicode_text == expected.unicode_text, repr(source)
+        assert result.kiratrai_char_count == expected.kiratrai_char_count, repr(source)
+        assert result.replacement_count == expected.replacement_count, repr(source)
+        assert result.unmapped_codepoints == expected.unmapped_codepoints == [], repr(source)
+        triple_interactions += result.unicode_text != "".join(isolated[part] for part in parts)
+
+    assert pair_interactions == 3
+    assert triple_interactions == 150
+
+
+def test_kiratrai_herald_public_contract_and_private_snapshots_are_immutable(monkeypatch):
+    canonical = KiratRaiConverter.default()
+    converter = KiratRaiHeraldConverter(canonical)
+    expected = converter.convert("a?Z0")
+
+    with pytest.raises(TypeError):
+        KIRATRAI_HERALD_PREMAP["a"] = "?"
+    with pytest.raises(AttributeError):
+        KIRATRAI_HERALD_PASSTHROUGH.add("?")
+    with pytest.raises(AttributeError):
+        KIRATRAI_HERALD_BLANKS.add("?")
+    with pytest.raises(TypeError):
+        converter._premap["a"] = "?"
+    with pytest.raises(AttributeError):
+        canonical._rules.clear()
+
+    monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_PREMAP", {"?": "k"})
+    monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_PASSTHROUGH", frozenset("?"))
+    monkeypatch.setattr(kiratrai_module, "KIRATRAI_HERALD_BLANKS", frozenset("?"))
+    canonical._rules = (((ord("?"),), (0x16D43,)),)
+
+    assert converter.convert("a?Z0") == expected
+    assert KiratRaiHeraldConverter.default().convert("a?Z0") == expected
+    assert convert_kiratrai_herald("a?Z0") == expected
+
+
+def test_kiratrai_herald_constructor_snapshots_custom_canonical_rules():
+    canonical = KiratRaiConverter([((ord("k"),), (0x16D43,))])
+    converter = KiratRaiHeraldConverter(canonical)
+    canonical._rules = (((ord("k"),), (0x16D44,)),)
+
+    assert converter.convert("a").unicode_text == chr(0x16D43)
+    with pytest.raises(ValueError, match="requires a KiratRaiConverter"):
+        KiratRaiHeraldConverter(object())
+
+
 def test_herald_corpus_masthead_regression():
     assert convert_kiratrai_herald("udzdle", strict=True).unicode_text == "".join(
         chr(codepoint) for codepoint in (0x16D65, 0x16D45, 0x16D6B, 0x16D45, 0x16D64, 0x16D5B)
@@ -366,3 +615,8 @@ def test_canonical_z_remains_kirat_rai_sang():
 def test_convert_dispatches_old_and_new_kiratrai_layouts_separately():
     assert convert("f", font="kiratraifont", strict=True) == chr(0x16D48)
     assert convert("N", font="kiratraifontnew", strict=True) == chr(0x16D48)
+
+
+@pytest.mark.parametrize("font", ["kiratrai-herald", "kiratraifont", "sikkimherald-kiratrai"])
+def test_every_herald_alias_uses_the_frozen_routing_contract(font):
+    assert convert("fZ0", font=font, strict=True) == "".join((chr(0x16D48), " ", chr(0x16D70)))

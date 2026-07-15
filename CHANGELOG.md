@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Freeze and pin the four-PDF Sikkim Herald Kirat Rai routing contract;
+  exhaust all byte values, supported pairs, and premap triples, isolate converter
+  state from public-name and canonical-rule mutation, and state the external
+  derivation boundary without adding legacy assignments.
 - Freeze and pin the complete distributed two-profile Videha recovery contract;
   reject coercible metadata, codepoints, glyph IDs, flags, malformed containers,
   and unbounded inputs without adding profiles or semantic glyph assignments.

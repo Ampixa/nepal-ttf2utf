@@ -1,11 +1,12 @@
 """Legacy Kirat Rai fonts -> Unicode Kirat Rai (U+16D40-U+16D7F).
 
 SIL publishes a TECkit map for the canonical 2021 ``kirat rai font new`` encoding;
-the vendored copy lives at ``maps/kiratraifontnew.map``. Sikkim Herald PDFs use a
-different, older layout hidden behind per-PDF CID subsets and ASCII ToUnicode values.
-Four independently subset Herald PDFs share one stable old->new remap: exact glyph
-outline plus advance-width identity covers the observed script characters. The
-Herald converter applies that complete premap before the SIL rules.
+the vendored copy lives at ``maps/kiratraifontnew.map``. Four audited Sikkim Herald
+PDF subsets use a different, older layout hidden behind per-PDF CIDs and ASCII
+ToUnicode values. The package's frozen Herald routing snapshot applies the observed
+38-entry old-to-new premap before the SIL rules. The source PDFs and intermediate
+outline-comparison artifacts are not distributed; ``docs/EVIDENCE.md`` records the
+derivation boundary.
 
 That map is expressed with TECkit ``ByteClass`` / ``UniClass`` declarations plus a
 handful of explicit multi-byte ligature rules. A ``[class] > [class]`` rule maps the
@@ -23,10 +24,11 @@ is a blank spacing glyph and is normalized to an ordinary space.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
+from types import MappingProxyType
 
 from ._controls import diagnostic_c0_codepoints
 from .unicode_span import _is_assigned_script_codepoint, _normalize_nfc
@@ -51,51 +53,54 @@ _KIRATRAI_LO, _KIRATRAI_HI = 0x16D40, 0x16D7F
 # in Herald PDFs these ASCII values belong to the separate permuted layout below.
 KIRATRAI_UNMAPPED_BYTES: frozenset[str] = frozenset("fRxFIL\\")
 
-# Sikkim Herald extracted ASCII -> canonical ``kiratraifontnew`` byte. Derived by exact
-# RecordingPen outline-command and advance-width identity against the font embedded in
-# Unicode proposal L2/22-043R. Shared by four PDF subsets and 43,037 exact-match chars.
-KIRATRAI_HERALD_PREMAP: dict[str, str] = {
-    "D": "q",
-    "F": "g",
-    "G": "P",
-    "H": "j",
-    "I": "W",
-    "J": "J",
-    "K": "Q",
-    "L": "$",
-    "O": "O",
-    "R": "w",
-    "S": "G",
-    "U": "o",
-    "a": "k",
-    "b": "A",
-    "c": "D",
-    "d": "K",
-    "e": "m",
-    "f": "N",
-    "g": "s",
-    "h": "a",
-    "i": "v",
-    "j": "b",
-    "k": "r",
-    "l": "i",
-    "m": "c",
-    "n": "p",
-    "o": "n",
-    "p": "t",
-    "q": "d",
-    "r": "e",
-    "s": "C",
-    "t": "h",
-    "u": "u",
-    "v": "B",
-    "w": "l",
-    "x": "T",
-    "y": "y",
-    "z": "z",
-}
+# Sikkim Herald extracted ASCII -> canonical ``kiratraifontnew`` byte. The
+# project-derived values are the complete distributed premap observed across the
+# four audited PDF subsets; they do not claim a universal Herald encoding.
+KIRATRAI_HERALD_PREMAP: Mapping[str, str] = MappingProxyType(
+    {
+        "D": "q",
+        "F": "g",
+        "G": "P",
+        "H": "j",
+        "I": "W",
+        "J": "J",
+        "K": "Q",
+        "L": "$",
+        "O": "O",
+        "R": "w",
+        "S": "G",
+        "U": "o",
+        "a": "k",
+        "b": "A",
+        "c": "D",
+        "d": "K",
+        "e": "m",
+        "f": "N",
+        "g": "s",
+        "h": "a",
+        "i": "v",
+        "j": "b",
+        "k": "r",
+        "l": "i",
+        "m": "c",
+        "n": "p",
+        "o": "n",
+        "p": "t",
+        "q": "d",
+        "r": "e",
+        "s": "C",
+        "t": "h",
+        "u": "u",
+        "v": "B",
+        "w": "l",
+        "x": "T",
+        "y": "y",
+        "z": "z",
+    }
+)
 
-# Values confirmed as identity/literal in the audited Herald PDFs. Backslash and
+# Values forwarded unchanged to the canonical map. Digits and slash consequently
+# become Kirat Rai characters; the remaining values stay literal. Backslash and
 # Herald ``Z`` are separate blank glyphs normalized to ordinary spaces. Canonical
 # ``kiratraifontnew`` Z remains U+16D6C and is unaffected.
 KIRATRAI_HERALD_PASSTHROUGH: frozenset[str] = frozenset(" \t\r\n0123456789(),-/.;")
@@ -236,7 +241,7 @@ class KiratRaiConverter:
                 label = " ".join(f"0x{value:02X}" for value in source)
                 raise ValueError(f"duplicate Kirat Rai source rule: {label}")
             seen.add(source)
-        self._rules = sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True)
+        self._rules = tuple(sorted(normalized_rules, key=lambda item: len(item[0]), reverse=True))
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "KiratRaiConverter":
@@ -357,11 +362,76 @@ class KiratRaiConverter:
         return all(ord(text[index + offset]) == code for offset, code in enumerate(source))
 
 
+def _freeze_herald_contract() -> tuple[Mapping[str, str], frozenset[str], frozenset[str]]:
+    """Validate and snapshot the fixed four-PDF Herald routing contract."""
+    if not isinstance(KIRATRAI_HERALD_PREMAP, Mapping):
+        raise ValueError("invalid Kirat Rai Herald premap")
+    premap = dict(KIRATRAI_HERALD_PREMAP)
+    passthrough = frozenset(KIRATRAI_HERALD_PASSTHROUGH)
+    blanks = frozenset(KIRATRAI_HERALD_BLANKS)
+
+    if len(premap) != 38:
+        raise ValueError("Kirat Rai Herald premap must contain exactly 38 entries")
+    if len(passthrough) != 21:
+        raise ValueError("Kirat Rai Herald passthrough must contain exactly 21 values")
+    if len(blanks) != 2:
+        raise ValueError("Kirat Rai Herald blanks must contain exactly two values")
+
+    for source, target in premap.items():
+        if (
+            type(source) is not str
+            or len(source) != 1
+            or ord(source) > 0xFF
+            or type(target) is not str
+            or len(target) != 1
+            or ord(target) > 0xFF
+        ):
+            raise ValueError(f"invalid Kirat Rai Herald premap entry: {source!r}: {target!r}")
+    if len(set(premap.values())) != len(premap):
+        raise ValueError("Kirat Rai Herald premap targets must be one-to-one")
+
+    for label, values in (("passthrough", passthrough), ("blank", blanks)):
+        if any(type(value) is not str or len(value) != 1 or ord(value) > 0xFF for value in values):
+            raise ValueError(f"invalid Kirat Rai Herald {label} value")
+
+    source_sets = (set(premap), set(passthrough), set(blanks))
+    if any(source_sets[left] & source_sets[right] for left, right in ((0, 1), (0, 2), (1, 2))):
+        raise ValueError("Kirat Rai Herald routing sources overlap")
+
+    canonical = KiratRaiConverter.default()
+    singleton_sources = {source[0] for source, _target in canonical._rules if len(source) == 1}
+    unsupported_targets = sorted(
+        target for target in premap.values() if ord(target) not in singleton_sources
+    )
+    if unsupported_targets:
+        labels = " ".join(f"U+{ord(target):04X}" for target in unsupported_targets)
+        raise ValueError(f"unsupported Kirat Rai Herald canonical target: {labels}")
+
+    for value in set(premap.values()) | set(passthrough) | {" "}:
+        result = canonical.convert(value)
+        if result.replacement_count != 1 or result.unmapped_codepoints:
+            raise ValueError(f"unclean Kirat Rai Herald canonical projection: {value!r}")
+
+    return MappingProxyType(premap), passthrough, blanks
+
+
+(
+    _DEFAULT_HERALD_PREMAP,
+    _DEFAULT_HERALD_PASSTHROUGH,
+    _DEFAULT_HERALD_BLANKS,
+) = _freeze_herald_contract()
+
+
 class KiratRaiHeraldConverter:
-    """Convert the permuted Sikkim Herald PDF layout through the canonical SIL map."""
+    """Convert the frozen four-PDF Herald layout through a canonical SIL snapshot."""
 
     def __init__(self, canonical: KiratRaiConverter) -> None:
-        self._canonical = canonical
+        if not isinstance(canonical, KiratRaiConverter):
+            raise ValueError("KiratRaiHeraldConverter requires a KiratRaiConverter")
+        self._canonical = KiratRaiConverter(canonical._rules)
+        self._premap = _DEFAULT_HERALD_PREMAP
+        self._passthrough = _DEFAULT_HERALD_PASSTHROUGH
+        self._blanks = _DEFAULT_HERALD_BLANKS
 
     @classmethod
     def default(cls) -> "KiratRaiHeraldConverter":
@@ -384,14 +454,14 @@ class KiratRaiHeraldConverter:
             canonical_run.clear()
 
         for char in text:
-            remapped = KIRATRAI_HERALD_PREMAP.get(char)
+            remapped = self._premap.get(char)
             if remapped is not None:
                 canonical_run.append(remapped)
                 continue
-            if char in KIRATRAI_HERALD_BLANKS:
+            if char in self._blanks:
                 canonical_run.append(" ")
                 continue
-            if char in KIRATRAI_HERALD_PASSTHROUGH:
+            if char in self._passthrough:
                 canonical_run.append(char)
                 continue
             if _is_assigned_script_codepoint(ord(char), "Kirat Rai"):

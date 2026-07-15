@@ -130,9 +130,9 @@ its `Z` is CID/GID 61 with zero outline commands and a nonzero advance width of
 1,251 font units. Treating this corpus byte as a space is therefore a rendering
 fact, not a semantic assignment to the canonical font's nonblank `Z`.
 
-The complete premap is
-[`KIRATRAI_HERALD_PREMAP`](../src/nepal_ttf2utf/kiratrai.py). Six bytes that
-previously looked like gaps resolve as follows:
+The complete distributed 38-entry premap for the four audited subsets is
+[`KIRATRAI_HERALD_PREMAP`](../src/nepal_ttf2utf/kiratrai.py). Six assignments
+with explicit four-PDF occurrence counts are:
 
 | Herald byte | Canonical byte | Unicode | Four-PDF occurrences |
 |---|---|---:|---:|
@@ -142,6 +142,34 @@ previously looked like gaps resolve as follows:
 | `F` | `g` | U+16D46 GA | 82 |
 | `I` | `W` | U+16D51 DDHA | 53 |
 | `L` | `$` | U+16D6D YUPI | 1 |
+
+The frozen routing contract contains the 38 premap entries, 21 values forwarded
+unchanged to the canonical map, and two blank-to-space inputs. The three source
+sets are disjoint. The sorted compact ASCII JSON array of integer
+`[Herald source, canonical source]` pairs is 349 bytes with SHA-256
+`49625e55234be5d752424ccf7ce9f3b2e1514d80d5268ab84cf7f42a42623f60`.
+The complete compact sorted-key ASCII JSON payload uses that array as `premap`
+and sorted codepoint arrays as `passthrough` and `blanks`. The 455-byte payload
+has SHA-256
+`096ab0ff7d78d25eb529af2041b11510e60f958e749b1cd92c11fa3a313ce14d`.
+The resulting 38 effective singleton outputs form a separate 518-byte compact
+ASCII JSON array of `[Herald source, [Unicode output]]` records with SHA-256
+`6c176c661b8af8a73f38d16a44f477edeee8ec9bfd987d9457ecedb5f2318eb8`.
+
+Tests classify all 256 byte values as 38 premap, 21 canonical-forward, two
+blank-to-space, and 195 preserved-but-diagnosed inputs. Of the 61 routed
+singletons, 49 produce assigned Kirat Rai characters, ten remain clean literal
+characters, and two become spaces. Every routed pair and every ordered triple
+of the 38 premap sources is checked against the canonical downstream map. This
+includes the reachable `br`, `rr`, `brr`, and `//` multibyte rules. Public
+routing constants and converter state are immutable snapshots.
+
+The package does not distribute the four source PDFs, their embedded subset
+fonts, glyph outlines, widths, ToUnicode tables, comparison scripts, or
+per-PDF result files. The distributed functional contract can therefore be
+verified from the repository, but the repository alone cannot reconstruct the
+outline correspondences, blank-glyph observations, occurrence totals, or
+coverage beyond the four audited subsets.
 
 The layouts must remain separate. Applying the SIL map directly to Herald text
 can produce valid Kirat Rai codepoints with the wrong semantics, even when none

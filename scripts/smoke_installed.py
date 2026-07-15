@@ -14,6 +14,7 @@ from nepal_ttf2utf import (
     convert_devanagari,
     convert_jg_lepcha,
     convert_kiratrai,
+    convert_kiratrai_herald,
     convert_lepcha,
     convert_limbu,
     convert_olchiki,
@@ -66,6 +67,8 @@ def main() -> int:
 
     assert convert_limbu("k", strict=True) == "ᤐ"
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
+    assert convert_kiratrai_herald("fZ0", strict=True).unicode_text == "𖵈 𖵰"
+    assert nepal_ttf2utf.convert("fZ0", font="kiratrai-herald", strict=True) == "𖵈 𖵰"
     assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
     assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
     assert nepal_ttf2utf.convert("!", font="tibetan-machine", strict=True) == "ཀ"
