@@ -368,6 +368,30 @@ database: Python 3.9 predates the Unicode 16 encoding of Gurung Khema, Sunuwar,
 and Kirat Rai, but it can still validate their assigned codepoints without
 treating reserved positions as characters.
 
+The eleven validator blocks contain 1,312 positions: 1,068 are assigned in the
+pinned repertoire and 244 are reserved. The primary Script-property sets
+contain 1,015 positions. The remaining 53 assigned positions are Common or
+Inherited values in the Devanagari and Tibetan blocks; they are accepted beside
+a native-script anchor but do not supply that anchor themselves. Exhaustive
+tests require exact normalized output and diagnostics for every assigned and
+reserved position, and exercise all 10,150 combinations of a primary-Script
+position routed through one of the other ten script validators. Eight assigned
+Devanagari values and 17 assigned Tibetan values expand to two script-specific
+characters under NFC, so `script_char_count` is checked after normalization.
+
+The functional-contract payload is a JSON object with keys `version`,
+`assigned`, `scripts`, `blocks`, and `nfc`. The three range objects map each
+script name to arrays of inclusive `[start, end]` integer pairs. Each `nfc`
+entry is `[decomposed-codepoint-array, composed-codepoint-array]`. Serialization
+uses sorted keys, separators `(",", ":")`, and ASCII encoding. The resulting
+1,836-byte payload has SHA-256
+`b3afd8d2313f3f7b03975dcbd1ae058dc4f1a9977dba2d665f380a1fbb92404b`.
+
+Invalid-value coverage includes all 29 nonstructural C0 controls, DEL, all 32
+C1 controls, all 2,048 surrogate values, all 66 Unicode noncharacters, and the
+boundaries of all three private-use ranges. TAB, LF, and CR remain valid
+structural whitespace.
+
 For the seven output scripts listed below, the same pinned membership determines
 whether native-script Unicode can pass through a legacy converter without a
 diagnostic. This check is deliberately narrower than full Unicode-span
@@ -395,11 +419,11 @@ representative CLI test requires the same visible diagnostic. Every assigned
 position in the same seven repertoires is also exhaustively tested as valid
 passthrough, including assigned Common or Inherited block values.
 
-Eleven canonical compositions introduced with Gurung Khema and Kirat Rai are
-also pinned so validator output and both legacy Kirat Rai layouts have stable
-NFC output on older Python releases. Outside the eleven pinned script blocks,
-unassigned-codepoint detection continues to use the host Python Unicode
-database.
+Fifteen decomposition inputs producing eleven canonical compositions introduced
+with Gurung Khema and Kirat Rai are also pinned so validator output and both
+legacy Kirat Rai layouts have stable NFC output on older Python releases.
+Outside the eleven pinned script blocks, unassigned-codepoint detection
+continues to use the host Python Unicode database.
 
 The validator covers Brahmi, Devanagari, Gurung Khema, Kirat Rai, Lepcha,
 Limbu, Newa, Ol Chiki, Sunuwar, Tibetan, and Tirhuta. It normalizes NFC and

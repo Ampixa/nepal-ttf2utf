@@ -1,6 +1,9 @@
 """Already-Unicode font-span routing tests."""
 
+import hashlib
+import json
 import unicodedata
+from collections import Counter
 
 import pytest
 
@@ -13,6 +16,45 @@ from nepal_ttf2utf import (
 )
 from nepal_ttf2utf.limbu import convert_limbu
 from nepal_ttf2utf.tirhuta import convert_tirhuta
+from nepal_ttf2utf.unicode_span import (
+    _ASSIGNED_BLOCK_RANGES,
+    _PINNED_NFC_COMPOSITIONS,
+    _SCRIPT_BLOCK_RANGES,
+    _SCRIPT_RANGES,
+)
+
+_UNICODE17_SCRIPT_INVENTORY = {
+    # assigned, Script-property, assigned Common/Inherited, reserved
+    "Brahmi": (115, 115, 0, 13),
+    "Devanagari": (213, 164, 49, 91),
+    "Gurung Khema": (58, 58, 0, 6),
+    "Kirat Rai": (58, 58, 0, 6),
+    "Lepcha": (74, 74, 0, 6),
+    "Limbu": (68, 68, 0, 12),
+    "Newa": (97, 97, 0, 31),
+    "Ol Chiki": (48, 48, 0, 0),
+    "Sunuwar": (44, 44, 0, 20),
+    "Tibetan": (211, 207, 4, 45),
+    "Tirhuta": (82, 82, 0, 14),
+}
+
+_SCRIPT_ANCHORS = {
+    "Brahmi": 0x11013,
+    "Devanagari": 0x0915,
+    "Gurung Khema": 0x16100,
+    "Kirat Rai": 0x16D43,
+    "Lepcha": 0x1C00,
+    "Limbu": 0x1900,
+    "Newa": 0x11400,
+    "Ol Chiki": 0x1C5A,
+    "Sunuwar": 0x11BC0,
+    "Tibetan": 0x0F40,
+    "Tirhuta": 0x11480,
+}
+
+
+def _expand_ranges(ranges):
+    return {codepoint for start, end in ranges for codepoint in range(start, end + 1)}
 
 
 @pytest.mark.parametrize(
@@ -58,6 +100,201 @@ def test_unicode_repertoire_is_version_pinned_and_discoverable():
     )
 
 
+def test_unicode17_contract_digest_and_complete_inventory():
+    contract = {
+        "version": UNICODE_REPERTOIRE_VERSION,
+        "assigned": {
+            script: [list(item) for item in ranges]
+            for script, ranges in _ASSIGNED_BLOCK_RANGES.items()
+        },
+        "scripts": {
+            script: [list(item) for item in ranges] for script, ranges in _SCRIPT_RANGES.items()
+        },
+        "blocks": {
+            script: [list(item) for item in ranges]
+            for script, ranges in _SCRIPT_BLOCK_RANGES.items()
+        },
+        "nfc": [
+            [[ord(char) for char in decomposed], [ord(char) for char in composed]]
+            for decomposed, composed in _PINNED_NFC_COMPOSITIONS
+        ],
+    }
+    payload = json.dumps(contract, sort_keys=True, separators=(",", ":")).encode("ascii")
+    assert len(payload) == 1836
+    assert hashlib.sha256(payload).hexdigest() == (
+        "b3afd8d2313f3f7b03975dcbd1ae058dc4f1a9977dba2d665f380a1fbb92404b"
+    )
+
+    assert set(_ASSIGNED_BLOCK_RANGES) == set(_UNICODE17_SCRIPT_INVENTORY)
+    assert set(_SCRIPT_RANGES) == set(_UNICODE17_SCRIPT_INVENTORY)
+    assert set(_SCRIPT_BLOCK_RANGES) == set(_UNICODE17_SCRIPT_INVENTORY)
+    assigned_total = specific_total = common_total = reserved_total = block_total = 0
+    all_specific: set[int] = set()
+    for script, expected_inventory in _UNICODE17_SCRIPT_INVENTORY.items():
+        assigned = _expand_ranges(_ASSIGNED_BLOCK_RANGES[script])
+        specific = _expand_ranges(_SCRIPT_RANGES[script])
+        block = _expand_ranges(_SCRIPT_BLOCK_RANGES[script])
+        assert specific <= assigned <= block
+        inventory = (len(assigned), len(specific), len(assigned - specific), len(block - assigned))
+        assert inventory == expected_inventory
+        assert _SCRIPT_ANCHORS[script] in specific
+
+        assigned_total += len(assigned)
+        specific_total += len(specific)
+        common_total += len(assigned - specific)
+        reserved_total += len(block - assigned)
+        block_total += len(block)
+        all_specific.update(specific)
+
+    assert (block_total, assigned_total, specific_total, common_total, reserved_total) == (
+        1312,
+        1068,
+        1015,
+        53,
+        244,
+    )
+    assert len(all_specific) == specific_total
+    assert len(_PINNED_NFC_COMPOSITIONS) == 15
+    assert Counter(len(decomposed) for decomposed, _composed in _PINNED_NFC_COMPOSITIONS) == {
+        2: 11,
+        3: 4,
+    }
+    assert len({composed for _decomposed, composed in _PINNED_NFC_COMPOSITIONS}) == 11
+
+
+def test_every_assigned_unicode17_position_has_exact_validator_behavior():
+    nfc_expansions: Counter[str] = Counter()
+    for script in _UNICODE17_SCRIPT_INVENTORY:
+        assigned = _expand_ranges(_ASSIGNED_BLOCK_RANGES[script])
+        specific = _expand_ranges(_SCRIPT_RANGES[script])
+        anchor = chr(_SCRIPT_ANCHORS[script])
+        for codepoint in sorted(assigned):
+            source = chr(codepoint)
+            expected = unicodedata.normalize("NFC", source)
+            result = validate_unicode_span(source, script=script)
+
+            assert result.unicode_text == expected, (script, f"U+{codepoint:04X}")
+            assert result.invalid_codepoints == [], (script, f"U+{codepoint:04X}")
+            assert result.unexpected_script_codepoints == [], (script, f"U+{codepoint:04X}")
+            assert result.script_char_count == sum(ord(char) in specific for char in expected), (
+                script,
+                f"U+{codepoint:04X}",
+            )
+
+            if expected != source:
+                assert len(expected) == 2
+                nfc_expansions[script] += 1
+
+            if codepoint in specific:
+                strict_result = validate_unicode_span(source, script=script, strict=True)
+                assert strict_result.unicode_text == expected
+            else:
+                assert result.script_char_count == 0
+                with pytest.raises(ValueError, match=rf"contains no {script}"):
+                    validate_unicode_span(source, script=script, strict=True)
+                anchored = validate_unicode_span(anchor + " " + source, script=script, strict=True)
+                assert anchored.script_char_count == 1
+                assert anchored.invalid_codepoints == []
+                assert anchored.unexpected_script_codepoints == []
+
+    assert nfc_expansions == {"Devanagari": 8, "Tibetan": 17}
+
+
+def test_every_reserved_unicode17_position_is_preserved_labeled_and_rejected():
+    checked = 0
+    for script in _UNICODE17_SCRIPT_INVENTORY:
+        assigned = _expand_ranges(_ASSIGNED_BLOCK_RANGES[script])
+        reserved = _expand_ranges(_SCRIPT_BLOCK_RANGES[script]) - assigned
+        for codepoint in sorted(reserved):
+            source = chr(codepoint)
+            label = f"U+{codepoint:04X}"
+            result = validate_unicode_span(source, script=script)
+
+            assert result.unicode_text == source, (script, label)
+            assert result.script_char_count == 0, (script, label)
+            assert result.invalid_codepoints == [label], (script, label)
+            assert result.unexpected_script_codepoints == [], (script, label)
+            with pytest.raises(ValueError, match=label.replace("+", r"\+")):
+                validate_unicode_span(source, script=script, strict=True)
+            checked += 1
+
+    assert checked == 244
+
+
+def test_reserved_positions_remain_invalid_if_the_runtime_reports_them_assigned(monkeypatch):
+    monkeypatch.setattr("nepal_ttf2utf.unicode_span.unicodedata.category", lambda _char: "Lo")
+
+    checked = 0
+    for script in _UNICODE17_SCRIPT_INVENTORY:
+        assigned = _expand_ranges(_ASSIGNED_BLOCK_RANGES[script])
+        reserved = _expand_ranges(_SCRIPT_BLOCK_RANGES[script]) - assigned
+        for codepoint in sorted(reserved):
+            label = f"U+{codepoint:04X}"
+            result = validate_unicode_span(chr(codepoint), script=script)
+            assert result.invalid_codepoints == [label], (script, label)
+            with pytest.raises(ValueError, match=label.replace("+", r"\+")):
+                validate_unicode_span(chr(codepoint), script=script, strict=True)
+            checked += 1
+
+    assert checked == 244
+
+
+def test_every_assigned_position_is_independent_of_runtime_assignment(monkeypatch):
+    assigned_all = set().union(
+        *(_expand_ranges(ranges) for ranges in _ASSIGNED_BLOCK_RANGES.values())
+    )
+    original_category = unicodedata.category
+
+    def old_runtime_category(char):
+        return "Cn" if ord(char) in assigned_all else original_category(char)
+
+    monkeypatch.setattr("nepal_ttf2utf.unicode_span.unicodedata.category", old_runtime_category)
+
+    checked = 0
+    for script in _UNICODE17_SCRIPT_INVENTORY:
+        assigned = _expand_ranges(_ASSIGNED_BLOCK_RANGES[script])
+        specific = _expand_ranges(_SCRIPT_RANGES[script])
+        anchor = chr(_SCRIPT_ANCHORS[script])
+        for codepoint in sorted(assigned):
+            result = validate_unicode_span(chr(codepoint), script=script)
+            assert result.invalid_codepoints == [], (script, f"U+{codepoint:04X}")
+            if codepoint in specific:
+                validate_unicode_span(chr(codepoint), script=script, strict=True)
+            else:
+                validate_unicode_span(anchor + " " + chr(codepoint), script=script, strict=True)
+            checked += 1
+
+    assert checked == 1068
+
+
+def test_every_script_specific_position_is_rejected_by_every_other_script_route():
+    checked = 0
+    for source_script in _UNICODE17_SCRIPT_INVENTORY:
+        specific = _expand_ranges(_SCRIPT_RANGES[source_script])
+        for codepoint in sorted(specific):
+            source = chr(codepoint)
+            normalized = unicodedata.normalize("NFC", source)
+            expected_labels = sorted({f"U+{ord(char):04X}" for char in normalized})
+            for target_script in _UNICODE17_SCRIPT_INVENTORY:
+                if target_script == source_script:
+                    continue
+                result = validate_unicode_span(source, script=target_script)
+                label = (source_script, target_script, f"U+{codepoint:04X}")
+
+                assert result.unicode_text == normalized, label
+                assert result.script_char_count == 0, label
+                assert result.invalid_codepoints == [], label
+                assert result.unexpected_script_codepoints == expected_labels, label
+                with pytest.raises(
+                    ValueError,
+                    match=rf"unexpected script characters in Unicode {target_script}",
+                ):
+                    validate_unicode_span(source, script=target_script, strict=True)
+                checked += 1
+
+    assert checked == 10150
+
+
 def test_new_unicode_scripts_do_not_depend_on_the_python_unicode_database(monkeypatch):
     original_category = unicodedata.category
     newer_codepoints = {0x11B00, 0x11BC0, 0x16100, 0x16D40}
@@ -95,6 +332,27 @@ def test_unicode16_nfc_composition_is_version_stable(script, decomposed, compose
     assert validate_unicode_span(decomposed, script=script, strict=True).unicode_text == composed
 
 
+def test_every_pinned_unicode16_composition_is_version_stable(monkeypatch):
+    monkeypatch.setattr(
+        "nepal_ttf2utf.unicode_span.unicodedata.normalize", lambda _form, text: text
+    )
+
+    seen_targets = set()
+    for decomposed, composed in _PINNED_NFC_COMPOSITIONS:
+        codepoint = ord(composed)
+        script = "Gurung Khema" if 0x16100 <= codepoint <= 0x1613F else "Kirat Rai"
+        result = validate_unicode_span(decomposed, script=script, strict=True)
+
+        assert len(composed) == 1
+        assert result.unicode_text == composed
+        assert result.script_char_count == 1
+        assert result.invalid_codepoints == []
+        assert result.unexpected_script_codepoints == []
+        seen_targets.add(composed)
+
+    assert len(seen_targets) == 11
+
+
 def test_reserved_codepoint_in_a_supported_block_is_rejected():
     source = chr(0x1613A)
     result = validate_unicode_span(source, script="Gurung Khema")
@@ -103,7 +361,7 @@ def test_reserved_codepoint_in_a_supported_block_is_rejected():
         validate_unicode_span(source, script="Gurung Khema", strict=True)
 
 
-@pytest.mark.parametrize("codepoint", [0xE000, 0xF0000, 0x100000])
+@pytest.mark.parametrize("codepoint", [0xE000, 0xF8FF, 0xF0000, 0xFFFFD, 0x100000, 0x10FFFD])
 def test_unicode_span_reports_private_use_values(codepoint):
     source = "𑐣" + chr(codepoint)
     result = validate_unicode_span(source, script="Newa")
@@ -176,6 +434,52 @@ def test_unicode_noncharacters_are_always_invalid(codepoint):
     assert result.invalid_codepoints == [f"U+{codepoint:04X}"]
     with pytest.raises(ValueError, match=f"U\\+{codepoint:04X}"):
         validate_unicode_span(source, script="Newa", strict=True)
+
+
+def _assert_complete_invalid_inventory(codepoints):
+    anchor = "𑐀"
+    source = anchor + "".join(chr(codepoint) for codepoint in codepoints)
+    result = validate_unicode_span(source, script="Newa")
+
+    assert result.unicode_text == source
+    assert result.script_char_count == 1
+    assert result.invalid_codepoints == sorted(f"U+{codepoint:04X}" for codepoint in codepoints)
+    assert result.unexpected_script_codepoints == []
+    with pytest.raises(ValueError, match="invalid characters in Unicode Newa span"):
+        validate_unicode_span(source, script="Newa", strict=True)
+
+
+def test_every_disallowed_c0_del_and_c1_control_is_invalid():
+    disallowed_controls = (
+        *range(0x00, 0x09),
+        0x0B,
+        0x0C,
+        *range(0x0E, 0x20),
+        0x7F,
+        *range(0x80, 0xA0),
+    )
+    assert len(disallowed_controls) == 62
+    _assert_complete_invalid_inventory(disallowed_controls)
+
+    allowed = validate_unicode_span("𑐀\t\n\r", script="Newa", strict=True)
+    assert allowed.unicode_text == "𑐀\t\n\r"
+    assert allowed.invalid_codepoints == []
+
+
+def test_every_surrogate_is_invalid():
+    surrogates = tuple(range(0xD800, 0xE000))
+    assert len(surrogates) == 2048
+    _assert_complete_invalid_inventory(surrogates)
+
+
+def test_every_unicode_noncharacter_is_invalid():
+    noncharacters = (
+        *range(0xFDD0, 0xFDF0),
+        *(plane * 0x10000 + tail for plane in range(17) for tail in (0xFFFE, 0xFFFF)),
+    )
+    assert len(noncharacters) == 66
+    assert len(set(noncharacters)) == 66
+    _assert_complete_invalid_inventory(noncharacters)
 
 
 def test_unicode_tibetan_font_families_are_normalized_without_legacy_mapping():

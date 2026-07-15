@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin the complete Unicode 17 validator contract across all eleven scripts,
+  exhaustively covering assigned, Common/Inherited, reserved, cross-script,
+  control, surrogate, noncharacter, and fallback-normalization behavior.
 - Exhaustively verify SIL's 131-rule Limbu map contract and reject malformed
   forward-pass syntax, invalid Unicode scalars, empty or duplicate classes,
   ambiguous sources, and unsafe direct-constructor rules.
