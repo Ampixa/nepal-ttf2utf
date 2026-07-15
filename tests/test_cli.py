@@ -18,6 +18,9 @@ def test_cli_lists_fonts(capsys):
     assert "janaki\tTirhuta\n" in output
     assert "jg-lepcha\tLepcha\n" in output
     assert "olck-optimum\tOl Chiki\n" in output
+    assert "olcklatic-normal\tOl Chiki\n" in output
+    assert "nithyaranjananu\tNewa\n" in output
+    assert "magar-akkha-brahmi\tBrahmi\n" in output
 
 
 def test_cli_reads_stdin(monkeypatch, capsys):

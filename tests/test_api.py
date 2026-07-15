@@ -6,7 +6,7 @@ from nepal_ttf2utf import __version__, convert, supported_fonts
 
 
 def test_version_matches_release():
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
 
 
 @pytest.mark.parametrize(
@@ -21,7 +21,12 @@ def test_version_matches_release():
         ("lepcha-sikkimherald", "Lepcha"),
         ("jg-lepcha", "Lepcha"),
         ("olck-optimum", "Ol Chiki"),
+        ("olcklatic-normal", "Ol Chiki"),
         ("janaki", "Tirhuta"),
+        ("annapurnasilnepal", "Devanagari"),
+        ("nithyaranjanadu", "Devanagari"),
+        ("nithyaranjananu", "Newa"),
+        ("magar-akkha-brahmi", "Brahmi"),
     ],
 )
 def test_supported_fonts_covers_every_converter_family(font, script):
@@ -30,6 +35,10 @@ def test_supported_fonts_covers_every_converter_family(font, script):
 
 def test_font_dispatch_is_case_insensitive_and_trimmed():
     assert convert("k", font="  JG-LEPCHA  ") == "ᰀ"
+
+
+def test_pdf_subset_font_prefix_is_ignored():
+    assert convert("𑑅", font="ABCDEF+NithyaRanjanaNU-Regular", strict=True) == "𑑅"
 
 
 def test_unknown_font_reports_supported_devanagari_keys():

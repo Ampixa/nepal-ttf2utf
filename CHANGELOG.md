@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 — 2026-07-15
+
+- Add a separate OLCKLatic converter for the Normal, Bold, and UltraBlack
+  layouts, including the Latic-specific `v`/`w` assignments and punctuation.
+- Add two hash-pinned Videha Janaki profiles that recover evidenced U+FFFD
+  characters from caller-supplied PyMuPDF glyph IDs and reject unknown profile
+  metadata or glyph IDs.
+- Resolve the final Sikkim Herald Kirat Rai corpus value: legacy `Z` selects a
+  blank spacing glyph and now normalizes to U+0020.
+- Resolve Sikkim Herald Lepcha `]` as final K, `%` as subjoined RA, and `-` as a
+  literal hyphen, leaving five rare layout bytes deliberately unmapped.
+- Add NFC normalization and expected-script validation routes for Unicode Newa,
+  Tibetan, Devanagari, and Brahmi font spans, including the actual Devanagari
+  and Newa encodings used by Nithya Ranjana DU and NU.
+- Add proposal-aligned Magar Akkha Devanagari/Brahmi transliteration, with a
+  lossless supported inventory by default and explicit optional lossy folding.
+- Report TibetanMachine U+E010 and U+E013 separately as source-font `.notdef`
+  selectors and reject them in strict mode.
+
 ## 0.2.0 — 2026-07-14
 
 - Add conservative Janaki/Devanagari-coded Tirhuta conversion, including the

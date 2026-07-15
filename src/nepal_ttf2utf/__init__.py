@@ -1,12 +1,11 @@
-"""nepal_ttf2utf — legacy ASCII-font -> Unicode for the scripts of Nepal and its diaspora.
+"""Legacy-font conversion and Unicode span validation for Nepal and Sikkim.
 
-Fills the gap left by Nepali-only converters (e.g. npttf2utf, which covers a few
-Devanagari ASCII fonts): one library covering Devanagari legacy fonts *including
-newspaper fonts like nayanepal/Gorkhapatra*, the Limbu/Sirijonga script, and the
-minority-language fonts of the Sikkim Herald (Kirat Rai, Sunuwar, Lepcha), Jason
-Glavy's JG Lepcha font, the Santali Ol Chiki 'Optimum' font, and Janaki's
-Devanagari-coded Tirhuta glyphs, plus TibetanMachine. Unresolved input is
-surfaced instead of guessed.
+The package converts evidenced Devanagari, Limbu, Kirat Rai, Sunuwar, Lepcha,
+Ol Chiki, Tirhuta, and Tibetan legacy layouts. It also normalizes and validates
+already-Unicode Devanagari, Newa, Tibetan, and Brahmi font spans. Specialized
+APIs provide hash-pinned Janaki PDF glyph-ID recovery and proposal-aligned Magar
+Akkha Devanagari/Brahmi transliteration. Unresolved input is surfaced instead of
+guessed.
 
     from nepal_ttf2utf import convert
     convert("g]kfn", font="preeti")       # -> 'नेपाल'   (Devanagari)
@@ -17,8 +16,10 @@ surfaced instead of guessed.
     convert("<herald bytes>", font="lepcha-sikkimherald")  # -> Unicode Lepcha
     convert("<JG Lepcha bytes>", font="jg-lepcha")  # -> Unicode Lepcha
     convert("<olck optimum bytes>", font="olck-optimum")  # -> Unicode Ol Chiki
+    convert("<olck latic bytes>", font="olcklatic-normal")  # -> Unicode Ol Chiki
     convert("<Janaki text>", font="janaki")  # -> Unicode Tirhuta
     convert("<TibetanMachine text>", font="tibetanmachine")  # -> Unicode Tibetan
+    convert("<Unicode Newa>", font="noto-sans-newa")  # -> validated Unicode Newa
 """
 
 from __future__ import annotations
@@ -109,7 +110,7 @@ __all__ = [
     "supported_devanagari_fonts",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Limbu/Sirijonga legacy fonts that share the Namdhinggo SIL byte encoding.
 _LIMBU_FONTS = {"namdhinggo", "namdhinggosill", "sirijonga", "limbu"}
@@ -210,18 +211,19 @@ def _normalize_font_key(font: str) -> str:
 
 
 def convert(text: str, font: str, *, strict: bool = False) -> str:
-    """Convert ``text`` rendered in a legacy ``font`` to proper Unicode (NFC).
+    """Convert a legacy span or validate an already-Unicode span as NFC.
 
-    ``font`` is case-insensitive. Devanagari fonts: preeti, kantipur, sagarmatha,
-    pcs-nepali, fontasy-himali, nayanepal, gorkhapatra. Limbu fonts: namdhinggo,
-    sirijonga, limbu. Kirat Rai: kiratrai. Sunuwar: sunuwar.
-    Lepcha: lepcha-sikkimherald or jg-lepcha. Ol Chiki (Santali 'Optimum'
-    legacy font): olck-optimum. Tirhuta (Janaki): janaki. Tibetan:
-    tibetanmachine.
+    ``font`` is case-insensitive. Supported legacy families cover Devanagari,
+    Limbu, Kirat Rai, Sunuwar, Lepcha, Ol Chiki Optimum and Latic, Janaki
+    Tirhuta, and TibetanMachine. Named Devanagari, Newa, Tibetan, and Brahmi
+    Unicode families use script validation without a legacy byte mapping. See
+    :func:`supported_fonts` for exact keys.
 
     ``strict=True`` raises if any converter leaves an unmapped or uncertain
     character. Lenient mode preserves that input. Use a format-specific
-    ``convert_*`` function to inspect its detailed conversion result.
+    ``convert_*`` function to inspect its detailed conversion result. Videha
+    glyph-ID recovery and Magar Akkha transliteration use their specialized
+    APIs rather than this dispatcher.
     """
     key = _normalize_font_key(font)
     if key in _DEVANAGARI_UNICODE_FONTS:

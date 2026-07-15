@@ -13,10 +13,10 @@ from . import __version__, convert, supported_fonts
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nepal-ttf2utf",
-        description="Convert text encoded for a supported legacy font to Unicode.",
+        description="Convert legacy-font text or validate an already-Unicode font span.",
     )
     parser.add_argument("text", nargs="?", help="text to convert; reads stdin when omitted")
-    parser.add_argument("-f", "--font", help="legacy font key (case-insensitive)")
+    parser.add_argument("-f", "--font", help="font or encoding key (case-insensitive)")
     parser.add_argument("-i", "--input-file", type=Path, help="read input from this file")
     parser.add_argument("-o", "--output-file", type=Path, help="write output to this file")
     parser.add_argument(

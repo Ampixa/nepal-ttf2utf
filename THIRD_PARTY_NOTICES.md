@@ -31,3 +31,13 @@ BDRC's [`py-tiblegenc`](https://github.com/buda-base/py-tiblegenc) UTFC mapping
 table, revision `0c6372e44be7238b611261d981355d80f68f85b8`. It is distributed
 under Apache License 2.0. The complete license is bundled beside the map as
 `LICENSE.py-tiblegenc-APACHE-2.0.txt`.
+
+## Ampixa magar-toolkit
+
+The functional Devanagari/Brahmi mapping in
+`src/nepal_ttf2utf/magar_akkha.py` is adapted from Ampixa's
+[`magar-toolkit`](https://github.com/Ampixa/magar-toolkit), revision
+`1384258068422fe7a44ad84ecf5d3c3b4f5ecedd`. The upstream work is distributed
+under the MIT License, copyright 2026 Ampixa / magar-toolkit contributors. The
+complete upstream license is bundled as
+`src/nepal_ttf2utf/maps/LICENSE.magar-toolkit-MIT.txt`.

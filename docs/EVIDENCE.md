@@ -26,7 +26,17 @@ stream **and advance width** produced:
 - one stable 38-letter premap shared by all four subsets;
 - 108 literal `)`, `-`, `.`, or `;` characters;
 - two blank backslash glyphs, normalized to spaces;
-- one semantically unresolved extracted `Z`.
+- one extracted `Z` whose embedded glyph is also blank, normalized to a space.
+
+The `Z` occurs once in `kiratrai_issue-027.pdf`, whose SHA-256 is
+`0d9fc6b9de4e781e09efb5e42d3d8f8580d8af051299fbb9c8bdb208af088747`.
+It is on page 4, block 8, line 12, in extracted span `guaSlhl hr/ Z` at bounding
+box `(530.0920, 588.2530, 538.6570, 603.9227)`.
+The extracted font has SHA-256
+`055ee4b5c8510788eff71b5019cfb4523df6a1675f62d43e11b12adec64f0213`;
+its `Z` is CID/GID 61 with zero outline commands and a nonzero advance width of
+1,251 font units. Treating this corpus byte as a space is therefore a rendering
+fact, not a semantic assignment to the canonical font's nonblank `Z`.
 
 The complete premap is
 [`KIRATRAI_HERALD_PREMAP`](../src/nepal_ttf2utf/kiratrai.py). Six bytes that
@@ -80,22 +90,47 @@ Together these establish `| → U+11BC5 SUNUWAR LETTER UTTHI`.
 
 ## Sikkim Herald Lepcha
 
-No new assignment passed the evidence threshold:
+Three formerly unresolved values now have font-specific structural evidence:
 
-- `]` occurs 544 times. Its isolated shape weakly resembles U+1C2D, but its
-  pre-base position and invalid double-vowel results contradict that mapping.
-- `%` occurs 224 times, nearly always after the legacy nukta byte `\`; the
-  companion glyph's identity remains unknown.
-- `*`, `-`, `(`, `)`, `+`, and `/` lack enough font-specific evidence to call
-  them either literal punctuation or script composites.
+- `]`, seen 544 times, is U+1C2D LEPCHA CONSONANT SIGN K. The legacy layout
+  stores the glyph visually before the following base, so conversion moves it
+  into that base's logical Unicode cluster after any vowel sign.
+- `%`, seen 224 times, is U+1C25 LEPCHA SUBJOINED LETTER RA. Its placement after
+  the legacy nukta byte is consistent with the documented nukta-plus-RA
+  retroflex sequences, and conversion emits canonical base, nukta, subjoined
+  order.
+- `-` has the font's literal ASCII hyphen outline and passes through as U+002D.
 
-The machine-converted 132-line evaluation set excludes `]` and `%`; it is not a
-native-reader transcription. JG Lepcha and Limbu use different encodings and
-cannot supply these assignments. The original map records the exact unresolved
-set in
+The remaining unresolved values are `*`, `(`, `)`, `+`, and `/`. The `*` glyph
+is a possible contextual form of U+1C24 LEPCHA SUBJOINED LETTER YA, but it does
+not yet have sufficiently independent evidence for a public mapping. JG Lepcha
+and Limbu use different encodings and cannot supply these assignments. The map
+records the exact unresolved set in
 [`sikkim_herald_lepcha.json`](../src/nepal_ttf2utf/maps/sikkim_herald_lepcha.json).
-A native transcription of affected words or recovered original font evidence is
-still required.
+
+## OLCKLatic Ol Chiki
+
+OLCKLatic is a distinct legacy layout, not an alias for OLCKOptimum. Three
+embedded family members establish the mapping through paired ASCII and Ol Chiki
+cmaps:
+
+| Embedded family | Font SHA-256 |
+|---|---|
+| OLCKLatic-UltraBlack | `990b5e578674ec80b3fd541d45b2b3519871a27ce362320cf31e45b9aa49ac7b` |
+| OLCKLatic-Normal | `7289595f7cfce81ade5063d9e668bf9517ae2fc216c7e065b24f8421a92485e2` |
+| OLCKLatic-Bold | `43c138a8ed911b3e9cd8b09dc87b676341495715a4d99a31ee8cc142385cf6c0` |
+
+Most letters and digits retain the Optimum semantics. Latic swaps the Optimum
+`v`/`V` and `w`/`W` assignments: `v` maps to U+1C76 and `w` maps to U+1C63.
+Its punctuation layer maps `.`, `-`, `:`, `~`, and `|` to U+1C79, U+1C7C,
+U+1C7A, U+1C7B, and U+1C7E respectively.
+
+The two audited Aale Chhatka PDFs have SHA-256
+`7588dae38adb5533e5692bf6cf6148cb5e411afa32c4f24dfe7cd1db1b9ec9b8`
+and `e22a72b483ff2fe5c196946832df3f3543bb81e3e986c19caed2d14e5a2f0ae2`.
+Their 234 OLCKLatic spans contain 2,089 characters: 70 UltraBlack, 272 Normal,
+and 1,747 Bold. The separate Latic converter maps the complete observed set
+without an unresolved character.
 
 ## Videha Janaki Tirhuta
 
@@ -110,8 +145,11 @@ SHA-256
 Its Janaki text layer uses semantically corresponding Devanagari codepoints for
 Tirhuta glyphs, but the Type0 font's incomplete `ToUnicode` table emits U+FFFD
 for many precomposed conjuncts. PyMuPDF retains the glyph ID for each failed
-character. A hash-pinned companion audit recovered all 3,306 U+FFFD
-occurrences across 164 glyph IDs:
+character. The `videha-issue-001` profile in
+[`videha.py`](../src/nepal_ttf2utf/videha.py) compares caller-supplied PDF hash,
+page count, and complete embedded-font hash set with pinned values before
+recovering a glyph. The profile recovered all 3,306 U+FFFD occurrences across
+164 glyph IDs:
 
 - 162 glyph IDs, covering 3,293 occurrences, had one unique Devanagari source
   sequence that HarfBuzz shaped to the glyph in Janaki 1.000;
@@ -132,18 +170,33 @@ its metadata credits Madan Puraskar Pustakalaya and states “All rights
 reserved.” It is decode-only evidence and is not distributed by this package.
 The functional map contains no font binary, glyph outline, cmap, or GSUB table.
 
+The profile's canonical functional-map digest is
+`ef23c410aeb6f75dedb3dffd255f00ba9da7ab66e9d4c76bc7b5ccf1af9cb963`.
+The independent 300-page `videha-2008-04-15` profile is pinned to PDF SHA-256
+`740782ecf5bfa9466727029bcb7733d9c8b046c36d848b598ddc60efc1c51bd2`
+and embedded-font SHA-256 values
+`c64600a4edc0fa153717d66d2524c1665562eee47dd489848578e3cec1c56861`
+and `d8863d057541d5cecb862fd43e93114a9a20c6d5de519fc30f3c990962a8b18b`.
+It contributes 34 additional evidenced glyph IDs for a 198-entry combined map,
+whose digest is
+`28ad7cf9b34f5da6c0d3d2cd03d2af2fbd159fdc1bd46dee905f2ccfe50ba326`.
+
+`recover_videha_janaki_trace()` accepts PyMuPDF character tuples only after all
+supplied profile metadata matches. Callers are responsible for securely
+computing that metadata; the function does not open or hash the PDF. An unknown
+PDF hash, incomplete font hash set, wrong page count, or unknown replacement
+glyph ID raises a profile error. Raw U+FFFD strings without their glyph-ID
+sidecar remain unrecoverable.
+
 These are aggregate text-fragment diagnostics, not audited line labels or an
-OCR evaluation. The U+25CC cases still require pixel review or exclusion, and
-only one issue is local, so no edition-disjoint evaluation split exists yet.
+OCR evaluation. The U+25CC cases still require pixel review or exclusion.
 
 ## TibetanMachine
 
-The recovered Gorkhapatra manifests contain 81 unique pages across 41 PDFs; 44
-pages include Tibetan-named fonts and 10 use TibetanMachine. One actual
-TibetanMachine page converted through BDRC's
-[`py-tiblegenc`](https://github.com/buda-base/py-tiblegenc) table to 13,623
-characters, including 12,801 Tibetan-block characters and zero U+FFFD
-replacements.
+The aligned Gorkhapatra corpus contains 95 unique pages (101 raw page hits) with
+relevant Tibetan, Bhote, Mugal, Lhomi, Sherpa, or Hyolmo material. Ten pages
+contain 2,380 TibetanMachine spans and 86,206 extracted characters. Conversion
+uses BDRC's [`py-tiblegenc`](https://github.com/buda-base/py-tiblegenc) table.
 
 The package vendors only the 217-row TibetanMachine subset from BDRC revision
 [`0c6372e`](https://github.com/buda-base/py-tiblegenc/commit/0c6372e44be7238b611261d981355d80f68f85b8),
@@ -153,10 +206,53 @@ upstream revision, followed by the package's NFC normalization.
 This is text-span conversion, not a PDF routing heuristic:
 
 - TibetanMachine spans use the legacy converter.
-- Monlam Unicode, Microsoft Himalaya, Qomolangma, and Jomolhari spans observed
-  in the corpus already extract as Unicode Tibetan.
-- Some Bhote and Sherpa pages are Devanagari despite Tibetan-looking font or
-  language labels.
+- U+E010 occurs 180 times on six pages and U+E013 occurs twice on two pages.
+  Both values select GID 0, the source font's visible `.notdef` placeholder,
+  rather than recoverable Tibetan glyphs. The converter reports them through
+  `missing_glyph_codepoints`, and strict conversion raises an error.
+- Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, and CTRC-HT spans
+  observed in the corpus already extract as Unicode Tibetan. Their routes
+  normalize NFC and validate the Tibetan block; they do not apply the
+  TibetanMachine byte table.
+- AnnapurnaSILNepal spans contain Unicode Devanagari. Across the aligned pages,
+  201,095 characters include 155,997 Devanagari-block characters.
 
 Production corpus conversion therefore still needs font-span segmentation,
 source-vs-output render comparison, and representative Tibetan-reader review.
+
+## Already-Unicode Newa and Nithya Ranjana
+
+The audited Transkribus Newa archive has SHA-256
+`c2cbab1c49a9022e17982ccc957ecc3021b3eea405309ea548e4c793d650c0b1`.
+Its 886 PAGE XML files contain 3,759 Unicode elements and 393,009 characters,
+including 299,539 Newa-block and 82,538 Devanagari-block characters. No U+FFFD
+or private-use value occurs. This establishes Unicode-span normalization and
+validation; it does not establish a legacy Newa byte map.
+
+Ek Type's [Nithya Ranjana](https://github.com/EkType/Nithya-Ranjana#readme)
+provides two encoding variants. DU stores Devanagari codepoints and NU stores
+Newa codepoints while both display Ranjana forms. The inspected
+`NithyaRanjanaDU-Regular.otf` has SHA-256
+`8a2ebe626740270ac62c52815f2237326cdc0ed137041e833b6d404f9771b92b` and
+contains 78 Devanagari cmap entries, 27 ASCII entries, and no private-use
+mapping. The package routes DU as Devanagari and NU as Newa. Neither route
+claims a standardized Ranjana encoding; Unicode lists Ranjana among
+[scripts not yet encoded](https://www.unicode.org/standard/unsupported.html).
+
+## Magar Akkha as Unicode Brahmi
+
+Anshuman Pandey's individual contribution
+[`L2/11-144`](https://www.unicode.org/wg2/docs/n4036.pdf), submitted for WG2 and
+UTC consideration, recommends unifying Magar Akkha with Brahmi unless evidence
+establishes distinct characters or behavior. No evidenced legacy Akkha font,
+keyboard layout, or running legacy corpus is part of this repository. A
+legacy-byte map would therefore be speculative.
+
+`transliterate_magar_akkha()` instead provides an explicit Unicode
+Devanagari-to-Brahmi mapping and its reverse. The 69-entry reversible table
+preserves every supported distinction by default; it includes the 67 entries
+from Ampixa's MIT-licensed
+[`magar-toolkit`](https://github.com/Ampixa/magar-toolkit) plus danda and double
+danda. Optional minimal-inventory folding merges selected retroflex and
+sibilant distinctions and is marked as lossy. The `magar-akkha-brahmi` font key
+only validates text that is already encoded in the Brahmi block.

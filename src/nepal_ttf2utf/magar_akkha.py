@@ -1,9 +1,10 @@
-"""Standards-aligned Magar Akkha representation using Unicode Brahmi.
+"""Proposal-aligned Magar Akkha representation using Unicode Brahmi.
 
-Unicode's script review recommends treating Magar Akkha as a Brahmi variant
-unless evidence establishes distinct encoded characters or behavior. This
-module transliterates Unicode Devanagari to the corresponding Unicode Brahmi
-characters; it is not a mapping for an unknown legacy Akkha font.
+An individual contribution submitted for WG2 and UTC consideration recommends
+treating Magar Akkha as a Brahmi variant unless evidence establishes distinct
+encoded characters or behavior. This module transliterates Unicode Devanagari
+to the corresponding Unicode Brahmi characters; it is not a mapping for an
+unknown legacy Akkha font.
 
 The functional mapping is adapted from Ampixa's MIT-licensed magar-toolkit.
 Default conversion preserves every supported distinction. Minimal-inventory
