@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve space, TAB, CR, and LF exactly across every legacy converter and
+  through CLI file input/output, including strict mode and mixed line endings.
 - Pin already-Unicode validation to the Unicode 17.0 assigned repertoire for
   all standardized output scripts plus Gurung Khema, independent of the Python
   runtime's older Unicode database.

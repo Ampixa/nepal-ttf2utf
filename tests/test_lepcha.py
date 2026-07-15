@@ -101,6 +101,12 @@ def test_lepcha_subjoined_ra_and_hyphen_are_resolved():
     assert not result.unmapped_bytes
 
 
+def test_lepcha_structural_whitespace_is_not_reported_as_unmapped():
+    result = convert_lepcha("A\t\r\n", strict=True)
+    assert result.unicode_text == "ᰀ\t\r\n"
+    assert result.unmapped_bytes == []
+
+
 def test_convert_dispatches_to_lepcha():
     out = convert("AgC", font="lepcha-sikkimherald")
     assert any(0x1C00 <= ord(c) <= 0x1C4F for c in out)

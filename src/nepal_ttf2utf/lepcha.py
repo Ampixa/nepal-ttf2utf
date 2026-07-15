@@ -126,7 +126,7 @@ class LepchaConverter:
         replacements = 0
         for ch in text:
             code = ord(ch)
-            if ch == " " or ch == "\n" or ch == "\t":
+            if ch in " \t\r\n":
                 out.append(ch)
                 continue
             target = self._byte_map.get(code)

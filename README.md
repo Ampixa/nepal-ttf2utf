@@ -94,6 +94,9 @@ fonts_by_script = supported_fonts()
 
 Lenient mode preserves unresolved input. `strict=True` raises `ValueError` if
 anything remains unresolved, making it suitable as a corpus-cleanliness gate.
+Every converter preserves ASCII space, TAB, CR, and LF exactly, including CRLF
+and lone-CR input. CLI file conversion decodes and encodes bytes explicitly so
+the host language runtime cannot normalize line endings during I/O.
 
 Detailed converters expose counts and unresolved values:
 
@@ -171,7 +174,8 @@ uvx twine check dist/*
 The test suite checks known mappings, multi-byte rules, visual-to-logical
 reordering, strict-mode failures, already-Unicode routing, hash-pinned glyph-ID
 recovery, version-stable assigned-repertoire validation, cross-script routing,
-CLI behavior, and mapping-resource validation.
+exact structural-whitespace preservation, CLI behavior, and mapping-resource
+validation.
 
 ## Licenses
 

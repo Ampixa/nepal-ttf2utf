@@ -153,6 +153,14 @@ def test_olchiki_ascii_punctuation_passes_through_unchanged():
     assert not res.unmapped_bytes
 
 
+@pytest.mark.parametrize("converter", [convert_olchiki, convert_olchiki_latic])
+def test_olchiki_structural_whitespace_is_not_reported_as_unmapped(converter):
+    res = converter("a\t\r\n", strict=True)
+    assert res.unicode_text == "ᱟ\t\r\n"
+    assert res.uncertain_bytes == []
+    assert res.unmapped_bytes == []
+
+
 def test_olchiki_passthrough_set_matches_module_constant():
     assert "," in OLCHIKI_PASSTHROUGH
     assert "." in OLCHIKI_PASSTHROUGH

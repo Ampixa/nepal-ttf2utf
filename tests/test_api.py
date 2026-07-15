@@ -45,6 +45,29 @@ def test_pdf_subset_font_prefix_is_ignored():
     assert convert("𑑅", font="ABCDEF+NithyaRanjanaNU-Regular", strict=True) == "𑑅"
 
 
+@pytest.mark.parametrize(
+    ("font", "source", "mapped"),
+    [
+        ("preeti", "g]kfn", "नेपाल"),
+        ("namdhinggo", "k", "ᤐ"),
+        ("kiratraifontnew", "N", "𖵈"),
+        ("kiratraifont", "f", "𖵈"),
+        ("sunuwar", "o", "𑯀"),
+        ("lepcha-sikkimherald", "A", "ᰀ"),
+        ("jg-lepcha", "k", "ᰀ"),
+        ("olck-optimum", "a", "ᱟ"),
+        ("olcklatic-normal", "a", "ᱟ"),
+        ("janaki", "क", "𑒏"),
+        ("tibetanmachine", "!", "ཀ"),
+    ],
+)
+def test_every_legacy_route_preserves_structural_whitespace(font, source, mapped):
+    separators = " \t\r\n"
+    assert convert(source + separators + source, font=font, strict=True) == (
+        mapped + separators + mapped
+    )
+
+
 def test_unknown_font_reports_supported_devanagari_keys():
     with pytest.raises(ValueError, match="unsupported Devanagari font"):
         convert("text", font="does-not-exist")

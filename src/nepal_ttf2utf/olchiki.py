@@ -173,7 +173,7 @@ class OLChikiConverter:
         uncertain_seen: set[str] = set()
         unmapped: set[str] = set()
         for ch in text:
-            if ch == " " or ch == "\n" or ch == "\t":
+            if ch in " \t\r\n":
                 out.append(ch)
                 continue
             code = ord(ch)

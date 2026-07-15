@@ -31,10 +31,16 @@ def test_cli_reads_stdin(monkeypatch, capsys):
     assert capsys.readouterr().out == "ᰀ"
 
 
-def test_cli_reads_legacy_file_encoding_and_writes_utf8(tmp_path):
+def test_cli_preserves_multiline_stdin(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdin", io.StringIO("g]kfn\n\tdu/"))
+    assert main(["--font", "preeti", "--strict"]) == 0
+    assert capsys.readouterr().out == "नेपाल\n\tमगर"
+
+
+def test_cli_reads_legacy_file_encoding_and_preserves_exact_line_endings(tmp_path):
     source = tmp_path / "legacy.txt"
     target = tmp_path / "unicode.txt"
-    source.write_bytes(b"\xc0")
+    source.write_bytes(b"\xc0\r\n\xc0\r\xc0")
 
     assert (
         main(
@@ -52,7 +58,7 @@ def test_cli_reads_legacy_file_encoding_and_writes_utf8(tmp_path):
         )
         == 0
     )
-    assert target.read_text(encoding="utf-8") == "ᰀᰤ"
+    assert target.read_bytes() == "ᰀᰤ\r\nᰀᰤ\rᰀᰤ".encode()
 
 
 def test_cli_strict_mode_has_clean_error(capsys):

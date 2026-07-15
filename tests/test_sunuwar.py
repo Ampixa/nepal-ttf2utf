@@ -108,6 +108,13 @@ def test_sunuwar_spaces_and_punctuation_pass_through():
     assert "," in res.unicode_text
 
 
+def test_sunuwar_structural_whitespace_is_not_reported_as_unmapped():
+    res = convert_sunuwar("o\t\r\n", strict=True)
+    assert res.unicode_text == "𑯀\t\r\n"
+    assert res.uncertain_bytes == []
+    assert res.unmapped_bytes == []
+
+
 def test_sunuwar_unmapped_ascii_is_surfaced():
     res = convert_sunuwar("B")
     assert "B" in res.unmapped_bytes

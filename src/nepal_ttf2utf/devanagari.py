@@ -19,7 +19,9 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-_CTRL = re.compile(r"[\x00-\x1f]")
+# Strip non-layout C0 controls while preserving document structure. TAB, LF,
+# and CR are data boundaries for multiline conversion, not font bytes.
+_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 # nayanepal/Gorkhapatra extension glyphs not present in the base Preeti map.
 _NAYANEPAL_EXT = {"ƒ": "र", "†": "्"}
 # Cosmetic normalizations: narrow-no-break-space, smart quotes/dashes -> plain forms.
@@ -96,7 +98,7 @@ def convert_devanagari(
         {
             c
             for c in out
-            if not (0x0900 <= ord(c) <= 0x097F) and c not in " \n\t।॥,.?!:;'\"()[]-/0123456789"
+            if not (0x0900 <= ord(c) <= 0x097F) and c not in " \t\r\n।॥,.?!:;'\"()[]-/0123456789"
         }
     )
     clean = not leftover

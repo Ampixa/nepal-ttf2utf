@@ -32,6 +32,12 @@ def test_converter_loads_default_map():
     assert isinstance(res.unmapped_codepoints, list)
 
 
+def test_limbu_structural_whitespace_is_not_reported_as_unmapped():
+    res = LimbuConverter.default().convert("k\t\r\n")
+    assert res.unicode_text == "ᤐ\t\r\n"
+    assert res.unmapped_codepoints == []
+
+
 def test_limbu_unmapped_ascii_is_surfaced_in_strict_mode():
     # The upstream map explicitly leaves '#' unresolved.
     res = LimbuConverter.default().convert("#")

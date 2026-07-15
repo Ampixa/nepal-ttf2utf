@@ -5,6 +5,26 @@ defined by a public conversion table. Exact outline identity, labeled regional
 glyphs, or native-reader evidence can establish a mapping. A nearest visual
 match by itself cannot.
 
+## Structural whitespace invariant
+
+ASCII space, TAB, CR, and LF delimit words, columns, and lines; they are not
+script-font glyph assignments. Every legacy route therefore preserves those
+four characters byte-for-codepoint and in their original order. This includes
+mixed LF, CRLF, and lone-CR input, and strict conversion does not report them as
+unresolved.
+
+The invariant is tested through the public dispatcher for all eleven legacy
+routes: Devanagari, Limbu, canonical and Herald Kirat Rai, Sunuwar, Herald and
+JG Lepcha, Ol Chiki Optimum and Latic, Janaki Tirhuta, and TibetanMachine.
+Detailed-result tests additionally require empty unresolved diagnostics for
+the routes that previously rejected a structural separator. CLI file tests use
+byte-level assertions because text-mode file APIs may apply universal-newline
+translation before conversion or platform newline translation afterward.
+
+This policy does not assign a meaning to other C0 control values. Existing
+font-specific handling for those values remains separate from structural
+whitespace preservation.
+
 ## Sikkim Herald Kirat Rai
 
 SIL's public

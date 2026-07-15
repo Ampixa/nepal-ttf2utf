@@ -25,6 +25,13 @@ def test_nayanepal_output_is_clean_devanagari():
     assert res.unicode_text.startswith("अनिल")
 
 
+def test_devanagari_preserves_structural_whitespace_but_cleans_other_c0_controls():
+    res = convert_devanagari("g]kfn\t\r\n\x03du/", font="preeti", strict=True)
+    assert res.unicode_text == "नेपाल\t\r\nमगर"
+    assert res.clean
+    assert res.leftover == []
+
+
 def test_strict_mode_surfaces_leftovers():
     # An unmapped byte (á / U+00E1) should raise in strict mode rather than pass silently.
     with pytest.raises(ValueError):

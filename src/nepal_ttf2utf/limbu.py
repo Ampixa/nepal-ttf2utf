@@ -73,6 +73,13 @@ class LimbuConverter:
         replacements = 0
         index = 0
         while index < len(text):
+            # The legacy map has an explicit rule for ASCII space. Preserve the
+            # other structural whitespace outside the byte map so multiline
+            # boundaries never become unresolved legacy input.
+            if text[index] in "\t\r\n":
+                output.append(text[index])
+                index += 1
+                continue
             code = ord(text[index])
             matched = False
             for source, target in self._rules:

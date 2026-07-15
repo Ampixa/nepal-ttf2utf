@@ -59,14 +59,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         if args.input_file is not None:
-            source = args.input_file.read_text(encoding=args.input_encoding)
+            # Decode bytes explicitly so Python's universal-newline handling
+            # cannot rewrite CRLF or lone CR before conversion.
+            source = args.input_file.read_bytes().decode(args.input_encoding)
         elif args.text is not None:
             source = args.text
         else:
             source = _read_stdin(args.input_encoding)
         output = convert(source, font=args.font, strict=args.strict)
         if args.output_file is not None:
-            args.output_file.write_text(output, encoding=args.output_encoding)
+            # Write encoded bytes directly for the same reason: converters
+            # preserve structural whitespace byte-for-codepoint.
+            args.output_file.write_bytes(output.encode(args.output_encoding))
         else:
             sys.stdout.write(output)
     except (LookupError, OSError, UnicodeError, ValueError) as error:
