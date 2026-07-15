@@ -422,38 +422,66 @@ OCR evaluation. The U+25CC cases still require pixel review or exclusion.
 
 ## TibetanMachine
 
-The aligned Gorkhapatra corpus contains 95 unique pages (101 raw page hits) with
-relevant Tibetan, Bhote, Mugal, Lhomi, Sherpa, or Hyolmo material. Ten pages
-contain 2,380 TibetanMachine spans and 86,206 extracted characters. Conversion
-uses BDRC's [`py-tiblegenc`](https://github.com/buda-base/py-tiblegenc) table.
-
-The package vendors only the 217-row TibetanMachine subset from BDRC revision
+The distributed and independently reproducible source contract is the 217-row
+TibetanMachine subset from BDRC revision
 [`0c6372e`](https://github.com/buda-base/py-tiblegenc/commit/0c6372e44be7238b611261d981355d80f68f85b8),
-under Apache-2.0. The exact local subset is pinned to SHA-256
+distributed under Apache-2.0. Its 2,270 bytes and 221 physical lines are pinned
+to SHA-256
 `eabcdd119ee7fa81ca221e3879745d3886ec4293b1bca72801a18498972cbc24`.
-Tests verify the hash, unique 217-source inventory, every vendored source's NFC
-output, and all 27 non-conflicting raw CP1252 aliases added by the parser.
+The raw inventory has 217 unique sources and target-length counts of 12 empty,
+105 singleton, 82 two-codepoint, and 18 three-codepoint values. The parser adds
+27 non-conflicting raw-byte aliases for decoded CP1252 sources, producing a
+244-entry post-alias lookup snapshot with 166 unique target strings. Compact
+sorted ASCII JSON of `[source, [target codepoints]]` pairs from that snapshot is
+3,832 bytes with SHA-256
+`0601c7fafb91066fdbc5b5c7ac0d320494236b78fb176b04b74a4c93723208e8`.
+The complete runtime conversion contract additionally includes the U+00A0
+pre-table override, whole-output NFC, and the empty, missing-glyph, and unmapped
+diagnostic policies described below.
+
+Custom construction and CSV parsing are limited to a project-permitted
+250-value source domain: raw values U+0021 through U+00FF plus the 27 defined
+CP1252 decodings of bytes 0x80 through 0x9F. Tables are nonempty, bounded,
+copied into an immutable runtime snapshot, and restricted to targets of at most
+three assigned Tibetan codepoints. Malformed entries, duplicate sources,
+conflicting decoded/raw CP1252 pairs, a nonempty U+00A0 target, oversized files,
+and excessive row counts fail closed. The six permitted sources absent from the
+default post-alias snapshot are U+0081, U+008D, U+008F, U+0090, U+009D, and
+U+00FF; the distributed default has no mapping evidence for them.
 
 Twelve vendored rows have empty targets. U+00A0 follows upstream preprocessing
 and becomes an ordinary space. The other eleven source values, plus raw-byte
 U+008E and U+009E aliases for U+017D and U+017E, produce empty output and are
 reported through `empty_codepoints`; all thirteen effective inputs fail strict
-conversion. Parser tests pin rejection of invalid or duplicate sources, missing
-targets, empty tables, structurally invalid CSV, and non-Tibetan or unassigned
-target values.
+conversion. Exhaustive tests classify all 256 byte values as 205 mapped to
+nonempty output, eleven mapped to empty output, one NBSP normalized to space,
+four preserved structural-whitespace values, and 35 preserved-but-diagnosed
+values. Every effective two-source sequence is also tested. Conversion applies
+NFC to the complete output string, because normalization can reorder marks
+across table-entry boundaries; 825 of the 244-by-244 ordered pairs distinguish
+whole-output NFC from concatenated per-entry NFC.
+
+Separate project corpus measurements are not distributed with the package and
+are not part of the reproducible mapping contract. That evidence set contains
+95 unique aligned pages (101 raw page hits) with relevant Tibetan, Bhote, Mugal,
+Lhomi, Sherpa, or Hyolmo material. Ten pages contain 2,380 TibetanMachine spans
+and 86,206 extracted characters. These measurements support routing and
+diagnostics but do not establish complete font, corpus, or linguistic coverage.
 
 This is text-span conversion, not a PDF routing heuristic:
 
 - TibetanMachine spans use the legacy converter.
-- U+E010 occurs 180 times on six pages and U+E013 occurs twice on two pages.
+- In the non-distributed corpus evidence, U+E010 occurs 180 times on six pages
+  and U+E013 occurs twice on two pages.
   Both values select GID 0, the source font's visible `.notdef` placeholder,
   rather than recoverable Tibetan glyphs. The converter reports them through
   `missing_glyph_codepoints`, and strict conversion raises an error.
 - Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, and CTRC-HT spans
-  observed in the corpus already extract as Unicode Tibetan. Their routes
+  in the same corpus evidence already extract as Unicode Tibetan. Their routes
   normalize NFC and validate the Tibetan block; they do not apply the
   TibetanMachine byte table.
-- AnnapurnaSILNepal spans contain Unicode Devanagari. Across the aligned pages,
+- AnnapurnaSILNepal spans in that evidence contain Unicode Devanagari. Across
+  the aligned pages,
   201,095 characters include 155,997 Devanagari-block characters.
 
 Production corpus conversion therefore still needs font-span segmentation,

@@ -64,6 +64,7 @@ def main() -> int:
     assert convert_kiratrai("a", strict=True).unicode_text == "𖵃"
     assert convert_jg_lepcha("k", strict=True).unicode_text == "ᰀ"
     assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
+    assert nepal_ttf2utf.convert("!", font="tibetan-machine", strict=True) == "ཀ"
     try:
         convert_tibetanmachine("Ž", strict=True)
     except ValueError as error:

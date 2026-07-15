@@ -2,13 +2,25 @@
 
 import csv
 import hashlib
+import json
 import unicodedata
+from collections import Counter
+from collections.abc import Mapping
 from importlib import resources
+from itertools import repeat
 
 import pytest
 
-from nepal_ttf2utf import convert, convert_tibetanmachine
-from nepal_ttf2utf.tibetan import TibetanMachineConverter
+from nepal_ttf2utf import convert, convert_tibetanmachine, supported_fonts
+from nepal_ttf2utf.tibetan import (
+    _ALLOWED_SOURCES,
+    _DECODED_CP1252_SOURCES,
+    _MAX_MAP_FILE_BYTES,
+    _MAX_TABLE_ENTRIES,
+    _RAW_BYTE_SOURCES,
+    TIBETANMACHINE_NOTDEF_PUA,
+    TibetanMachineConverter,
+)
 
 _MAP_RESOURCE = resources.files("nepal_ttf2utf.maps") / "TibetanMachine.csv"
 _MAP_BYTES = _MAP_RESOURCE.read_bytes()
@@ -20,16 +32,93 @@ _PINNED_ROWS = tuple(
 )
 
 
+class _InfiniteItemsMapping(Mapping):
+    def __getitem__(self, key):
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return 1
+
+    def items(self):
+        return repeat((0x21, "ཀ"))
+
+
+class _PathologicalItemsMapping(Mapping):
+    def __init__(self, items):
+        self._items = items
+
+    def __getitem__(self, key):
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return len(self._items)
+
+    def items(self):
+        return iter(self._items)
+
+
+class _TibetanString(str):
+    pass
+
+
+def _effective_payload(converter: TibetanMachineConverter) -> bytes:
+    return json.dumps(
+        [
+            [source, [ord(character) for character in target]]
+            for source, target in sorted(converter._table.items())
+        ],
+        separators=(",", ":"),
+    ).encode("ascii")
+
+
 def test_tibetanmachine_map_matches_the_pinned_bdrc_source_and_runtime_inventory():
+    assert len(_MAP_BYTES) == 2270
+    assert len(_MAP_BYTES.decode("utf-8").splitlines()) == 221
     assert hashlib.sha256(_MAP_BYTES).hexdigest() == (
         "eabcdd119ee7fa81ca221e3879745d3886ec4293b1bca72801a18498972cbc24"
     )
     assert len(_PINNED_ROWS) == 217
     assert len({source for source, _target in _PINNED_ROWS}) == 217
     assert sum(not target for _source, target in _PINNED_ROWS) == 12
+    assert Counter(len(target) for _source, target in _PINNED_ROWS) == {
+        0: 12,
+        1: 105,
+        2: 82,
+        3: 18,
+    }
 
     converter = TibetanMachineConverter.default()
     assert len(converter._table) == 244
+    assert len(_RAW_BYTE_SOURCES) == 223
+    assert len(_DECODED_CP1252_SOURCES) == 27
+    assert len(_ALLOWED_SOURCES) == _MAX_TABLE_ENTRIES == 250
+    assert set(converter._table) <= _ALLOWED_SOURCES
+    assert _ALLOWED_SOURCES - set(converter._table) == {
+        0x0081,
+        0x008D,
+        0x008F,
+        0x0090,
+        0x009D,
+        0x00FF,
+    }
+    assert Counter(len(target) for target in converter._table.values()) == {
+        0: 14,
+        1: 107,
+        2: 93,
+        3: 30,
+    }
+    assert len(set(converter._table.values())) == 166
+    payload = _effective_payload(converter)
+    assert len(payload) == 3832
+    assert hashlib.sha256(payload).hexdigest() == (
+        "0601c7fafb91066fdbc5b5c7ac0d320494236b78fb176b04b74a4c93723208e8"
+    )
 
 
 def test_every_tibetanmachine_source_row_has_exact_nfc_output_and_diagnostics():
@@ -79,6 +168,78 @@ def test_every_cp1252_decoded_and_raw_byte_alias_has_identical_output():
         assert raw_result.unmapped_codepoints == decoded_result.unmapped_codepoints == []
 
 
+def test_every_byte_has_an_exact_tibetanmachine_classification():
+    converter = TibetanMachineConverter.default()
+    counts: Counter[str] = Counter()
+    structural = {" ", "\t", "\r", "\n"}
+
+    for codepoint in range(0x100):
+        source = chr(codepoint)
+        label = f"U+{codepoint:04X}"
+        result = converter.convert(source)
+        if codepoint == 0x00A0:
+            classification = "nbsp"
+            assert result.unicode_text == " "
+            assert result.replacement_count == 1
+            assert result.empty_codepoints == []
+        elif codepoint in converter._table:
+            target = converter._table[codepoint]
+            classification = "mapped" if target else "empty"
+            assert result.unicode_text == unicodedata.normalize("NFC", target)
+            assert result.replacement_count == 1
+            assert result.empty_codepoints == ([] if target else [label])
+        elif source in structural:
+            classification = "structural"
+            assert result.unicode_text == source
+            assert result.replacement_count == 0
+            assert result.empty_codepoints == []
+        else:
+            classification = "unmapped"
+            assert result.unicode_text == source
+            assert result.replacement_count == 0
+            assert result.empty_codepoints == []
+            assert result.unmapped_codepoints == [label]
+
+        assert result.tibetan_char_count == sum(
+            0x0F00 <= ord(character) <= 0x0FFF for character in result.unicode_text
+        )
+        assert result.missing_glyph_codepoints == []
+        if classification in {"empty", "unmapped"}:
+            with pytest.raises(ValueError, match=label.replace("+", r"\+")):
+                convert_tibetanmachine(source, strict=True)
+        else:
+            assert result.unmapped_codepoints == []
+            assert convert_tibetanmachine(source, strict=True) == result
+        counts[classification] += 1
+
+    assert counts == {
+        "mapped": 205,
+        "empty": 11,
+        "nbsp": 1,
+        "structural": 4,
+        "unmapped": 35,
+    }
+
+
+def test_every_effective_target_pair_obeys_whole_output_nfc():
+    converter = TibetanMachineConverter.default()
+    effective_targets = {
+        source: " " if source == 0x00A0 else target for source, target in converter._table.items()
+    }
+    cross_boundary_reorders = 0
+    for first_source, first_target in effective_targets.items():
+        for second_source, second_target in effective_targets.items():
+            separate_nfc = unicodedata.normalize("NFC", first_target) + unicodedata.normalize(
+                "NFC", second_target
+            )
+            whole_nfc = unicodedata.normalize("NFC", first_target + second_target)
+            cross_boundary_reorders += whole_nfc != separate_nfc
+            result = converter.convert(chr(first_source) + chr(second_source))
+            assert result.unicode_text == whole_nfc
+            assert result.replacement_count == 2
+    assert cross_boundary_reorders == 825
+
+
 def test_every_effective_empty_mapping_is_diagnostic_and_strictly_rejected():
     converter = TibetanMachineConverter.default()
     expected_sources = {
@@ -116,15 +277,23 @@ def test_every_effective_empty_mapping_is_diagnostic_and_strictly_rejected():
     ("map_text", "message"),
     [
         ("source_codepoint,target\nnot-a-number,ཀ\n", "invalid TibetanMachine source row"),
-        ("source_codepoint,target\n-1,ཀ\n", "invalid/duplicate TibetanMachine source"),
-        ("source_codepoint,target\n1114112,ཀ\n", "invalid/duplicate TibetanMachine source"),
+        ("source_codepoint,target\n-1,ཀ\n", "invalid TibetanMachine source row"),
+        ("source_codepoint,target\n+33,ཀ\n", "invalid TibetanMachine source row"),
+        ("source_codepoint,target\n033,ཀ\n", "invalid TibetanMachine source row"),
+        ("source_codepoint,target\n1114112,ཀ\n", "invalid TibetanMachine source"),
+        ("source_codepoint,target\n9,ཀ\n", "invalid TibetanMachine source"),
+        ("source_codepoint,target\n32,ཀ\n", "invalid TibetanMachine source"),
+        ("source_codepoint,target\n3904,ཁ\n", "invalid TibetanMachine source"),
+        ("source_codepoint,target\n1114111,ཀ\n", "invalid TibetanMachine source"),
         (
             "source_codepoint,target\n33,ཀ\n33,ཁ\n",
-            "invalid/duplicate TibetanMachine source",
+            "duplicate TibetanMachine source",
         ),
         ("source_codepoint,target\n33\n", "missing TibetanMachine target"),
         ("source_codepoint,target\n33,A\n", "non-Tibetan or unassigned target"),
         ("source_codepoint,target\n33,\u0f48\n", "non-Tibetan or unassigned target"),
+        ("source_codepoint,target\n33,ཀཁགང\n", "invalid TibetanMachine target"),
+        ("source_codepoint,target\n160,ཀ\n", "U\\+00A0 target must be empty"),
         ("source_codepoint,target\n", "requires a non-empty map"),
         ('source_codepoint,target\n33,"ཀ', "invalid TibetanMachine CSV"),
         (
@@ -146,6 +315,120 @@ def test_tibetanmachine_parser_rejects_malformed_or_unassigned_rows(tmp_path, ma
     map_path.write_text(map_text, encoding="utf-8")
     with pytest.raises(ValueError, match=message):
         TibetanMachineConverter.from_map_file(map_path)
+
+
+def test_tibetanmachine_parser_rejects_oversized_files_and_row_inventories(tmp_path):
+    oversized = tmp_path / "oversized.csv"
+    oversized.write_text("x" * (_MAX_MAP_FILE_BYTES + 1), encoding="utf-8")
+    with pytest.raises(ValueError, match="map exceeds"):
+        TibetanMachineConverter.from_map_file(oversized)
+
+    long_source = tmp_path / "long-source.csv"
+    long_source.write_text(
+        f"source_codepoint,target\n{'9' * 5_000},ཀ\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="invalid TibetanMachine source row"):
+        TibetanMachineConverter.from_map_file(long_source)
+
+    too_many_rows = tmp_path / "too-many-rows.csv"
+    rows = ["source_codepoint,target"] + [f"{source},ཀ" for source in range(_MAX_TABLE_ENTRIES + 1)]
+    too_many_rows.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="source rows"):
+        TibetanMachineConverter.from_map_file(too_many_rows)
+
+
+def test_tibetanmachine_parser_requires_consistent_explicit_cp1252_aliases(tmp_path):
+    conflicting = tmp_path / "conflicting.csv"
+    conflicting.write_text(
+        "source_codepoint,target\n128,ཀ\n8364,ཁ\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="conflicting TibetanMachine decoded/raw CP1252"):
+        TibetanMachineConverter.from_map_file(conflicting)
+
+    consistent = tmp_path / "consistent.csv"
+    consistent.write_text(
+        "source_codepoint,target\n128,ཀ\n8364,ཀ\n",
+        encoding="utf-8",
+    )
+    converter = TibetanMachineConverter.from_map_file(consistent)
+    assert dict(converter._table) == {128: "ཀ", 8364: "ཀ"}
+    assert converter.convert("\x80€").unicode_text == "ཀཀ"
+
+
+def test_tibetanmachine_parser_adds_a_missing_raw_cp1252_alias(tmp_path):
+    map_path = tmp_path / "decoded-only.csv"
+    map_path.write_text("source_codepoint,target\n8364,ཀ\n", encoding="utf-8")
+    converter = TibetanMachineConverter.from_map_file(map_path)
+    assert dict(converter._table) == {128: "ཀ", 8364: "ཀ"}
+
+
+@pytest.mark.parametrize(
+    ("table", "message"),
+    [
+        ([], "table must be a mapping"),
+        (None, "table must be a mapping"),
+        ({}, "requires a non-empty map"),
+        ({True: "ཀ"}, "invalid TibetanMachine source"),
+        ({33.0: "ཀ"}, "invalid TibetanMachine source"),
+        ({"33": "ཀ"}, "invalid TibetanMachine source"),
+        ({0x20: "ཀ"}, "invalid TibetanMachine source"),
+        ({0x09: "ཀ"}, "invalid TibetanMachine source"),
+        ({0x100: "ཀ"}, "invalid TibetanMachine source"),
+        ({0x0F40: "ཀ"}, "invalid TibetanMachine source"),
+        ({0x2603: "ཀ"}, "invalid TibetanMachine source"),
+        ({0xE010: "ཀ"}, "invalid TibetanMachine source"),
+        ({0x10FFFF: "ཀ"}, "invalid TibetanMachine source"),
+        ({0x21: None}, "invalid TibetanMachine target"),
+        ({0x21: 3904}, "invalid TibetanMachine target"),
+        ({0x21: _TibetanString("ཀ")}, "invalid TibetanMachine target"),
+        ({0x21: "A"}, "non-Tibetan or unassigned target"),
+        ({0x21: "\u0f48"}, "non-Tibetan or unassigned target"),
+        ({0x21: "ཀཁགང"}, "invalid TibetanMachine target"),
+        ({0xA0: "ཀ"}, "U\\+00A0 target must be empty"),
+        ({0x80: "ཀ", 0x20AC: "ཁ"}, "conflicting TibetanMachine decoded/raw CP1252"),
+        (_InfiniteItemsMapping(), "item sequence exceeds"),
+        (_PathologicalItemsMapping(["bad"]), "invalid TibetanMachine table entry"),
+        (_PathologicalItemsMapping([{0x21, "ཀ"}]), "invalid TibetanMachine table entry"),
+        (_PathologicalItemsMapping([(0x21,)]), "invalid TibetanMachine table entry"),
+        (_PathologicalItemsMapping([(0x21, "ཀ", "extra")]), "table entry exceeds"),
+        (
+            _PathologicalItemsMapping([(0x21, "ཀ"), (0x21, "ཁ")]),
+            "duplicate TibetanMachine source",
+        ),
+    ],
+)
+def test_tibetanmachine_constructor_rejects_unsafe_tables(table, message):
+    with pytest.raises(ValueError, match=message):
+        TibetanMachineConverter(table)
+
+
+def test_tibetanmachine_constructor_accepts_the_complete_source_and_target_boundaries():
+    converter = TibetanMachineConverter(
+        {
+            0x21: "ཀ",
+            0x80: "ཁ",
+            0x20AC: "ཁ",
+            0xA0: "",
+            0xFF: "གངཅ",
+        }
+    )
+    assert converter.convert("!").unicode_text == "ཀ"
+    assert converter.convert("\x80€").unicode_text == "ཁཁ"
+    assert converter.convert("\u00a0").unicode_text == " "
+    assert converter.convert("ÿ").unicode_text == "གངཅ"
+
+
+def test_tibetanmachine_constructor_snapshots_and_freezes_the_input_mapping():
+    table = {0x21: "ཀ"}
+    converter = TibetanMachineConverter(table)
+    table[0x21] = "A"
+    table[0x22] = "ཁ"
+    assert converter.convert('!"').unicode_text == 'ཀ"'
+    assert converter.convert('!"').unmapped_codepoints == ["U+0022"]
+    with pytest.raises(TypeError):
+        converter._table[0x21] = "A"
 
 
 def test_tibetanmachine_basic_consonants_follow_bdrc_table():
@@ -199,7 +482,7 @@ def test_tibetanmachine_unknown_and_unicode_passthrough():
     assert not result.unmapped_codepoints
 
 
-@pytest.mark.parametrize("codepoint", [0xE010, 0xE013])
+@pytest.mark.parametrize("codepoint", sorted(TIBETANMACHINE_NOTDEF_PUA))
 def test_tibetanmachine_notdef_pua_is_reported_as_missing_glyph(codepoint):
     source = chr(codepoint)
     result = convert_tibetanmachine(source)
@@ -217,5 +500,18 @@ def test_tibetanmachine_map_targets_are_tibetan_and_output_is_nfc():
     assert result.unicode_text == unicodedata.normalize("NFC", result.unicode_text)
 
 
-def test_convert_dispatches_to_tibetanmachine():
-    assert convert("!", font="tibetanmachine", strict=True) == "ཀ"
+@pytest.mark.parametrize("font", ["tibetanmachine", "tibetan-machine"])
+def test_every_tibetanmachine_alias_has_exact_strict_behavior(font):
+    assert supported_fonts()[font] == "Tibetan"
+    assert convert("!", font=font, strict=True) == "ཀ"
+    with pytest.raises(ValueError, match=r"U\+002D"):
+        convert("-", font=font, strict=True)
+    with pytest.raises(ValueError, match=r"U\+2603"):
+        convert("☃", font=font, strict=True)
+
+
+@pytest.mark.parametrize("font", ["ABCDEF+TIBETANMACHINE", "ABCDEF+TIBETAN-MACHINE"])
+def test_tibetanmachine_pdf_subset_aliases_have_exact_strict_behavior(font):
+    assert convert("!", font=font, strict=True) == "ཀ"
+    with pytest.raises(ValueError, match=r"U\+002D"):
+        convert("-", font=font, strict=True)
