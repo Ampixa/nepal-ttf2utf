@@ -330,6 +330,7 @@ package:
 
 | Font reference | Script / assigned cmap | SHA-256 |
 |---|---|---|
+| [LTK Madan2](https://ltk.org.np/downloads.php) | 72 Devanagari cmap entries; family, full, and PostScript names are exactly `Madan2` | `2321a8e7ef1e87e628e115c8e34a56120b108db37f6195c6496ce9012f5042bb` |
 | [SIL Namdhinggo 3.100 Regular](https://github.com/silnrsi/font-namdhinggo/releases/tag/v3.100) | Assigned Limbu characters within U+1900–U+194F | `1b46b16277e4b6784bd19306a9474281888b656e9c57233b4e7dc63bd1229d6c` |
 | [Kanchenjunga Regular](https://github.com/google/fonts/tree/main/ofl/kanchenjunga) | Kirat Rai U+16D40–U+16D79 | `45609f8cc90d4733d3d1665346d359afc1a659def340d0f369121af034322ef9` |
 | [Noto Sans Sunuwar Regular](https://github.com/notofonts/sunuwar) | Sunuwar U+11BC0–U+11BE1 and U+11BF0–U+11BF9 | `332bbbcbb64c42ccc0a1b79dfd557b47aa3bd88a8ffab1417dd2f6989ad67f4d` |
@@ -338,6 +339,27 @@ package:
 | [Noto Sans Ol Chiki Variable](https://github.com/google/fonts/tree/main/ofl/notosansolchiki) | Ol Chiki U+1C50–U+1C7F | `c9c31988656f49eccec9588825ab3b5045099c2f850ef98f356f976e8a596b4d` |
 | [Noto Sans Tirhuta Regular](https://github.com/google/fonts/tree/main/ofl/notosanstirhuta) | Tirhuta assigned repertoire | `ad7123ee63118b83ed2f723591e5e861baad8dd157508b8339362850c6036efe` |
 | [Noto Sans Gurung Khema Regular](https://github.com/notofonts/gurung-khema) | Gurung Khema U+16100–U+16139 | `bc6f0f510c020c05aea09b170b91ebe1f48981fc3973dce4f98ba5174266692d` |
+
+LTK labels its official [`fonts.zip`](https://ltk.org.np/downloads/fonts.zip)
+archive as “Nepali Unicode Fonts” and separately distinguishes legacy Preeti,
+Kantipur, JagHimali, Kanchan, and Himali input from Unicode-compatible Madan
+output in the [`Conversion Tools`](https://ltk.org.np/download2.php)
+description. The inspected archive has SHA-256
+`0c325228d16ea798ff5b2a2ebc685fcca0237ea23f08e9336ad98905a4dc9e3e`.
+Its `madan.ttf` member has the Madan2 hash and names recorded above, 112 Unicode
+cmap entries in total, 72 Devanagari entries within U+0900–U+097F, and no
+private-use mapping. This establishes already-Unicode Devanagari storage, not
+a legacy conversion table, complete glyph coverage, rendering quality, or
+corpus occurrence. The exact `madan2` route performs NFC normalization and
+Unicode 17 Devanagari validation; no broader filename or weight alias is
+inferred.
+
+Madan2 is an inspected reference only. The font metadata says that its OpenType
+rules and Nepali glyph sets were released under GPL, while a separate name
+record carries an all-rights-reserved Madan Puraskar Pustakalaya copyright
+notice; the archive contains no standalone GPL license. No font binary, glyph
+data, cmap, or shaping table is distributed by this package, and the project
+makes no redistribution claim.
 
 Bare `namdhinggo` remains the legacy NamdhinggoSILL route for compatibility.
 The modern Unicode family uses explicit `namdhinggo-regular` or

@@ -12,6 +12,11 @@ def test_cli_converts_positional_text(capsys):
     assert capsys.readouterr().out == "नेपाल"
 
 
+def test_cli_validates_madan2_unicode_text(capsys):
+    assert main(["--font", "Madan2", "--strict", "नेपाल"]) == 0
+    assert capsys.readouterr().out == "नेपाल"
+
+
 def test_cli_lists_fonts(capsys):
     assert main(["--list-fonts"]) == 0
     output = capsys.readouterr().out
@@ -21,6 +26,7 @@ def test_cli_lists_fonts(capsys):
     assert "olcklatic-normal\tOl Chiki\n" in output
     assert "nithyaranjananu\tNewa\n" in output
     assert "magar-akkha-brahmi\tBrahmi\n" in output
+    assert "madan2\tDevanagari\n" in output
     assert "namdhinggo-regular\tLimbu\n" in output
     assert "notosansgurungkhema\tGurung Khema\n" in output
 

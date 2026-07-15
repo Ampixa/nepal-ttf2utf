@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Route the exact LTK `Madan2` family name through already-Unicode Devanagari
+  validation without bundling the font or applying a legacy byte map.
 - Apply the pinned Unicode 17 assigned repertoire to native-script passthrough
   in legacy converters, diagnosing 103 reserved positions across six output
   scripts without changing lenient text or existing count fields.

@@ -179,12 +179,14 @@ _TIBETAN_UNICODE_FONTS = {
     "unicode-tibetan",
 }
 # Unicode Devanagari font spans that need identity routing, including the DU
-# encoding of Nithya Ranjana (Ranjana glyphs over Devanagari characters).
+# encoding of Nithya Ranjana (Ranjana glyphs over Devanagari characters) and
+# LTK's exact Madan2 family/full/PostScript name.
 _DEVANAGARI_UNICODE_FONTS = {
     "annapurna sil nepal",
     "annapurna-sil-nepal",
     "annapurnasilnepal",
     "devanagari-unicode",
+    "madan2",
     "nithya ranjana du",
     "nithya-ranjana-du",
     "nithyaranjanadu",

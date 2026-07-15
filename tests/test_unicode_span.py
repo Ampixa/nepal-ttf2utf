@@ -233,6 +233,37 @@ def test_unicode_devanagari_and_ranjana_du_fonts_are_identity_routed():
     assert convert(text, font="Nithya Ranjana DU", strict=True) == text
 
 
+def test_madan2_exact_name_routes_unicode_devanagari_without_a_legacy_pass():
+    source = "नेपाल क्षेत्र e\u0301 २०८३।"
+    expected = unicodedata.normalize("NFC", source)
+    assert convert(source, font="Madan2", strict=True) == expected
+    assert convert(source, font="  mAdAn2  ", strict=True) == expected
+    assert convert(source, font="ABCDEF+Madan2", strict=True) == expected
+    assert convert("g]kfn", font="Madan2") == "g]kfn"
+
+
+def test_madan2_strict_route_rejects_unanchored_invalid_and_misrouted_text():
+    with pytest.raises(ValueError, match="contains no Devanagari"):
+        convert("g]kfn", font="Madan2", strict=True)
+    with pytest.raises(ValueError, match=r"U\+11400.*Newa"):
+        convert("म𑐀", font="Madan2", strict=True)
+    with pytest.raises(ValueError, match=r"U\+11480.*Tirhuta"):
+        convert("म𑒀", font="Madan2", strict=True)
+    with pytest.raises(ValueError, match=r"U\+FFFD"):
+        convert("म�", font="Madan2", strict=True)
+    with pytest.raises(ValueError, match=r"U\+11B0A"):
+        convert("म\U00011b0a", font="Madan2", strict=True)
+
+
+@pytest.mark.parametrize(
+    "font",
+    ["madan", "madan.ttf", "madan2-regular", "Madan2 Regular", "ABCDE+Madan2"],
+)
+def test_madan2_route_does_not_infer_unsupported_names(font):
+    with pytest.raises(ValueError, match="unsupported Devanagari font"):
+        convert("नेपाल", font=font, strict=True)
+
+
 def test_pdf_subset_prefix_is_removed_before_font_routing():
     assert convert("བོད", font="ABCDEF+Jomolhari-ID", strict=True) == "བོད"
     assert convert("नेपाल", font="ABCDEF+AnnapurnaSILNepal", strict=True) == "नेपाल"
@@ -256,6 +287,9 @@ def test_unicode_fonts_are_discoverable():
     assert fonts["microsoft-himalaya"] == "Tibetan"
     assert fonts["newa-unicode"] == "Newa"
     assert fonts["annapurnasilnepal"] == "Devanagari"
+    assert fonts["madan2"] == "Devanagari"
+    assert "madan" not in fonts
+    assert "madan2-regular" not in fonts
     assert fonts["nithyaranjanadu"] == "Devanagari"
     assert fonts["nithyaranjananu"] == "Newa"
     assert fonts["namdhinggo-regular"] == "Limbu"
