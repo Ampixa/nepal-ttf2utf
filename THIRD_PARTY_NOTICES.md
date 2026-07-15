@@ -41,3 +41,11 @@ The functional Devanagari/Brahmi mapping in
 under the MIT License, copyright 2026 Ampixa / magar-toolkit contributors. The
 complete upstream license is bundled as
 `src/nepal_ttf2utf/maps/LICENSE.magar-toolkit-MIT.txt`.
+
+## Unicode Character Database
+
+The assigned ranges, Script-property ranges, block boundaries, and canonical
+compositions in `src/nepal_ttf2utf/unicode_span.py` are derived from Unicode
+17.0 `DerivedAge.txt`, `Scripts.txt`, `Blocks.txt`, and `UnicodeData.txt`.
+Copyright © 1991-2026 Unicode, Inc. The complete Unicode License V3 is bundled
+as `src/nepal_ttf2utf/maps/LICENSE.unicode-data.txt`.

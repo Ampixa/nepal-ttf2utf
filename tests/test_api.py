@@ -27,6 +27,10 @@ def test_version_matches_release():
         ("nithyaranjanadu", "Devanagari"),
         ("nithyaranjananu", "Newa"),
         ("magar-akkha-brahmi", "Brahmi"),
+        ("namdhinggo-regular", "Limbu"),
+        ("kanchenjunga-regular", "Kirat Rai"),
+        ("notosanssunuwar-regular", "Sunuwar"),
+        ("notosansgurungkhema", "Gurung Khema"),
     ],
 )
 def test_supported_fonts_covers_every_converter_family(font, script):

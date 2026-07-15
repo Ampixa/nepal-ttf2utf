@@ -220,6 +220,62 @@ This is text-span conversion, not a PDF routing heuristic:
 Production corpus conversion therefore still needs font-span segmentation,
 source-vs-output render comparison, and representative Tibetan-reader review.
 
+## Version-stable Unicode font routing
+
+Unicode span validation is derived from Unicode 17.0
+[`DerivedAge.txt`](https://www.unicode.org/Public/17.0.0/ucd/DerivedAge.txt),
+[`Scripts.txt`](https://www.unicode.org/Public/17.0.0/ucd/Scripts.txt), and
+[`UnicodeData.txt`](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt).
+Assigned-repertoire membership is independent of Python's bundled Unicode
+database: Python 3.9 predates the Unicode 16 encoding of Gurung Khema, Sunuwar,
+and Kirat Rai, but it can still validate their assigned codepoints without
+treating reserved positions as characters.
+
+Eleven canonical compositions introduced with Gurung Khema and Kirat Rai are
+also pinned so NFC output is stable on older Python releases. Outside the
+eleven pinned script blocks, unassigned-codepoint detection continues to use
+the host Python Unicode database.
+
+The validator covers Brahmi, Devanagari, Gurung Khema, Kirat Rai, Lepcha,
+Limbu, Newa, Ol Chiki, Sunuwar, Tibetan, and Tirhuta. It normalizes NFC and
+reports four distinct routing failures:
+
+- U+FFFD, private-use values, surrogates, reserved positions inside the pinned
+  blocks, runtime-unassigned values, and non-text controls are invalid;
+- a character with another supported Unicode Script property is reported as an
+  unexpected script value; Common and Inherited marks are not assigned to one
+  script merely because of their block location;
+- strict mode rejects a nonempty span with no script-specific character from
+  its declared script;
+- Latin text, ordinary punctuation, whitespace, and ASCII digits may remain
+  embedded in a valid native-script span.
+
+Modern font-family aliases are based on cmap inventory, not visual inference.
+Selected reference binaries are listed below; no font is distributed by this
+package:
+
+| Font reference | Script / assigned cmap | SHA-256 |
+|---|---|---|
+| [SIL Namdhinggo 3.100 Regular](https://github.com/silnrsi/font-namdhinggo/releases/tag/v3.100) | Assigned Limbu characters within U+1900–U+194F | `1b46b16277e4b6784bd19306a9474281888b656e9c57233b4e7dc63bd1229d6c` |
+| [Kanchenjunga Regular](https://github.com/google/fonts/tree/main/ofl/kanchenjunga) | Kirat Rai U+16D40–U+16D79 | `45609f8cc90d4733d3d1665346d359afc1a659def340d0f369121af034322ef9` |
+| [Noto Sans Sunuwar Regular](https://github.com/notofonts/sunuwar) | Sunuwar U+11BC0–U+11BE1 and U+11BF0–U+11BF9 | `332bbbcbb64c42ccc0a1b79dfd557b47aa3bd88a8ffab1417dd2f6989ad67f4d` |
+| [SIL Mingzat Regular](https://software.sil.org/mingzat/) | Lepcha assigned repertoire | `c1507a565a1d263c6473a2b36944d5244bfa5b6e6f6af023a3dc8c7234fedd05` |
+| [Noto Sans Lepcha Regular](https://github.com/google/fonts/tree/main/ofl/notosanslepcha) | Lepcha assigned repertoire | `9624931ae8f9a8a2a45233e5486fac1a80f333a0b3a25f84d0e2484363914f84` |
+| [Noto Sans Ol Chiki Variable](https://github.com/google/fonts/tree/main/ofl/notosansolchiki) | Ol Chiki U+1C50–U+1C7F | `c9c31988656f49eccec9588825ab3b5045099c2f850ef98f356f976e8a596b4d` |
+| [Noto Sans Tirhuta Regular](https://github.com/google/fonts/tree/main/ofl/notosanstirhuta) | Tirhuta assigned repertoire | `ad7123ee63118b83ed2f723591e5e861baad8dd157508b8339362850c6036efe` |
+| [Noto Sans Gurung Khema Regular](https://github.com/notofonts/gurung-khema) | Gurung Khema U+16100–U+16139 | `bc6f0f510c020c05aea09b170b91ebe1f48981fc3973dce4f98ba5174266692d` |
+
+Bare `namdhinggo` remains the legacy NamdhinggoSILL route for compatibility.
+The modern Unicode family uses explicit `namdhinggo-regular` or
+`namdhinggo-unicode` keys. Equivalent explicit separation applies to the
+legacy and Unicode routes for Kirat Rai, Sunuwar, Lepcha, Ol Chiki, and
+Tirhuta.
+
+The Gurung Khema font confirms cmap coverage for all 58 characters assigned in
+Unicode 17.0. It does not establish linguistic sample text or a mapping for the
+separate Sikkim Herald `khema 2019` legacy layout. That layout remains deferred
+until its semantic font audit and independent source-page reviews are complete.
+
 ## Already-Unicode Newa and Nithya Ranjana
 
 The audited Transkribus Newa archive has SHA-256

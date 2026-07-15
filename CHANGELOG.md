@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Pin already-Unicode validation to the Unicode 17.0 assigned repertoire for
+  all standardized output scripts plus Gurung Khema, independent of the Python
+  runtime's older Unicode database.
+- Add explicit modern Unicode font routes for Namdhinggo, Kanchenjunga, Noto
+  Sans Sunuwar/Lepcha/Ol Chiki/Tirhuta/Gurung Khema, and SIL Mingzat while
+  keeping similarly named legacy layouts separate.
+- Report private-use, reserved, and cross-script values in Unicode spans and
+  reject them in strict mode.
+- Apply the Unicode 16 canonical compositions for Gurung Khema and Kirat Rai
+  on older Python releases, and return canonical script names in diagnostics.
+
 ## 0.3.0 — 2026-07-15
 
 - Add a separate OLCKLatic converter for the Normal, Bold, and UltraBlack

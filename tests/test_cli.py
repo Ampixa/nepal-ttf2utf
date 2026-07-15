@@ -21,6 +21,8 @@ def test_cli_lists_fonts(capsys):
     assert "olcklatic-normal\tOl Chiki\n" in output
     assert "nithyaranjananu\tNewa\n" in output
     assert "magar-akkha-brahmi\tBrahmi\n" in output
+    assert "namdhinggo-regular\tLimbu\n" in output
+    assert "notosansgurungkhema\tGurung Khema\n" in output
 
 
 def test_cli_reads_stdin(monkeypatch, capsys):

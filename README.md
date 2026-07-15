@@ -21,25 +21,39 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 |---|---|---|
 | Devanagari | `preeti`, `kantipur`, `sagarmatha`, `pcs-nepali`, `fontasy-himali` | Delegates to the tested `npttf2utf` maps. |
 | Devanagari | `nayanepal`, `gorkhapatra` | Preeti-family map plus two observed newspaper extension glyphs. |
-| Devanagari | `annapurnasilnepal`, `nithyaranjanadu` and aliases | NFC normalization and script validation for text that is already Unicode. Nithya Ranjana DU displays Ranjana glyphs over Devanagari codepoints. |
+| Devanagari | `annapurnasilnepal`, Noto Sans/Serif Devanagari, `nithyaranjanadu` and aliases | NFC normalization and assigned-repertoire validation for text that is already Unicode. Nithya Ranjana DU displays Ranjana glyphs over Devanagari codepoints. |
 | Limbu / Sirijonga | `namdhinggo`, `namdhinggosill`, `sirijonga`, `limbu` | Native reader for SIL's bundled [`Limbu.map`](src/nepal_ttf2utf/maps/Limbu.map), including Unicode-order repair. The source map explicitly leaves legacy `#` undefined. |
+| Limbu / Sirijonga | `namdhinggo-regular`, `namdhinggo-unicode`, Noto Sans Limbu and aliases | Unicode Limbu validation for modern Namdhinggo 3.100 and Noto fonts. Bare `namdhinggo` remains the legacy route for compatibility. |
 | Kirat Rai | `kiratrai`, `kiratrai-new`, `kiratraifontnew`, `akrs`, `akrs-new` | Native reader for SIL's canonical 2021 [`kiratraifontnew.map`](src/nepal_ttf2utf/maps/kiratraifontnew.map). |
 | Kirat Rai | `kiratrai-herald`, `kiratraifont`, `sikkimherald-kiratrai` | Complete premap for the older, globally permuted Sikkim Herald layout. The only unmatched corpus glyph, legacy `Z`, is an empty glyph and normalizes to a space. |
+| Kirat Rai | Kanchenjunga family and `kirat-rai-unicode` | Unicode Kirat Rai validation for the modern Unicode font family. |
 | Sunuwar / Jenticha | `sunuwar`, `jenticha`, `koits`, `kirat1` | All observed script bytes are confirmed. The final `\|` byte is the Sikkim regional form of U+11BC5 UTTHI. |
+| Sunuwar / Jenticha | Noto Sans Sunuwar and `sunuwar-unicode` | Unicode Sunuwar validation, independent of the older `kirat1` layout. |
 | Lepcha / Róng | `jg-lepcha`, `jglepcha`, `lepcha-jg` | Complete native forward reader for SIL's two-pass [`JGLepcha.map`](src/nepal_ttf2utf/maps/JGLepcha.map). |
 | Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Corpus-derived Sikkim Herald layout. Legacy `]`, `%`, and `-` are resolved; only `*`, `(`, `)`, `+`, and `/` remain unmapped. |
+| Lepcha / Róng | Mingzat, Noto Sans Lepcha and `lepcha-unicode` | Unicode Lepcha assigned-repertoire validation; it does not apply either legacy layout. |
 | Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka` | Complete observed Optimum letter, mark, digit, and punctuation map. |
 | Ol Chiki | `olck-latic`, `olcklatic-*`, `olchiki-latic` | Separate OLCKLatic mapping, including its swapped `v`/`w` assignments and distinct punctuation. All 2,089 audited characters converted without an unmapped value. |
+| Ol Chiki | Noto Sans Ol Chiki and `ol-chiki-unicode` | Unicode Ol Chiki validation without a legacy-byte pass. |
 | Tirhuta / Mithilakshar | `janaki`, `tirhuta`, `mithilakshar` | Conservative Janaki conversion from semantically corresponding Devanagari codepoints, with observed visual-order repairs. Hash-pinned Videha profiles can also recover broken U+FFFD text from PyMuPDF glyph IDs. |
+| Tirhuta / Mithilakshar | Noto Sans Tirhuta and `tirhuta-unicode` | Unicode Tirhuta validation, kept separate from Janaki's Devanagari-coded layout. |
 | Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's Apache-2.0 TibetanMachine table. The audited spans contain 86,206 extracted characters; two source PUA values select the font's visible `.notdef` glyph and fail strict conversion. |
-| Tibetan | Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, CTRC-HT and aliases | NFC normalization and Tibetan-script validation for already-Unicode spans. |
-| Newa | `newa`, `newa-unicode`, `noto-sans-newa`, `nithyaranjananu` and aliases | NFC normalization and Newa-script validation. Nithya Ranjana NU displays Ranjana glyphs over Newa codepoints. |
+| Tibetan | Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, CTRC-HT and aliases | NFC normalization and assigned Tibetan-repertoire validation for already-Unicode spans. |
+| Newa | `newa`, `newa-unicode`, `noto-sans-newa`, `nithyaranjananu` and aliases | NFC normalization and assigned Newa-repertoire validation. Nithya Ranjana NU displays Ranjana glyphs over Newa codepoints. |
 | Brahmi representation for Magar Akkha | `transliterate_magar_akkha()`; `magar-akkha-brahmi` and `akkha-brahmi` | Devanagari/Brahmi transliteration is lossless over its supported inventory, and already-Brahmi text can be validated. Optional minimal-inventory folding is explicit and lossy. This is not a legacy-font converter. |
+| Gurung Khema | Noto Sans Gurung Khema and `gurung-khema-unicode` | Validation covers the 58 characters assigned in Unicode 17.0, U+16100–U+16139. No legacy-font mapping or linguistic corpus claim is made. |
 
 The result of `supported_fonts()` is the authoritative list of accepted font
 keys. Font names are case-insensitive, and six-letter PDF subset prefixes such
 as `ABCDEF+` are ignored. The measurements and source links behind derived
 mappings are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+
+Already-Unicode routes use an assigned repertoire pinned to Unicode 17.0
+rather than the host Python's Unicode database. This keeps Unicode 16 scripts
+such as Gurung Khema, Sunuwar, and Kirat Rai valid on Python 3.9 while still
+reporting reserved positions, private-use values, and characters assigned to a
+different supported script. `supported_unicode_scripts()` lists all eleven
+accepted validator names.
 
 ### Encoding boundaries
 
@@ -57,11 +71,14 @@ mappings are recorded in [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 - Raw U+FFFD text extracted from a broken Janaki PDF cannot be reconstructed by
   `convert_tirhuta()`. Recovery requires PyMuPDF glyph IDs and an exact built-in
   Videha PDF/font fingerprint profile.
+- The Gurung Khema Unicode route validates encoded characters only. The
+  inventoried legacy `khema 2019` layout still lacks the completed semantic font
+  audit and independent page review required for a byte converter.
 
 The deliberately unresolved inputs are the legacy Limbu `#`, five rare Sikkim
 Herald Lepcha bytes, unknown legacy Ranjana or Magar Akkha fonts, unknown Janaki
-glyph IDs, and the two TibetanMachine `.notdef` selectors. Lenient conversion
-preserves them; strict conversion reports them.
+glyph IDs, the Gurung Khema legacy layout, and the two TibetanMachine `.notdef`
+selectors. Lenient conversion preserves them; strict conversion reports them.
 
 ## Python API
 
@@ -85,6 +102,7 @@ from nepal_ttf2utf import (
     convert_kiratrai,
     convert_olchiki_latic,
     convert_tirhuta,
+    supported_unicode_scripts,
     transliterate_magar_akkha,
     validate_unicode_span,
 )
@@ -103,6 +121,8 @@ print(result.unicode_text)
 
 result = validate_unicode_span(newa_text, script="Newa", strict=True)
 print(result.script_char_count)
+
+print(supported_unicode_scripts())
 ```
 
 `recover_videha_janaki_trace()` is the fail-closed companion API for PyMuPDF
@@ -116,9 +136,11 @@ Available detailed entry points are `convert_devanagari`, `convert_limbu`,
 `convert_kiratrai`, `convert_kiratrai_herald`, `convert_sunuwar`,
 `convert_lepcha`, `convert_jg_lepcha`, `convert_olchiki`,
 `convert_olchiki_latic`, `convert_tirhuta`, `convert_tibetanmachine`,
-`validate_unicode_span`, `recover_videha_janaki_trace`, and
-`transliterate_magar_akkha`. `convert_limbu` retains its original string return
-type; use `LimbuConverter.convert()` for its detailed result.
+`validate_unicode_span`, `supported_unicode_scripts`,
+`recover_videha_janaki_trace`, and `transliterate_magar_akkha`.
+`UNICODE_REPERTOIRE_VERSION` identifies the pinned validation data.
+`convert_limbu` retains its original string return type; use
+`LimbuConverter.convert()` for its detailed result.
 
 ## Command line
 
@@ -148,7 +170,8 @@ uvx twine check dist/*
 
 The test suite checks known mappings, multi-byte rules, visual-to-logical
 reordering, strict-mode failures, already-Unicode routing, hash-pinned glyph-ID
-recovery, CLI behavior, and mapping-resource validation.
+recovery, version-stable assigned-repertoire validation, cross-script routing,
+CLI behavior, and mapping-resource validation.
 
 ## Licenses
 
