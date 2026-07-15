@@ -7,11 +7,13 @@ from nepal_ttf2utf._controls import DIAGNOSTIC_C0, STRUCTURAL_C0
 from nepal_ttf2utf.devanagari import convert_devanagari
 from nepal_ttf2utf.jg_lepcha import JGLepchaConverter
 from nepal_ttf2utf.kiratrai import KiratRaiConverter
+from nepal_ttf2utf.limbu import LimbuConverter, convert_limbu
 from nepal_ttf2utf.olchiki import convert_olchiki, convert_olchiki_latic
 from nepal_ttf2utf.sunuwar import convert_sunuwar
 
 DIAGNOSTIC_TEXT = "".join(sorted(DIAGNOSTIC_C0, key=ord))
 DIAGNOSTIC_LABELS = [f"U+{ord(char):04X}" for char in DIAGNOSTIC_TEXT]
+ALL_C0_TEXT = "".join(chr(codepoint) for codepoint in range(0x20))
 
 LEGACY_ROUTES = (
     ("preeti", "g]kfn"),
@@ -55,11 +57,27 @@ def test_devanagari_retains_lenient_cleanup_but_reports_removed_controls():
     assert all(label in str(error.value) for label in DIAGNOSTIC_LABELS)
 
 
-@pytest.mark.parametrize("converter", [KiratRaiConverter.default(), JGLepchaConverter.default()])
+@pytest.mark.parametrize(
+    "converter",
+    [LimbuConverter.default(), KiratRaiConverter.default(), JGLepchaConverter.default()],
+)
 def test_teckit_control_rules_preserve_but_diagnose_c0_outside_allowlist(converter):
     result = converter.convert(DIAGNOSTIC_TEXT)
     assert result.unicode_text == DIAGNOSTIC_TEXT
     assert result.replacement_count == 29
+    assert result.unmapped_codepoints == DIAGNOSTIC_LABELS
+
+
+def test_limbu_direct_strict_error_lists_every_diagnostic_c0():
+    with pytest.raises(ValueError) as error:
+        convert_limbu(DIAGNOSTIC_TEXT, strict=True)
+    assert all(label in str(error.value) for label in DIAGNOSTIC_LABELS)
+
+
+def test_limbu_complete_ctl_class_counts_all_32_positional_rules():
+    result = LimbuConverter.default().convert(ALL_C0_TEXT)
+    assert result.unicode_text == ALL_C0_TEXT
+    assert result.replacement_count == 32
     assert result.unmapped_codepoints == DIAGNOSTIC_LABELS
 
 
@@ -76,7 +94,10 @@ def test_raw_byte_result_apis_use_visible_codepoints_in_strict_errors(converter)
     assert not DIAGNOSTIC_C0 & set(message)
 
 
-@pytest.mark.parametrize("converter", [KiratRaiConverter.default(), JGLepchaConverter.default()])
+@pytest.mark.parametrize(
+    "converter",
+    [LimbuConverter.default(), KiratRaiConverter.default(), JGLepchaConverter.default()],
+)
 def test_teckit_structural_controls_keep_existing_map_counts(converter):
     text = "\t\r\n"
     result = converter.convert(text)

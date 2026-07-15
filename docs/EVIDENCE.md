@@ -27,15 +27,27 @@ legacy route reports them and rejects them in strict mode. Most routes preserve
 the source value in lenient output. Legacy Devanagari conversion retains its
 established lenient removal of those controls for corpus compatibility but
 records each unique removed value in `leftover`, so the result is no longer
-marked clean. The canonical Kirat Rai and JG Lepcha source tables contain
-identity rules for the full C0 range; those rules still determine lenient
-output and replacement counts, while the package now reports all 29 diagnostic
-values after conversion. Unicode format controls outside the C0 range are not
-reclassified by this policy.
+marked clean. The Limbu, canonical Kirat Rai, and JG Lepcha source tables
+contain positional identity rules for the full C0 range; those rules determine
+lenient output and contribute one matched rule to `replacement_count` per
+control, while the package reports all 29 diagnostic values after conversion.
+Unicode format controls outside the C0 range are not reclassified by this
+policy.
 
 An exhaustive dispatcher regression covers all 29 values across the eleven
-legacy routes. Detailed-result tests separately pin Preeti cleanup diagnostics,
-Kirat Rai/JG Lepcha identity output, and the existing TAB/CR/LF map counts.
+legacy routes. Detailed-result tests separately pin Preeti cleanup diagnostics
+and Limbu/Kirat Rai/JG Lepcha identity output and TAB/CR/LF map counts.
+
+The bundled `Limbu.map` has SHA-256
+`2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58`
+and matches
+[`scripts/Limb/legacy/limbu-dc/mappings/Limbu.map`](https://github.com/silnrsi/wsresources/blob/2a39449d20420fe7259f9ce5231c347432840075/scripts/Limb/legacy/limbu-dc/mappings/Limbu.map)
+at SIL `wsresources` revision
+`2a39449d20420fe7259f9ce5231c347432840075`. Its forward byte pass contains 99
+literal rules and a positional 32-member C0 class, producing 131 flattened
+forward rules after class expansion. The native reader does not implement the
+map's reverse conversion or its default-substitution directives; undefined
+legacy input therefore retains the package's preserve-and-diagnose behavior.
 
 ## Sikkim Herald Kirat Rai
 

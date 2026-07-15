@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Expand the positional C0 class in SIL's Limbu TECkit map so detailed
+  replacement counts reflect all matched control rules while strict mode still
+  diagnoses the 29 non-structural C0 values; pin the map's upstream provenance
+  and include the upstream MIT license in built packages.
 - Route the exact LTK `Madan2` family name through already-Unicode Devanagari
   validation without bundling the font or applying a legacy byte map.
 - Apply the pinned Unicode 17 assigned repertoire to native-script passthrough

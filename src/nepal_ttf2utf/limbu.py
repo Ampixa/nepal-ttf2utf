@@ -1,7 +1,8 @@
 """Limbu/Sirijonga legacy-font (Namdhinggo SIL) -> Unicode Limbu (U+1900-U+194F).
 
-Ports the SIL TECkit ``Byte_Unicode`` pass from the vendored ``Limbu.map`` and applies
-the vowel / subjoined-consonant reordering that Unicode logical order requires. Validated
+Applies the forward explicit assignments from the SIL TECkit ``Byte_Unicode`` pass,
+including positional class rules, in the vendored ``Limbu.map``. It also applies the
+vowel / subjoined-consonant reordering that Unicode logical order requires. Validated
 against real Gorkhapatra Limbu/Sirijonga newspaper pages.
 """
 
@@ -13,14 +14,79 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from ._controls import STRUCTURAL_C0, diagnostic_c0_codepoints
 from .unicode_span import _is_assigned_script_codepoint
 
 _BYTE_RULE_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
 _UNICODE_RULE_RE = re.compile(r"U\+([0-9A-Fa-f]{4,6})")
+_BYTECLASS_RE = re.compile(r"^ByteClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
+_UNICLASS_RE = re.compile(r"^UniClass\s*\[([^\]]+)\]\s*=\s*\((.*)\)\s*$")
+_CLASS_RULE_RE = re.compile(r"^\[([^\]]+)\]\s*<?>\s*\[([^\]]+)\]\s*$")
 _LIMBU_CODEPOINT_RE = re.compile(r"[ᤀ-᥏]")
 _VOWEL_RANGE = range(0x1920, 0x1929)
 _SUBJOINED_RANGE = range(0x1929, 0x192C)
 _KEMPHRENG = "᤺"
+
+
+def _tokens(body: str) -> list[str]:
+    body = re.sub(r"\s*\.\.\s*", " .. ", body)
+    return [token for token in body.split() if token]
+
+
+def _expand_byte_tokens(body: str) -> tuple[int, ...]:
+    values: list[int] = []
+    tokens = _tokens(body)
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if index + 2 < len(tokens) and tokens[index + 1] == "..":
+            start_match = _BYTE_RULE_RE.fullmatch(token)
+            end_match = _BYTE_RULE_RE.fullmatch(tokens[index + 2])
+            if start_match is None or end_match is None:
+                raise ValueError(f"invalid byte range in Limbu map: {token}..{tokens[index + 2]}")
+            start = int(start_match.group(1), 16)
+            end = int(end_match.group(1), 16)
+            if end < start:
+                raise ValueError(f"invalid byte range in Limbu map: {token}..{tokens[index + 2]}")
+            values.extend(range(start, end + 1))
+            index += 3
+            continue
+        match = _BYTE_RULE_RE.fullmatch(token)
+        if match is None:
+            raise ValueError(f"unparseable byte token in Limbu map: {token!r}")
+        values.append(int(match.group(1), 16))
+        index += 1
+    return tuple(values)
+
+
+def _expand_unicode_tokens(body: str) -> tuple[int, ...]:
+    values: list[int] = []
+    tokens = _tokens(body)
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if index + 2 < len(tokens) and tokens[index + 1] == "..":
+            start_match = _UNICODE_RULE_RE.fullmatch(token)
+            end_match = _UNICODE_RULE_RE.fullmatch(tokens[index + 2])
+            if start_match is None or end_match is None:
+                raise ValueError(
+                    f"invalid Unicode range in Limbu map: {token}..{tokens[index + 2]}"
+                )
+            start = int(start_match.group(1), 16)
+            end = int(end_match.group(1), 16)
+            if end < start:
+                raise ValueError(
+                    f"invalid Unicode range in Limbu map: {token}..{tokens[index + 2]}"
+                )
+            values.extend(range(start, end + 1))
+            index += 3
+            continue
+        match = _UNICODE_RULE_RE.fullmatch(token)
+        if match is None:
+            raise ValueError(f"unparseable Unicode token in Limbu map: {token!r}")
+        values.append(int(match.group(1), 16))
+        index += 1
+    return tuple(values)
 
 
 @dataclass(frozen=True)
@@ -46,16 +112,58 @@ class LimbuConverter:
         map_path = Path(path)
         if not map_path.is_file():
             raise FileNotFoundError(f"Limbu legacy map does not exist: {map_path}")
+        byte_classes: dict[str, tuple[int, ...]] = {}
+        unicode_classes: dict[str, tuple[int, ...]] = {}
         rules: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
         in_byte_pass = False
-        for raw_line in map_path.read_text(encoding="utf-8").splitlines():
+        rule_lines: list[str] = []
+        for raw_line in map_path.read_text(encoding="utf-8-sig").splitlines():
             line = raw_line.split(";", 1)[0].strip()
             if not line:
                 continue
-            if line.startswith("Pass("):
-                in_byte_pass = line == "Pass(Byte_Unicode)"
+            lowered = line.lower()
+            if lowered.startswith("pass("):
+                in_byte_pass = lowered == "pass(byte_unicode)"
                 continue
-            if not in_byte_pass or ("<>" not in line and ">" not in line):
+            if not in_byte_pass:
+                continue
+            byte_match = _BYTECLASS_RE.match(line)
+            if byte_match:
+                byte_classes[byte_match.group(1).strip()] = _expand_byte_tokens(byte_match.group(2))
+                continue
+            unicode_match = _UNICLASS_RE.match(line)
+            if unicode_match:
+                unicode_classes[unicode_match.group(1).strip()] = _expand_unicode_tokens(
+                    unicode_match.group(2)
+                )
+                continue
+            rule_lines.append(line)
+
+        for line in rule_lines:
+            class_match = _CLASS_RULE_RE.match(line)
+            if class_match:
+                byte_name, unicode_name = (name.strip() for name in class_match.groups())
+                byte_values = byte_classes.get(byte_name)
+                unicode_values = unicode_classes.get(unicode_name)
+                if byte_values is None:
+                    raise ValueError(
+                        f"Limbu class rule references unknown byte class: {byte_name!r}"
+                    )
+                if unicode_values is None:
+                    raise ValueError(
+                        f"Limbu class rule references unknown Unicode class: {unicode_name!r}"
+                    )
+                if len(byte_values) != len(unicode_values):
+                    raise ValueError(
+                        f"Limbu class rule length mismatch for [{byte_name}]>[{unicode_name}]: "
+                        f"{len(byte_values)} bytes vs {len(unicode_values)} codepoints"
+                    )
+                rules.extend(
+                    ((byte_value,), (codepoint,))
+                    for byte_value, codepoint in zip(byte_values, unicode_values)
+                )
+                continue
+            if "<>" not in line and ">" not in line:
                 continue
             left, right = line.split("<>", 1) if "<>" in line else line.split(">", 1)
             source = tuple(int(value, 16) for value in _BYTE_RULE_RE.findall(left))
@@ -75,13 +183,6 @@ class LimbuConverter:
         replacements = 0
         index = 0
         while index < len(text):
-            # The legacy map has an explicit rule for ASCII space. Preserve the
-            # other structural whitespace outside the byte map so multiline
-            # boundaries never become unresolved legacy input.
-            if text[index] in "\t\r\n":
-                output.append(text[index])
-                index += 1
-                continue
             code = ord(text[index])
             matched = False
             for source, target in self._rules:
@@ -94,11 +195,16 @@ class LimbuConverter:
             if matched:
                 continue
             output.append(text[index])
-            if not _is_assigned_script_codepoint(code, "Limbu"):
+            if text[index] not in STRUCTURAL_C0 and not _is_assigned_script_codepoint(
+                code, "Limbu"
+            ):
                 unmapped.append(f"U+{code:04X}")
             index += 1
         converted = _reorder_limbu(("".join(output)))
         converted = unicodedata.normalize("NFC", converted)
+        # SIL's CTL class preserves every C0 value. Keep that exact lenient
+        # mapping/count behavior but diagnose values outside the allowlist.
+        unmapped.extend(diagnostic_c0_codepoints(converted))
         return LimbuConversion(
             legacy_text=text,
             unicode_text=converted,

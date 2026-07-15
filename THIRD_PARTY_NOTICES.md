@@ -21,8 +21,9 @@ licensed under the MIT License:
 - `src/nepal_ttf2utf/maps/kiratraifontnew.map` — copyright 2021 SIL International.
 - `src/nepal_ttf2utf/maps/JGLepcha.map` — SIL's JG Lepcha conversion map, version 1.1.
 
-The files retain their source notices. This notice is informational and is not
-legal advice.
+The files retain their source notices. The complete upstream license is bundled
+as `src/nepal_ttf2utf/maps/LICENSE.wsresources-MIT.txt`. This notice is
+informational and is not legal advice.
 
 ## BDRC py-tiblegenc
 
