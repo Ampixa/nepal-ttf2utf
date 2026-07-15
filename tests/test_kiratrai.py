@@ -125,18 +125,15 @@ def test_herald_premap_preserves_canonical_multibyte_rules():
     assert convert_kiratrai_herald("//", strict=True).unicode_text == chr(0x16D6F)
 
 
-def test_herald_blank_glyph_normalizes_to_space():
-    assert convert_kiratrai_herald("a\\a", strict=True).unicode_text == (
-        chr(0x16D44) + " " + chr(0x16D44)
-    )
+@pytest.mark.parametrize("blank", ["\\", "Z"])
+def test_herald_blank_glyphs_normalize_to_space(blank):
+    result = convert_kiratrai_herald(f"a{blank}a", strict=True)
+    assert result.unicode_text == chr(0x16D44) + " " + chr(0x16D44)
+    assert not result.unmapped_codepoints
 
 
-def test_herald_single_unknown_z_is_surfaced():
-    result = convert_kiratrai_herald("Z")
-    assert result.unicode_text == "Z"
-    assert result.unmapped_codepoints == ["U+005A"]
-    with pytest.raises(ValueError):
-        convert_kiratrai_herald("Z", strict=True)
+def test_canonical_z_remains_kirat_rai_sang():
+    assert convert_kiratrai("Z", strict=True).unicode_text == chr(0x16D6C)
 
 
 def test_convert_dispatches_old_and_new_kiratrai_layouts_separately():
