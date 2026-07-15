@@ -42,6 +42,7 @@ from .olchiki import OLChikiConversion, OLChikiConverter, convert_olchiki
 from .sunuwar import SunuwarConversion, SunuwarConverter, convert_sunuwar
 from .tibetan import TibetanMachineConversion, TibetanMachineConverter, convert_tibetanmachine
 from .tirhuta import TirhutaConversion, TirhutaConverter, convert_tirhuta
+from .unicode_span import UnicodeSpanConversion, validate_unicode_span
 
 __all__ = [
     "convert",
@@ -56,6 +57,7 @@ __all__ = [
     "convert_lepcha",
     "convert_olchiki",
     "convert_tirhuta",
+    "validate_unicode_span",
     "DevanagariConversion",
     "LimbuConversion",
     "LimbuConverter",
@@ -74,6 +76,7 @@ __all__ = [
     "OLChikiConverter",
     "TirhutaConversion",
     "TirhutaConverter",
+    "UnicodeSpanConversion",
     "supported_devanagari_fonts",
 ]
 
@@ -89,6 +92,27 @@ _KIRATRAI_HERALD_FONTS = {"kiratrai-herald", "kiratraifont", "sikkimherald-kirat
 _SUNUWAR_FONTS = {"sunuwar", "jenticha", "koits", "kirat1"}
 # BDRC/UTFC legacy TibetanMachine encoding (not Unicode Tibetan fonts).
 _TIBETAN_MACHINE_FONTS = {"tibetanmachine", "tibetan-machine"}
+# Tibetan font families observed with real Unicode text layers.
+_TIBETAN_UNICODE_FONTS = {
+    "jomolhari",
+    "microsoft himalaya",
+    "microsoft-himalaya",
+    "monlam unicode",
+    "monlam-unicode",
+    "monlamuniouchan5",
+    "qomolangma",
+    "qomolangma-subtitle",
+    "qomolangma-title",
+}
+# Unicode Newa/Prachalit font keys. These normalize and validate; they do not
+# apply a legacy-byte mapping.
+_NEWA_UNICODE_FONTS = {
+    "newa",
+    "newa-unicode",
+    "noto sans newa",
+    "noto-sans-newa",
+    "prachalit-unicode",
+}
 # Sikkim Herald live-text Lepcha body font (TT*O00 named layout).
 _LEPCHA_FONTS = {"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"}
 # Jason Glavy's public legacy Lepcha encoding (different from the Herald layout).
@@ -107,6 +131,8 @@ def supported_fonts() -> dict[str, str]:
     fonts.update({f: "Kirat Rai" for f in sorted(_KIRATRAI_HERALD_FONTS)})
     fonts.update({f: "Sunuwar" for f in sorted(_SUNUWAR_FONTS)})
     fonts.update({f: "Tibetan" for f in sorted(_TIBETAN_MACHINE_FONTS)})
+    fonts.update({f: "Tibetan" for f in sorted(_TIBETAN_UNICODE_FONTS)})
+    fonts.update({f: "Newa" for f in sorted(_NEWA_UNICODE_FONTS)})
     fonts.update({f: "Lepcha" for f in sorted(_LEPCHA_FONTS)})
     fonts.update({f: "Lepcha" for f in sorted(_JG_LEPCHA_FONTS)})
     fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_FONTS)})
@@ -139,6 +165,10 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
         return convert_sunuwar(text, strict=strict).unicode_text
     if key in _TIBETAN_MACHINE_FONTS:
         return convert_tibetanmachine(text, strict=strict).unicode_text
+    if key in _TIBETAN_UNICODE_FONTS:
+        return validate_unicode_span(text, script="Tibetan", strict=strict).unicode_text
+    if key in _NEWA_UNICODE_FONTS:
+        return validate_unicode_span(text, script="Newa", strict=strict).unicode_text
     if key in _LEPCHA_FONTS:
         return convert_lepcha(text, strict=strict).unicode_text
     if key in _JG_LEPCHA_FONTS:
