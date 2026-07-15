@@ -38,7 +38,13 @@ from .kiratrai import (
 )
 from .lepcha import LepchaConversion, LepchaConverter, convert_lepcha
 from .limbu import LimbuConversion, LimbuConverter, convert_limbu
-from .olchiki import OLChikiConversion, OLChikiConverter, convert_olchiki
+from .olchiki import (
+    OLChikiConversion,
+    OLChikiConverter,
+    OLChikiLaticConverter,
+    convert_olchiki,
+    convert_olchiki_latic,
+)
 from .sunuwar import SunuwarConversion, SunuwarConverter, convert_sunuwar
 from .tibetan import TibetanMachineConversion, TibetanMachineConverter, convert_tibetanmachine
 from .tirhuta import TirhutaConversion, TirhutaConverter, convert_tirhuta
@@ -65,6 +71,7 @@ __all__ = [
     "convert_tibetanmachine",
     "convert_lepcha",
     "convert_olchiki",
+    "convert_olchiki_latic",
     "convert_tirhuta",
     "validate_unicode_span",
     "recover_videha_janaki_trace",
@@ -85,6 +92,7 @@ __all__ = [
     "LepchaConverter",
     "OLChikiConversion",
     "OLChikiConverter",
+    "OLChikiLaticConverter",
     "TirhutaConversion",
     "TirhutaConverter",
     "UnicodeSpanConversion",
@@ -135,6 +143,18 @@ _LEPCHA_FONTS = {"lepcha-sikkimherald", "lepcha", "sikkimherald-lepcha"}
 _JG_LEPCHA_FONTS = {"jg-lepcha", "jglepcha", "lepcha-jg"}
 # Santali Ol Chiki 'Optimum' legacy display font (OLCKOptimum-Medium/-ExtraBlack).
 _OLCHIKI_FONTS = {"olck-optimum", "olchiki-optimum", "olchiki", "aale-chhatka"}
+# OLCKLatic shares the semantic letters/digits but has different punctuation.
+_OLCHIKI_LATIC_FONTS = {
+    "olck-latic",
+    "olcklatic",
+    "olcklatic-black",
+    "olcklatic-bold",
+    "olcklatic-extrablack",
+    "olcklatic-medium",
+    "olcklatic-normal",
+    "olcklatic-ultrablack",
+    "olchiki-latic",
+}
 # Janaki stores Tirhuta glyphs under semantically corresponding Devanagari codepoints.
 _TIRHUTA_FONTS = {"janaki", "tirhuta", "mithilakshar"}
 
@@ -152,6 +172,7 @@ def supported_fonts() -> dict[str, str]:
     fonts.update({f: "Lepcha" for f in sorted(_LEPCHA_FONTS)})
     fonts.update({f: "Lepcha" for f in sorted(_JG_LEPCHA_FONTS)})
     fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_FONTS)})
+    fonts.update({f: "Ol Chiki" for f in sorted(_OLCHIKI_LATIC_FONTS)})
     fonts.update({f: "Tirhuta" for f in sorted(_TIRHUTA_FONTS)})
     return fonts
 
@@ -191,6 +212,8 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
         return convert_jg_lepcha(text, strict=strict).unicode_text
     if key in _OLCHIKI_FONTS:
         return convert_olchiki(text, strict=strict).unicode_text
+    if key in _OLCHIKI_LATIC_FONTS:
+        return convert_olchiki_latic(text, strict=strict).unicode_text
     if key in _TIRHUTA_FONTS:
         return convert_tirhuta(text, strict=strict).unicode_text
     return convert_devanagari(text, font=key, strict=strict).unicode_text

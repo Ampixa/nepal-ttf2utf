@@ -11,8 +11,14 @@ from importlib import resources
 
 import pytest
 
-from nepal_ttf2utf import convert, convert_olchiki
-from nepal_ttf2utf.olchiki import OLCHIKI_PASSTHROUGH, OLChikiConverter
+from nepal_ttf2utf import convert, convert_olchiki, convert_olchiki_latic
+from nepal_ttf2utf.olchiki import (
+    OLCHIKI_LATIC_OVERRIDES,
+    OLCHIKI_LATIC_PASSTHROUGH,
+    OLCHIKI_PASSTHROUGH,
+    OLChikiConverter,
+    OLChikiLaticConverter,
+)
 
 
 def _load_raw_map() -> dict:
@@ -172,6 +178,35 @@ def test_olchiki_real_unicode_mixed_in_passes_through():
 def test_convert_dispatches_to_olchiki():
     out = convert("ab", font="olck-optimum")
     assert any(0x1C50 <= ord(c) <= 0x1C7F for c in out)
+
+
+def test_latic_letters_and_digits_share_optimum_semantics_except_v_w_swap():
+    optimum = OLChikiConverter.default()
+    latic = OLChikiLaticConverter.default()
+    for byte in "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz":
+        if byte.lower() in {"v", "w"}:
+            continue
+        assert latic.convert(byte).unicode_text == optimum.convert(byte).unicode_text, byte
+    assert latic.convert("vVwW").unicode_text == "ᱶᱶᱣᱣ"
+
+
+def test_latic_punctuation_uses_exact_unicode_cmap_matches():
+    source = ".-:~|"
+    expected = "".join(chr(OLCHIKI_LATIC_OVERRIDES[ord(byte)]) for byte in source)
+    result = convert_olchiki_latic(source, strict=True)
+    assert result.unicode_text == expected
+    assert result.confirmed_byte_count == 5
+
+
+def test_latic_literal_apostrophe_and_optimum_punctuation_stay_separate():
+    assert convert_olchiki_latic("'", strict=True).unicode_text == "'"
+    assert convert_olchiki(".-:~", strict=True).unicode_text == ".-:~"
+    assert not frozenset(".-:~") & OLCHIKI_LATIC_PASSTHROUGH
+
+
+def test_convert_dispatches_to_latic_layout():
+    for font in ("OLCKLatic-Normal", "OLCKLatic-Bold", "OLCKLatic-UltraBlack"):
+        assert convert("a.", font=font, strict=True) == "ᱟᱹ"
 
 
 def test_olchiki_empty_map_rejected():
