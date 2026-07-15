@@ -30,7 +30,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Sunuwar / Jenticha | `sunuwar`, `jenticha`, `koits`, `kirat1` | All observed script bytes are confirmed. The final `\|` byte is the Sikkim regional form of U+11BC5 UTTHI. |
 | Sunuwar / Jenticha | Noto Sans Sunuwar and `sunuwar-unicode` | Unicode Sunuwar validation, independent of the older `kirat1` layout. |
 | Lepcha / Róng | `jg-lepcha`, `jglepcha`, `lepcha-jg` | Native forward reader for SIL's exact two-pass [`JGLepcha.map`](src/nepal_ttf2utf/maps/JGLepcha.map). Legacy `<`, `=`, and `>` have only upstream U+25CC placeholders, so they remain uncertain and fail strict conversion. |
-| Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Corpus-derived Sikkim Herald layout. Legacy `]`, `%`, and `-` are resolved; only `*`, `(`, `)`, `+`, and `/` remain unmapped. |
+| Lepcha / Róng | `lepcha-sikkimherald`, `lepcha`, `sikkimherald-lepcha` | Hash-pinned, corpus-derived Sikkim Herald layout. Legacy `]`, `%`, and `-` are resolved. The observed unresolved glyph bytes are `*`, `(`, `)`, `+`, and `/`; any other unsupported byte is also diagnosed. Custom maps fail closed on malformed or ambiguous schemas. |
 | Lepcha / Róng | Mingzat, Noto Sans Lepcha and `lepcha-unicode` | Unicode Lepcha assigned-repertoire validation; it does not apply either legacy layout. |
 | Ol Chiki | `olck-optimum`, `olchiki-optimum`, `olchiki`, `aale-chhatka` | Complete observed Optimum letter, mark, digit, and punctuation map. |
 | Ol Chiki | `olck-latic`, `olcklatic`, `olchiki-latic`, and `olcklatic-` followed by `black`, `bold`, `extrablack`, `medium`, `normal`, or `ultrablack` | Separate OLCKLatic mapping, including its swapped `v`/`w` assignments and distinct punctuation. All 2,089 audited characters converted without an unmapped value. |
@@ -89,7 +89,7 @@ older supported Python releases.
   audit and independent page review required for a byte converter.
 
 The deliberately unresolved inputs are the legacy Limbu `#`, JG Lepcha `<`,
-`=`, and `>` placeholders, five rare Sikkim Herald Lepcha bytes, unknown legacy
+`=`, and `>` placeholders, five observed Sikkim Herald Lepcha glyph bytes, unknown legacy
 Ranjana or Magar Akkha fonts, unknown Janaki glyph IDs, the Gurung Khema legacy
 layout, and two TibetanMachine `.notdef` selectors. Existing legacy converters
 preserve unresolved input or emit the documented placeholder in lenient mode,

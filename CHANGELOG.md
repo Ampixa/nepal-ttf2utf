@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Pin the 65-entry Sikkim Herald Lepcha resource and its functional mapping,
+  exhaustively classify every byte, and reject unsafe or ambiguous custom maps
+  without assigning the five observed unresolved glyph values.
 - Pin the complete Unicode 17 validator contract across all eleven scripts,
   exhaustively covering assigned, Common/Inherited, reserved, cross-script,
   control, surrogate, noncharacter, and fallback-normalization behavior.

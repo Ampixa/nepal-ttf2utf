@@ -193,12 +193,29 @@ Three formerly unresolved values now have font-specific structural evidence:
   order.
 - `-` has the font's literal ASCII hyphen outline and passes through as U+002D.
 
-The remaining unresolved values are `*`, `(`, `)`, `+`, and `/`. The `*` glyph
-is a possible contextual form of U+1C24 LEPCHA SUBJOINED LETTER YA, but it does
-not yet have sufficiently independent evidence for a public mapping. JG Lepcha
-and Limbu use different encodings and cannot supply these assignments. The map
-records the exact unresolved set in
+The remaining observed unresolved glyph values are `*`, `(`, `)`, `+`, and
+`/`. The `*` glyph is a possible contextual form of U+1C24 LEPCHA SUBJOINED
+LETTER YA, but it does not yet have sufficiently independent evidence for a
+public mapping. JG Lepcha and Limbu use different encodings and cannot supply
+these assignments. The map records this exact observed unresolved set in
 [`sikkim_herald_lepcha.json`](../src/nepal_ttf2utf/maps/sikkim_herald_lepcha.json).
+
+That 2,571-byte, 79-line resource has SHA-256
+`29f55542cf67d230a6bb2f1474f85e6688b0e30e36271251a2f24af2f6d78bb1`.
+It contains 65 unique source bytes mapped to 65 unique assigned Lepcha
+codepoints; every bundled target is a singleton. The targets comprise 36
+letters, ten nonspacing marks, nine spacing marks, and ten digits. Tests pin
+every mapping's exact isolated output and classify all 256 single-byte inputs,
+including structural whitespace, literal hyphen passthrough, and unsupported
+input. The custom-map reader rejects duplicate or noncanonical keys, unknown
+fields, empty or non-list targets, unsafe source bytes, and targets outside
+the pinned assigned Lepcha repertoire.
+
+The functional-digest payload is an outer JSON array of
+`[source-byte, target-codepoint-array]` pairs sorted by source byte, serialized
+with separators `(",", ":")`, and encoded as ASCII. The resulting 796-byte
+payload has SHA-256
+`ae61a37f712694d6e1b8541c0e9854ab3e1d2b8a5ffb4213f231bca86e029d60`.
 
 ## JG Lepcha placeholders
 

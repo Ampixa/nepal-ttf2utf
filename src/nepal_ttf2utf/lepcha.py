@@ -25,7 +25,9 @@ signs, RAN/NUKTA, and digits. Output is NFC in canonical Lepcha storage order
 The legacy ``]`` glyph is final K stored visually before the following base; it is
 reordered with the pre-base vowels. ``%`` is subjoined RA, including the documented
 NUKTA+RA retroflex sequences. A small set of rare bytes remains deliberately
-unresolved and is surfaced in ``unmapped_bytes`` (or raised in ``strict`` mode).
+unresolved in the observed material and is surfaced in ``unmapped_bytes`` (or
+raised in ``strict`` mode). Other bytes outside the supported inventory receive
+the same diagnostic treatment.
 """
 
 from __future__ import annotations
@@ -33,14 +35,20 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from collections.abc import Iterable, Mapping, Set
 from dataclasses import dataclass
 from importlib import resources
+from itertools import islice
 from pathlib import Path
 
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
 _LEPCHA_CODEPOINT_RE = re.compile(r"[ᰀ-ᱏ]")
+_BYTE_KEY_RE = re.compile(r"[0-9A-F]{2}")
+_TARGET_KEY_RE = re.compile(r"[0-9A-F]{4}")
+_FORBIDDEN_SOURCE_BYTES = frozenset(range(0x21)) | {0x7F}
+_MAX_TARGET_CODEPOINTS = 256
 
 # Pre-base dependent vowel signs (keyed before the base in the legacy visual stream;
 # Unicode stores them after the base). I / O / OO.
@@ -68,44 +76,142 @@ class LepchaConversion:
     unmapped_bytes: list[str]
 
 
+def _validate_source_byte(source: object) -> int:
+    if isinstance(source, bool) or not isinstance(source, int) or not (0 <= source <= 0xFF):
+        raise ValueError(f"invalid Lepcha source byte: {source!r}")
+    if source in _FORBIDDEN_SOURCE_BYTES:
+        raise ValueError(f"Lepcha source byte must not be C0, SPACE, or DEL: 0x{source:02X}")
+    if chr(source) in LEPCHA_PASSTHROUGH:
+        raise ValueError(f"Lepcha source byte is a fixed passthrough: 0x{source:02X}")
+    return source
+
+
+def _validate_target_codepoint(codepoint: object, source: int) -> int:
+    if (
+        isinstance(codepoint, bool)
+        or not isinstance(codepoint, int)
+        or not _is_assigned_script_codepoint(codepoint, "Lepcha")
+    ):
+        raise ValueError(
+            f"invalid or unassigned Lepcha target {codepoint!r} for source 0x{source:02X}"
+        )
+    return codepoint
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key in Lepcha map: {key!r}")
+        result[key] = value
+    return result
+
+
 class LepchaConverter:
     """Byte->Unicode converter for the Sikkim Herald live-text Lepcha body font.
 
-    ``byte_map`` maps a single legacy byte value (the Latin code) to a tuple of Lepcha
-    codepoints. Conversion is a single byte pass (no multi-byte rules in this font)
-    followed by a per-cluster reorder that (a) moves pre-base vowel signs after the base
-    and (b) sorts the dependent signs into canonical Lepcha storage order.
+    ``byte_map`` maps a single legacy byte value (the Latin code) to a nonempty ordered
+    iterable of at most 256 assigned Lepcha codepoints. Conversion is a single byte pass
+    (no multi-byte rules in this font) followed by a per-cluster reorder that (a) moves
+    pre-base vowel signs after the base and (b) sorts the dependent signs into canonical
+    Lepcha storage order.
     """
 
-    def __init__(self, byte_map: dict[int, tuple[int, ...]]) -> None:
-        if not byte_map:
+    def __init__(self, byte_map: Mapping[int, Iterable[int]]) -> None:
+        if not isinstance(byte_map, Mapping) or not byte_map:
             raise ValueError("LepchaConverter requires a non-empty map")
-        self._byte_map = dict(byte_map)
+        normalized: dict[int, tuple[int, ...]] = {}
+        for raw_source, raw_target in byte_map.items():
+            source = _validate_source_byte(raw_source)
+            if isinstance(raw_target, (str, bytes, Mapping, Set)):
+                raise ValueError(f"invalid Lepcha target sequence for source 0x{source:02X}")
+            try:
+                target = tuple(islice(iter(raw_target), _MAX_TARGET_CODEPOINTS + 1))
+            except TypeError as error:
+                raise ValueError(
+                    f"invalid Lepcha target sequence for source 0x{source:02X}"
+                ) from error
+            if not target:
+                raise ValueError(f"empty Lepcha target sequence for source 0x{source:02X}")
+            if len(target) > _MAX_TARGET_CODEPOINTS:
+                raise ValueError(
+                    f"Lepcha target sequence for source 0x{source:02X} exceeds "
+                    f"{_MAX_TARGET_CODEPOINTS} codepoints"
+                )
+            normalized[source] = tuple(
+                _validate_target_codepoint(codepoint, source) for codepoint in target
+            )
+        self._byte_map = normalized
 
     @classmethod
     def from_map_file(cls, path: str | Path) -> "LepchaConverter":
         map_path = Path(path)
         if not map_path.is_file():
             raise FileNotFoundError(f"Lepcha legacy map does not exist: {map_path}")
-        raw = json.loads(map_path.read_text(encoding="utf-8"))
+        try:
+            map_text = map_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(f"invalid UTF-8 in Lepcha legacy map {map_path}") from error
+        try:
+            raw = json.loads(map_text, object_pairs_hook=_unique_json_object)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                f"invalid JSON in Lepcha legacy map {map_path}: {error.msg}"
+            ) from error
+        if not isinstance(raw, dict):
+            raise ValueError(f"Lepcha legacy map root must be an object: {map_path}")
+        unexpected_fields = set(raw) - {"_doc", "_confidence", "_unresolved_bytes", "map"}
+        if unexpected_fields:
+            fields = ", ".join(repr(field) for field in sorted(unexpected_fields))
+            raise ValueError(f"unexpected Lepcha legacy map field(s) {fields}: {map_path}")
+        for metadata_name in ("_doc", "_confidence"):
+            if metadata_name in raw and not isinstance(raw[metadata_name], str):
+                raise ValueError(
+                    f"Lepcha legacy map {metadata_name!r} metadata must be a string: {map_path}"
+                )
         entries = raw.get("map")
         if not isinstance(entries, dict):
             raise ValueError(f"Lepcha legacy map missing 'map' object: {map_path}")
         byte_map: dict[int, tuple[int, ...]] = {}
         for byte_hex, target in entries.items():
-            try:
-                b = int(byte_hex, 16)
-            except ValueError as exc:
-                raise ValueError(f"invalid byte key in Lepcha map: {byte_hex!r}") from exc
-            if not (0 <= b <= 0xFF):
-                raise ValueError(f"byte key out of range in Lepcha map: {byte_hex!r}")
-            cps = tuple(int(u, 16) for u in target)
-            for cp in cps:
-                if not (LEPCHA_LO <= cp <= LEPCHA_HI):
+            if _BYTE_KEY_RE.fullmatch(byte_hex) is None:
+                raise ValueError(
+                    f"invalid Lepcha byte key {byte_hex!r}; expected two uppercase hex digits"
+                )
+            source = _validate_source_byte(int(byte_hex, 16))
+            if not isinstance(target, list) or not target:
+                raise ValueError(f"Lepcha map target for byte {byte_hex} must be a non-empty list")
+            if len(target) > _MAX_TARGET_CODEPOINTS:
+                raise ValueError(
+                    f"Lepcha map target for byte {byte_hex} exceeds "
+                    f"{_MAX_TARGET_CODEPOINTS} codepoints"
+                )
+            target_codepoints: list[int] = []
+            for value in target:
+                if not isinstance(value, str) or _TARGET_KEY_RE.fullmatch(value) is None:
                     raise ValueError(
-                        f"Lepcha map target U+{cp:04X} outside Lepcha block for byte {byte_hex}"
+                        f"invalid Lepcha target {value!r} for byte {byte_hex}; "
+                        "expected four uppercase hex digits"
                     )
-            byte_map[b] = cps
+                target_codepoints.append(_validate_target_codepoint(int(value, 16), source))
+            byte_map[source] = tuple(target_codepoints)
+
+        unresolved_raw = raw.get("_unresolved_bytes", [])
+        if not isinstance(unresolved_raw, list):
+            raise ValueError(f"Lepcha map '_unresolved_bytes' must be a list: {map_path}")
+        unresolved: set[int] = set()
+        for byte_hex in unresolved_raw:
+            if not isinstance(byte_hex, str) or _BYTE_KEY_RE.fullmatch(byte_hex) is None:
+                raise ValueError(
+                    f"invalid unresolved Lepcha byte {byte_hex!r}; "
+                    "expected two uppercase hex digits"
+                )
+            source = _validate_source_byte(int(byte_hex, 16))
+            if source in unresolved:
+                raise ValueError(f"duplicate unresolved Lepcha byte: {byte_hex}")
+            if source in byte_map:
+                raise ValueError(f"mapped Lepcha byte is also marked unresolved: {byte_hex}")
+            unresolved.add(source)
         return cls(byte_map)
 
     @classmethod
@@ -259,8 +365,8 @@ _DEFAULT: LepchaConverter | None = None
 def convert_lepcha(text: str, *, strict: bool = False) -> LepchaConversion:
     """Convert Sikkim Herald live-text Lepcha to Unicode Lepcha (NFC).
 
-    Returns a :class:`LepchaConversion`. Bytes outside the derived map (the small set
-    of deliberately-unresolved rare bytes) and Unicode values outside the pinned
+    Returns a :class:`LepchaConversion`. Bytes outside the derived map, including the
+    documented observed unresolved values, and Unicode values outside the pinned
     assigned Lepcha repertoire pass through and are surfaced in ``unmapped_bytes``.
     With ``strict=True`` any such leftover raises ``ValueError`` instead of passing
     silently.
