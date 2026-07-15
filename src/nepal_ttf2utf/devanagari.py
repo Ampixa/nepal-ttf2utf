@@ -1,4 +1,4 @@
-"""Legacy ASCII Devanagari fonts -> Unicode Devanagari (U+0900-U+097F).
+"""Legacy ASCII Devanagari fonts -> Unicode Devanagari.
 
 Builds on the tested ``npttf2utf`` font maps (Preeti, Kantipur, Sagarmatha, PCS Nepali,
 Fontasy Himali) and adds:
@@ -9,6 +9,7 @@ Fontasy Himali) and adds:
 - whitespace + smart-punctuation normalization,
 - a strict mode that surfaces leftover non-Devanagari bytes instead of silently dropping
   them (the failure mode of most legacy converters),
+- pinned Unicode-17 Devanagari passthrough for mixed legacy/Unicode spans,
 - optional Kiranti glottal-stop normalization to U+097D.
 """
 
@@ -20,6 +21,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from ._controls import DIAGNOSTIC_C0
+from .unicode_span import _is_assigned_script_codepoint
 
 # Strip C0 values outside the package's structural allowlist. TAB, LF, and CR
 # are data boundaries for multiline conversion, not font bytes.
@@ -28,6 +30,8 @@ _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _NAYANEPAL_EXT = {"ƒ": "र", "†": "्"}
 # Cosmetic normalizations: narrow-no-break-space, smart quotes/dashes -> plain forms.
 _PUNCT_NORMALIZE = {" ": " ", "‘": "'", "’": "'", "–": "-", "—": "-"}
+_GROUP_REFERENCE_RE = re.compile(r"\\([1-9][0-9]*)")
+_MappedToken = tuple[str, frozenset[int], frozenset[int]]
 
 # Fonts handled directly by the bundled npttf2utf maps.
 _NPTTF2UTF_FONTS = {
@@ -65,6 +69,99 @@ def supported_devanagari_fonts() -> list[str]:
     return sorted(set(_NPTTF2UTF_FONTS) | set(_PREETI_FAMILY_EXT))
 
 
+def _replacement_tokens(
+    match: re.Match[str], replacement: str, tokens: list[_MappedToken]
+) -> list[_MappedToken]:
+    """Expand a dependency replacement while retaining source ownership."""
+    matched_owners = frozenset(
+        owner
+        for _char, owners, _protected in tokens[match.start() : match.end()]
+        for owner in owners
+    )
+    expanded: list[_MappedToken] = []
+    position = 0
+    for reference in _GROUP_REFERENCE_RE.finditer(replacement):
+        expanded.extend(
+            (char, matched_owners, frozenset())
+            for char in replacement[position : reference.start()]
+        )
+        start, end = match.span(int(reference.group(1)))
+        if start >= 0:
+            expanded.extend(tokens[start:end])
+        position = reference.end()
+    expanded.extend((char, matched_owners, frozenset()) for char in replacement[position:])
+    value = "".join(char for char, _owners, _protected in expanded)
+    if value != match.expand(replacement):
+        raise ValueError(f"unsupported npttf2utf replacement syntax: {replacement!r}")
+    return expanded
+
+
+def _apply_post_rule(
+    tokens: list[_MappedToken], pattern: str, replacement: str
+) -> list[frozenset[int]]:
+    """Apply one regex rule and return source-owner sets erased by the rule."""
+    value = "".join(char for char, _owners, _protected in tokens)
+    matches = list(re.compile(pattern).finditer(value))
+    deletion_events: list[frozenset[int]] = []
+    for match in reversed(matches):
+        expanded = _replacement_tokens(match, replacement, tokens)
+        protected_before = sorted(
+            owner
+            for _char, _owners, protected in tokens[match.start() : match.end()]
+            for owner in protected
+        )
+        protected_after = sorted(
+            owner for _char, _owners, protected in expanded for owner in protected
+        )
+        if protected_before != protected_after:
+            continue
+        if match.start() != match.end() and not expanded:
+            deletion_events.append(
+                frozenset(
+                    owner
+                    for _char, owners, _protected in tokens[match.start() : match.end()]
+                    for owner in owners
+                )
+            )
+        tokens[match.start() : match.end()] = expanded
+    return deletion_events
+
+
+def _map_with_unicode_passthrough(text: str, *, base_font: str) -> tuple[str, set[str]]:
+    """Apply dependency rules while protecting assigned Unicode Devanagari input."""
+    mapper = _font_mapper()
+    rules = mapper.all_rules[base_font]["rules"]
+    if rules["pre-rules"]:
+        raise ValueError("unsupported npttf2utf pre-rules prevent protected mapping")
+
+    output: list[str] = []
+    dropped: set[str] = set()
+    split_pattern = re.compile(r"(\s+|\S+)")
+    for word in re.findall(split_pattern, text):
+        tokens: list[_MappedToken] = []
+        for source_index, source in enumerate(word):
+            owners = frozenset({source_index})
+            if _is_assigned_script_codepoint(ord(source), "Devanagari"):
+                tokens.append((source, owners, owners))
+                continue
+            target = rules["character-map"].get(source, source)
+            if not target:
+                dropped.add(source)
+                continue
+            tokens.extend((char, owners, frozenset()) for char in target)
+
+        deletion_events: list[frozenset[int]] = []
+        for pattern, replacement in rules["post-rules"]:
+            deletion_events.extend(_apply_post_rule(tokens, pattern, replacement))
+        surviving_owners = {owner for _char, owners, _protected in tokens for owner in owners}
+        for event in deletion_events:
+            if event.isdisjoint(surviving_owners):
+                dropped.update(word[source_index] for source_index in event)
+        mapped_word = "".join(char for char, _owners, _protected in tokens)
+        output.append(mapped_word)
+    return "".join(output), dropped
+
+
 def convert_devanagari(
     text: str,
     font: str = "preeti",
@@ -85,7 +182,7 @@ def convert_devanagari(
             f"unsupported Devanagari font {font!r}; supported: {supported_devanagari_fonts()}"
         )
 
-    out = _font_mapper().map_to_unicode(_CTRL.sub("", text), from_font=base_font)
+    out, dropped = _map_with_unicode_passthrough(_CTRL.sub("", text), base_font=base_font)
     for src, dst in ext.items():
         out = out.replace(src, dst)
     for src, dst in _PUNCT_NORMALIZE.items():
@@ -101,10 +198,11 @@ def convert_devanagari(
             {
                 c
                 for c in out
-                if not (0x0900 <= ord(c) <= 0x097F)
+                if not _is_assigned_script_codepoint(ord(c), "Devanagari")
                 and c not in " \t\r\n।॥,.?!:;'\"()[]-/0123456789"
             }
         )
+        | dropped
         | (set(text) & DIAGNOSTIC_C0)
     )
     clean = not leftover

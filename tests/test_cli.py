@@ -90,6 +90,25 @@ def test_cli_strict_mode_rejects_a_pinned_reserved_output_position(capsys):
     assert "U+16D7A" in capsys.readouterr().err
 
 
+def test_cli_strict_devanagari_reports_dependency_deletion(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["--font", "preeti", "--strict", r"\f"])
+    assert error.value.code == 2
+    message = capsys.readouterr().err
+    assert "U+005C" in message
+    assert "U+0066" in message
+
+
+def test_cli_devanagari_uses_the_pinned_assigned_repertoire(capsys):
+    assert main(["--font", "preeti", "--strict", "\U00011b00"]) == 0
+    assert capsys.readouterr().out == "\U00011b00"
+
+    with pytest.raises(SystemExit) as error:
+        main(["--font", "preeti", "--strict", "\U00011b0a"])
+    assert error.value.code == 2
+    assert "U+11B0A" in capsys.readouterr().err
+
+
 def test_cli_requires_font(capsys):
     with pytest.raises(SystemExit) as error:
         main(["g]kfn"])

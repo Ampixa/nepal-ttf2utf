@@ -34,6 +34,23 @@ control, while the package reports all 29 diagnostic values after conversion.
 Unicode format controls outside the C0 range are not reclassified by this
 policy.
 
+Legacy Devanagari conversion also audits data removed by the installed
+`npttf2utf` rule set. Assigned Unicode 17 Devanagari characters are protected
+through character mapping and post-rule evaluation: dependency rules may move
+them through backreferences, but may not replace or delete them. This preserves
+word-level context for mixed input before NFC normalization.
+
+Legacy-only output remains byte-inventory compatible with the dependency.
+Explicit empty character-map entries and deleting-rule matches whose
+participating source values make no surviving contribution appear in
+`DevanagariConversion.leftover` and fail strict conversion. A match remains
+clean when any participating source value contributes to surviving output,
+such as the half-form-plus-AA rule used to produce a full consonant. Tests
+derive all current empty entries and single- or double-source deleting-rule
+cases from the installed maps, cover embedded deletion cases, pin valid
+nonempty transformations and mixed word context, and exercise direct,
+dispatcher, and CLI strict failures.
+
 An exhaustive dispatcher regression covers all 29 values across the eleven
 legacy routes. Detailed-result tests separately pin Preeti cleanup diagnostics
 and Limbu/Kirat Rai/JG Lepcha identity output and TAB/CR/LF map counts.
@@ -310,7 +327,7 @@ database: Python 3.9 predates the Unicode 16 encoding of Gurung Khema, Sunuwar,
 and Kirat Rai, but it can still validate their assigned codepoints without
 treating reserved positions as characters.
 
-For the six output scripts listed below, the same pinned membership determines
+For the seven output scripts listed below, the same pinned membership determines
 whether native-script Unicode can pass through a legacy converter without a
 diagnostic. This check is deliberately narrower than full Unicode-span
 validation: it does not impose a native-script anchor or reclassify mixed text
@@ -320,6 +337,7 @@ counts, movement counts, and block-character counts remain unchanged.
 
 | Output script | Unicode 17 reserved positions | Legacy route variants |
 |---|---|---|
+| Devanagari | U+1CFB–U+1CFF, U+11B0A–U+11B5F | all seven `npttf2utf`-backed font keys |
 | Limbu | U+191F, U+192C–U+192F, U+193C–U+193F, U+1941–U+1943 | Namdhinggo |
 | Kirat Rai | U+16D7A–U+16D7F | canonical and Sikkim Herald |
 | Sunuwar | U+11BE2–U+11BEF, U+11BFA–U+11BFF | Koĩts/Kirat1 |
@@ -327,13 +345,13 @@ counts, movement counts, and block-character counts remain unchanged.
 | Tirhuta | U+114C8–U+114CF, U+114DA–U+114DF | Janaki, including strict Videha recovery |
 | Tibetan | U+0F48, U+0F6D–U+0F70, U+0F98, U+0FBD, U+0FCD, U+0FDB–U+0FFF | TibetanMachine |
 
-These ranges contain 103 distinct reserved positions and produce 115
-route/codepoint combinations across the eight route variants. Exhaustive tests
+These ranges contain 194 distinct reserved positions and produce 752
+route/codepoint combinations across the fifteen route variants. Exhaustive tests
 require each reserved value to remain codepoint-for-codepoint identical in
 lenient output, appear in the established detailed diagnostic field, and fail
 direct and dispatcher strict gates with a visible `U+XXXX` label. A
 representative CLI test requires the same visible diagnostic. Every assigned
-position in the same six repertoires is also exhaustively tested as valid
+position in the same seven repertoires is also exhaustively tested as valid
 passthrough, including assigned Common or Inherited block values.
 
 Eleven canonical compositions introduced with Gurung Khema and Kirat Rai are

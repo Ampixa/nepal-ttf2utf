@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve the pinned assigned Devanagari repertoire when Unicode characters
+  are mixed into legacy spans, reject all 91 reserved extension positions, and
+  make explicit empty mappings and fully consumed deleting-rule inputs visible
+  to strict conversion while retaining dependency-compatible legacy-byte output.
 - Declare the third-party notice and bundled license texts in wheel metadata;
   verify source, wheel, and sdist package bytes, reject draft/AppleDouble/cache
   leakage, validate wheel metadata/`RECORD`, and smoke installed resource-backed

@@ -19,7 +19,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 
 | Output script | Font keys or API | Evidence and current limits |
 |---|---|---|
-| Devanagari | `preeti`, `kantipur`, `sagarmatha`, `pcs-nepali`, `fontasy-himali` | Delegates to the tested `npttf2utf` maps. |
+| Devanagari | `preeti`, `kantipur`, `sagarmatha`, `pcs-nepali`, `fontasy-himali` | Delegates to the tested `npttf2utf` maps. Strict diagnostics include explicit empty mappings and fully consumed deleting-rule inputs, and assigned Unicode Devanagari is preserved in mixed spans. |
 | Devanagari | `nayanepal`, `gorkhapatra` | Preeti-family map plus two observed newspaper extension glyphs. |
 | Devanagari | `madan2`, `annapurnasilnepal`, Noto Sans/Serif Devanagari, `nithyaranjanadu` and aliases | NFC normalization and assigned-repertoire validation for text that is already Unicode. `madan2` is the exact internal name in Language Technology Kendra's Unicode-font archive; Nithya Ranjana DU displays Ranjana glyphs over Devanagari codepoints. |
 | Limbu / Sirijonga | `namdhinggo`, `namdhinggosill`, `sirijonga`, `limbu` | Native reader for SIL's bundled [`Limbu.map`](src/nepal_ttf2utf/maps/Limbu.map), including positional class rules and Unicode-order repair. The source map explicitly leaves legacy `#` undefined. |
@@ -58,9 +58,9 @@ reporting reserved positions, private-use values, and characters assigned to a
 different supported script. `supported_unicode_scripts()` lists all eleven
 accepted validator names.
 
-The Limbu, Kirat Rai, Sunuwar, Lepcha, Tirhuta, and Tibetan legacy converters
-use the same pinned repertoire when native-script Unicode is mixed into a
-legacy span. Assigned characters remain valid passthrough text. The 103
+The Devanagari, Limbu, Kirat Rai, Sunuwar, Lepcha, Tirhuta, and Tibetan legacy
+converters use the same pinned repertoire when native-script Unicode is mixed
+into a legacy span. Assigned characters remain valid passthrough text. The 194
 reserved positions in those output blocks are preserved in lenient output but
 reported and rejected in strict mode. Both legacy Kirat Rai layouts also apply
 the package's pinned Unicode 16 compositions, keeping NFC output stable on
@@ -116,6 +116,10 @@ The other 29 C0 control values are always diagnostics and fail strict legacy
 conversion. Most routes preserve them in lenient output. Legacy Devanagari
 routes retain their established lenient cleanup but now include every removed
 control in `DevanagariConversion.leftover` instead of reporting a clean result.
+They also retain dependency-compatible legacy-byte output while recording
+explicit empty mappings and deleting-rule inputs whose participating source
+values make no surviving contribution in `leftover`; strict mode cannot report
+those lossy cases as clean.
 
 Detailed converters expose counts and unresolved values:
 

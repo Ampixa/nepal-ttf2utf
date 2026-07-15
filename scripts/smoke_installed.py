@@ -9,6 +9,7 @@ from pathlib import Path
 
 import nepal_ttf2utf
 from nepal_ttf2utf import (
+    convert_devanagari,
     convert_jg_lepcha,
     convert_kiratrai,
     convert_lepcha,
@@ -64,6 +65,18 @@ def main() -> int:
     assert convert_olchiki("a", strict=True).unicode_text == "ᱟ"
     assert convert_olchiki_latic(".", strict=True).unicode_text == "ᱹ"
     assert convert_lepcha("A", strict=True).unicode_text == "ᰀ"
+    assert convert_devanagari("g]kfn", strict=True).unicode_text == "नेपाल"
+    assigned_devanagari = "\u0903\U00011b00"
+    assert convert_devanagari(assigned_devanagari, strict=True).unicode_text == (
+        assigned_devanagari
+    )
+    try:
+        convert_devanagari(r"s\fs", strict=True)
+    except ValueError as error:
+        assert "U+005C" in str(error)
+        assert "U+0066" in str(error)
+    else:
+        raise AssertionError("strict Devanagari conversion accepted deleted input")
 
     package_metadata = metadata.metadata("nepal-ttf2utf")
     assert set(package_metadata.get_all("License-File") or ()) == EXPECTED_LICENSE_FILES

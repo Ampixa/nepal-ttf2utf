@@ -1,12 +1,16 @@
 """Pinned Unicode-17 reserved-position tests for legacy converter output."""
 
+from __future__ import annotations
+
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 import pytest
 
 from nepal_ttf2utf import convert
+from nepal_ttf2utf.devanagari import convert_devanagari, supported_devanagari_fonts
 from nepal_ttf2utf.jg_lepcha import convert_jg_lepcha
 from nepal_ttf2utf.kiratrai import convert_kiratrai, convert_kiratrai_herald
 from nepal_ttf2utf.lepcha import convert_lepcha
@@ -32,6 +36,7 @@ def _points(*parts):
 
 
 RESERVED_BY_SCRIPT = {
+    "Devanagari": _points(range(0x1CFB, 0x1D00), range(0x11B0A, 0x11B60)),
     "Limbu": _points(0x191F, range(0x192C, 0x1930), range(0x193C, 0x1940), range(0x1941, 0x1944)),
     "Kirat Rai": _points(range(0x16D7A, 0x16D80)),
     "Sunuwar": _points(range(0x11BE2, 0x11BF0), range(0x11BFA, 0x11C00)),
@@ -55,13 +60,27 @@ class ReservedRoute:
     detailed_converter: Callable[[str], object]
     strict_converter: Callable[..., object]
     diagnostic_field: str
-    count_field: str
+    count_field: str | None
     raw_diagnostics: bool = False
+    replacement_count_field: str | None = "replacement_count"
 
 
 _LIMBU = LimbuConverter.default()
 
 RESERVED_ROUTES = (
+    *(
+        ReservedRoute(
+            "Devanagari",
+            font,
+            partial(convert_devanagari, font=font),
+            partial(convert_devanagari, font=font),
+            "leftover",
+            None,
+            raw_diagnostics=True,
+            replacement_count_field=None,
+        )
+        for font in supported_devanagari_fonts()
+    ),
     ReservedRoute(
         "Limbu",
         "namdhinggo",
@@ -135,8 +154,8 @@ def _expand(ranges):
 
 
 def test_reserved_inventory_matches_the_pinned_unicode17_tables():
-    assert len(set().union(*RESERVED_BY_SCRIPT.values())) == 103
-    assert sum(len(RESERVED_BY_SCRIPT[route.script]) for route in RESERVED_ROUTES) == 115
+    assert len(set().union(*RESERVED_BY_SCRIPT.values())) == 194
+    assert sum(len(RESERVED_BY_SCRIPT[route.script]) for route in RESERVED_ROUTES) == 752
 
     for script, expected in RESERVED_BY_SCRIPT.items():
         assigned = _expand(_ASSIGNED_BLOCK_RANGES[script])
@@ -154,8 +173,10 @@ def test_every_reserved_position_is_preserved_diagnosed_and_strictly_rejected(ro
         result = route.detailed_converter(source)
 
         assert result.unicode_text == source
-        assert result.replacement_count == 0
-        assert getattr(result, route.count_field) == 1
+        if route.replacement_count_field is not None:
+            assert getattr(result, route.replacement_count_field) == 0
+        if route.count_field is not None:
+            assert getattr(result, route.count_field) == 1
         expected_diagnostics = [source] if route.raw_diagnostics else [label]
         assert getattr(result, route.diagnostic_field) == expected_diagnostics
 
@@ -183,3 +204,4 @@ def test_legacy_assignment_checks_do_not_depend_on_runtime_unicode_categories(mo
 
     monkeypatch.setattr("nepal_ttf2utf.unicode_span.unicodedata.category", lambda _char: "Cn")
     assert convert("\U00016d40", font="kiratraifontnew", strict=True) == "\U00016d40"
+    assert convert("\U00011b00", font="preeti", strict=True) == "\U00011b00"
