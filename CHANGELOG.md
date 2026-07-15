@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an opt-in strict residual gate to hash-pinned Videha Janaki trace
+  recovery while retaining lenient residual diagnostics by default.
 - Preserve space, TAB, CR, and LF exactly across every legacy converter and
   through CLI file input/output, including strict mode and mixed line endings.
 - Pin already-Unicode validation to the Unicode 17.0 assigned repertoire for

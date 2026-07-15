@@ -54,6 +54,7 @@ def test_functional_gid_maps_are_complete_and_stable():
 def test_issue_001_recovers_replacement_gids_and_converts_to_tirhuta():
     result = recover_videha_janaki_trace(
         ((ord("क"), 1), (0xFFFD, 245), (0xFFFD, 424), (ord("।"), 2)),
+        strict=True,
         **ISSUE_001,
     )
     assert result.devanagari_text == "कप्रने।"
@@ -67,9 +68,69 @@ def test_issue_001_recovers_replacement_gids_and_converts_to_tirhuta():
 def test_april_extension_is_available_only_to_its_exact_profile():
     with pytest.raises(UnknownJanakiGlyphError, match="612"):
         recover_videha_janaki_trace(((0xFFFD, 612),), **ISSUE_001)
-    result = recover_videha_janaki_trace(((0xFFFD, 612),), **APRIL_2008)
+    result = recover_videha_janaki_trace(((0xFFFD, 612),), strict=True, **APRIL_2008)
     assert result.devanagari_text == "फ्रे"
     assert "�" not in result.unicode_text
+
+
+@pytest.mark.parametrize(
+    ("profile", "gid_map"),
+    [
+        pytest.param(ISSUE_001, JANAKI_GID_TO_DEVANAGARI, id="issue-001"),
+        pytest.param(APRIL_2008, JANAKI_GID_TO_DEVANAGARI_2008_04_15, id="april-2008"),
+    ],
+)
+def test_every_pinned_gid_expansion_passes_strict_tirhuta_conversion(profile, gid_map):
+    gids = tuple(sorted(gid_map))
+    result = recover_videha_janaki_trace(
+        tuple((0xFFFD, gid) for gid in gids), strict=True, **profile
+    )
+    assert result.replacement_count == len(gids)
+    assert result.recovered_gids == gids
+    assert result.unmapped_codepoints == []
+
+
+@pytest.mark.parametrize(
+    ("profile", "gid"),
+    [
+        pytest.param(ISSUE_001, 245, id="issue-001"),
+        pytest.param(APRIL_2008, 612, id="april-2008"),
+    ],
+)
+def test_strict_residual_gate_is_opt_in_for_each_profile(profile, gid):
+    chars = ((0x25CC, 1), (0xFFFD, gid), (ord("A"), 2), (0x25CC, 3))
+    default = recover_videha_janaki_trace(chars, **profile)
+    explicit_lenient = recover_videha_janaki_trace(chars, strict=False, **profile)
+    assert default == explicit_lenient
+    assert default.unmapped_codepoints == ["U+0041", "U+25CC"]
+    with pytest.raises(
+        ValueError,
+        match=r"Tirhuta conversion: U\+0041 U\+25CC$",
+    ):
+        recover_videha_janaki_trace(chars, strict=True, **profile)
+
+
+def test_strict_gate_reports_the_full_known_issue_001_residual_set():
+    chars = tuple((ord(char), index) for index, char in enumerate("◌*^", start=1))
+    result = recover_videha_janaki_trace(chars, **ISSUE_001)
+    assert result.unicode_text == "◌*^"
+    assert result.unmapped_codepoints == ["U+002A", "U+005E", "U+25CC"]
+    with pytest.raises(
+        ValueError,
+        match=r"Tirhuta conversion: U\+002A U\+005E U\+25CC$",
+    ):
+        recover_videha_janaki_trace(chars, strict=True, **ISSUE_001)
+
+
+def test_strict_recovery_accepts_shared_punctuation_and_structural_whitespace():
+    text = "क।॥,!? 123\t\r\n"
+    result = recover_videha_janaki_trace(
+        tuple((ord(char), index) for index, char in enumerate(text)),
+        strict=True,
+        **ISSUE_001,
+    )
+    assert result.unicode_text == "𑒏।॥,!? 123\t\r\n"
+    assert result.unmapped_codepoints == []
 
 
 @pytest.mark.parametrize(
@@ -94,3 +155,13 @@ def test_recovery_rejects_unknown_or_malformed_trace_characters():
         recover_videha_janaki_trace(((0xFFFD,),), **ISSUE_001)
     with pytest.raises(VidehaProfileError, match="invalid codepoint/GID"):
         recover_videha_janaki_trace((("not-a-codepoint", 245),), **ISSUE_001)
+
+
+def test_strict_gate_runs_after_profile_and_trace_validation():
+    bad_profile = {**ISSUE_001, "pdf_sha256": "0" * 64}
+    with pytest.raises(VidehaProfileError, match="PDF SHA-256"):
+        recover_videha_janaki_trace(((ord("A"), 1),), strict=True, **bad_profile)
+    with pytest.raises(UnknownJanakiGlyphError, match="9999"):
+        recover_videha_janaki_trace(((ord("A"), 1), (0xFFFD, 9999)), strict=True, **ISSUE_001)
+    with pytest.raises(VidehaProfileError, match="fewer than two"):
+        recover_videha_janaki_trace(((ord("A"), 1), (0xFFFD,)), strict=True, **ISSUE_001)

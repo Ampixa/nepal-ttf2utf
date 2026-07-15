@@ -177,8 +177,9 @@ recovering a glyph. The profile recovered all 3,306 U+FFFD occurrences across
   and `dNn.half`, resolved by the font's GSUB evidence to `न्` and `ण्`;
 - the existing semantic remap then produced 64,896 Tirhuta-block characters;
 - 30,396 of 30,581 PyMuPDF trace fragments converted without residuals
-  (99.395049%); the remaining fragments contain 183 U+25CC dotted-circle
-  values, one literal `*`, and one literal `^`.
+  (99.395049%); the remainder comprises 183 fragments containing U+25CC, one
+  containing literal `*`, and one containing literal `^`. These are affected
+  fragment counts, not established character-occurrence counts.
 
 The embedded Janaki faces are accepted only at SHA-256
 `b51da8d0c99bf8cc0e7ee85f18681272b0f57eb80f277838f4e2cdcaa5253755`
@@ -206,7 +207,12 @@ supplied profile metadata matches. Callers are responsible for securely
 computing that metadata; the function does not open or hash the PDF. An unknown
 PDF hash, incomplete font hash set, wrong page count, or unknown replacement
 glyph ID raises a profile error. Raw U+FFFD strings without their glyph-ID
-sidecar remain unrecoverable.
+sidecar remain unrecoverable. The API does not authenticate that caller-supplied
+tuples came from the named file or span. By default it preserves downstream
+Tirhuta residuals and returns their sorted unique values in
+`unmapped_codepoints`; `strict=True` raises `ValueError` if any residual remains.
+This gate adds no glyph recovery and does not establish whole-document or
+linguistic completeness.
 
 These are aggregate text-fragment diagnostics, not audited line labels or an
 OCR evaluation. The U+25CC cases still require pixel review or exclusion.

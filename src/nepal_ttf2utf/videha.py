@@ -5,8 +5,10 @@ text trace retains their glyph IDs. This module expands those IDs to the unique
 Devanagari sequences established by Janaki 1.000 shaping evidence, then applies
 the package's ordinary Devanagari-to-Tirhuta conversion.
 
-Every recovery call verifies the complete PDF profile. Unknown PDFs, embedded
-font sets, page counts, and replacement glyph IDs fail closed.
+Every recovery call compares complete caller-supplied profile metadata with
+pinned values. Unsupported profile names, mismatched PDF/font/page metadata,
+and unknown replacement glyph IDs fail closed; the caller remains responsible
+for authenticating the supplied file metadata and trace tuples.
 """
 
 from __future__ import annotations
@@ -341,12 +343,15 @@ def recover_videha_janaki_trace(
     pdf_sha256: str,
     janaki_font_sha256: Iterable[str],
     page_count: int,
+    strict: bool = False,
 ) -> VidehaJanakiRecovery:
     """Recover and convert one PyMuPDF Janaki get_texttrace sequence.
 
     Each trace character must begin with (unicode_codepoint, glyph_id, ...).
     Ordinary Unicode values pass through. U+FFFD is replaced only when its glyph
-    ID is in the selected, fingerprint-verified profile.
+    ID is in the selected profile after caller-supplied metadata matches its
+    pinned values. With ``strict=True``, downstream Tirhuta conversion raises if
+    any residual codepoint remains.
     """
     expected = _validated_profile(
         profile,
@@ -387,7 +392,7 @@ def recover_videha_janaki_trace(
         recovered_gids.append(gid)
 
     devanagari_text = "".join(output)
-    conversion = convert_tirhuta(devanagari_text)
+    conversion = convert_tirhuta(devanagari_text, strict=strict)
     return VidehaJanakiRecovery(
         profile=profile,
         devanagari_text=devanagari_text,

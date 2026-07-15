@@ -128,12 +128,16 @@ print(result.script_char_count)
 print(supported_unicode_scripts())
 ```
 
-`recover_videha_janaki_trace()` is the fail-closed companion API for PyMuPDF
+`recover_videha_janaki_trace()` is the profile-gated companion API for PyMuPDF
 `get_texttrace()` character tuples. Callers must securely compute and supply a
 built-in profile name, the exact PDF SHA-256, the complete embedded Janaki font
 SHA-256 set, and the page count. The API compares that metadata with the pinned
-profile; it does not open or hash the PDF. `janaki_gid_map_sha256()` exposes the
-canonical functional-map digest for reproducibility.
+profile; it does not open or hash the PDF or authenticate the provenance of the
+supplied tuples. Lenient mode preserves downstream Tirhuta residuals and lists
+their unique values in `unmapped_codepoints`. `strict=True` raises `ValueError`
+when any such residual remains. Profile mismatches and unknown replacement
+glyph IDs fail in both modes. `janaki_gid_map_sha256()` exposes the canonical
+functional-map digest for reproducibility.
 
 Available detailed entry points are `convert_devanagari`, `convert_limbu`,
 `convert_kiratrai`, `convert_kiratrai_herald`, `convert_sunuwar`,
