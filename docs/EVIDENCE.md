@@ -623,15 +623,52 @@ claims a standardized Ranjana encoding; Unicode lists Ranjana among
 Anshuman Pandey's individual contribution
 [`L2/11-144`](https://www.unicode.org/wg2/docs/n4036.pdf), submitted for WG2 and
 UTC consideration, recommends unifying Magar Akkha with Brahmi unless evidence
-establishes distinct characters or behavior. No evidenced legacy Akkha font,
-keyboard layout, or running legacy corpus is part of this repository. A
-legacy-byte map would therefore be speculative.
+establishes distinct characters or behavior. It is not a standardized Magar
+Akkha encoding. No evidenced legacy Akkha font, keyboard layout, or running
+legacy corpus is part of this repository. A legacy-byte map would therefore be
+speculative.
 
-`transliterate_magar_akkha()` instead provides an explicit Unicode
-Devanagari-to-Brahmi mapping and its reverse. The 69-entry reversible table
-preserves every supported distinction by default; it includes the 67 entries
-from Ampixa's MIT-licensed
-[`magar-toolkit`](https://github.com/Ampixa/magar-toolkit) plus danda and double
-danda. Optional minimal-inventory folding merges selected retroflex and
-sibilant distinctions and is marked as lossy. The `magar-akkha-brahmi` font key
-only validates text that is already encoded in the Brahmi block.
+`transliterate_magar_akkha()` provides an explicit project
+Devanagari-to-Brahmi mapping and its reverse. The table is derived from the 67
+sources in Ampixa's access-restricted, non-distributed, MIT-licensed
+[`magar-toolkit`](https://github.com/Ampixa/magar-toolkit) repository at revision
+`17251963b1a872c1558bcd3421efac30afce510c`, with danda and double danda added.
+The upstream revision is not publicly inspectable; the complete resulting
+functional contract is distributed in this repository and pinned below. The
+upstream table's eight non-AA dependent-vowel targets were neighboring or
+unrelated Brahmi characters. This project corrects them using the official
+Unicode 17 [Devanagari](https://www.unicode.org/charts/nameslist/n_0900.html)
+and [Brahmi](https://www.unicode.org/charts/nameslist/n_11000.html) character
+identities:
+
+| Devanagari source | Brahmi target |
+|---|---|
+| U+093F VOWEL SIGN I | U+1103A VOWEL SIGN I |
+| U+0940 VOWEL SIGN II | U+1103B VOWEL SIGN II |
+| U+0941 VOWEL SIGN U | U+1103C VOWEL SIGN U |
+| U+0942 VOWEL SIGN UU | U+1103D VOWEL SIGN UU |
+| U+0947 VOWEL SIGN E | U+11042 VOWEL SIGN E |
+| U+0948 VOWEL SIGN AI | U+11043 VOWEL SIGN AI |
+| U+094B VOWEL SIGN O | U+11044 VOWEL SIGN O |
+| U+094C VOWEL SIGN AU | U+11045 VOWEL SIGN AU |
+
+The resulting 69-pair table is one-to-one and reversible. The project-defined
+optional eight-pair minimal-inventory fold is non-normative, forward-only, and
+lossy. The compact sorted-key ASCII JSON payload uses `forward` and `fold`
+arrays of sorted integer `[source, target]` pairs. Its 1,015 bytes have SHA-256
+`7be4d246c8b994cd7dd81f96681b8cbf3f220873e38a4b30895a13eb6aebb021`.
+Tests execute all 69 pairs in both directions, all eight folds, and all 128
+positions of each source block: both directions classify 69 values as mapped
+and 59 as preserved but diagnosed. Public tables and private conversion
+snapshots are immutable, and the fold option accepts only a Boolean.
+Transliteration strict mode diagnoses unsupported characters only inside the
+selected Devanagari or Brahmi source block; unrelated text passes through. The
+font keys or `validate_unicode_span()` provide whole-span Brahmi validation.
+
+Correcting the vowel identities changes forward output and reverse
+interpretation. Some pre-correction outputs overlap corrected targets and are
+therefore ambiguous; no automatic compatibility remapping is applied. Output
+created by an earlier version should be regenerated from known Devanagari
+source text where possible. The `magar-akkha-brahmi` font keys only validate
+text already encoded in the Brahmi block; they do not validate Magar language
+or a legacy font layout.

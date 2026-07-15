@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Correct eight Magar Akkha dependent-vowel targets to the semantically matching
+  Brahmi characters; pin and freeze the 69-pair reversible project contract and
+  its eight explicit lossy folds. Earlier generated dependent-vowel output may
+  be ambiguous and should be regenerated from known source text where possible.
 - Pin and exhaust the 38-source Sunuwar project contract; freeze its public and
   effective tables, require a Boolean compatibility flag, add installed-wheel
   coverage, and state the non-distributed derivation boundary explicitly.
@@ -85,8 +89,8 @@
 - Add NFC normalization and expected-script validation routes for Unicode Newa,
   Tibetan, Devanagari, and Brahmi font spans, including the actual Devanagari
   and Newa encodings used by Nithya Ranjana DU and NU.
-- Add proposal-aligned Magar Akkha Devanagari/Brahmi transliteration, with a
-  lossless supported inventory by default and explicit optional lossy folding.
+- Add explicit project Magar Akkha Devanagari/Brahmi transliteration, with a
+  reversible supported inventory by default and explicit optional lossy folding.
 - Report TibetanMachine U+E010 and U+E013 separately as source-font `.notdef`
   selectors and reject them in strict mode.
 

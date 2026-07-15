@@ -18,6 +18,7 @@ from nepal_ttf2utf import (
     convert_olchiki_latic,
     convert_sunuwar,
     convert_tibetanmachine,
+    transliterate_magar_akkha,
 )
 
 EXPECTED_RESOURCES = {
@@ -73,6 +74,9 @@ def main() -> int:
     assert convert_olchiki_latic(".", strict=True).unicode_text == "ᱹ"
     assert convert_sunuwar("A", strict=True).unicode_text == "𑯖"
     assert nepal_ttf2utf.convert("A", font="kirat1", strict=True) == "𑯖"
+    magar_akkha = transliterate_magar_akkha("कि", strict=True).unicode_text
+    assert magar_akkha == "\U00011013\U0001103a"
+    assert nepal_ttf2utf.convert(magar_akkha, font="akkha-brahmi", strict=True) == magar_akkha
     assert convert_lepcha("A", strict=True).unicode_text == "ᰀ"
     assert convert_devanagari("g]kfn", strict=True).unicode_text == "नेपाल"
     assigned_devanagari = "\u0903\U00011b00"

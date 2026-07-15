@@ -47,11 +47,15 @@ The complete license is bundled beside the map as
 ## Ampixa magar-toolkit
 
 The functional Devanagari/Brahmi mapping in
-`src/nepal_ttf2utf/magar_akkha.py` is adapted from Ampixa's
+`src/nepal_ttf2utf/magar_akkha.py` is adapted from Ampixa's access-restricted
 [`magar-toolkit`](https://github.com/Ampixa/magar-toolkit), revision
-`1384258068422fe7a44ad84ecf5d3c3b4f5ecedd`. The upstream work is distributed
-under the MIT License, copyright 2026 Ampixa / magar-toolkit contributors. The
-complete upstream license is bundled as
+`17251963b1a872c1558bcd3421efac30afce510c`. That upstream repository and
+revision are not publicly inspectable or distributed here; the derived
+functional mapping is distributed in the source file named above. The project
+retains 59 of its 67 pairs unchanged, corrects eight dependent-vowel targets
+against the Unicode 17 character identities, and adds danda and double danda.
+The upstream work is licensed under the MIT License, copyright 2026 Ampixa /
+magar-toolkit contributors. The complete MIT license text is bundled as
 `src/nepal_ttf2utf/maps/LICENSE.magar-toolkit-MIT.txt`.
 
 ## Unicode Character Database

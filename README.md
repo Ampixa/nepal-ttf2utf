@@ -40,7 +40,7 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 | Tibetan | `tibetanmachine`, `tibetan-machine` | BDRC/UTFC's hash-pinned 217-row Apache-2.0 TibetanMachine table. Every source row and raw CP1252 alias is checked. Thirteen effective empty inputs and two source PUA `.notdef` selectors fail strict conversion. |
 | Tibetan | Monlam Unicode, Microsoft Himalaya, Qomolangma, Jomolhari, CTRC-HT and aliases | NFC normalization and assigned Tibetan-repertoire validation for already-Unicode spans. |
 | Newa | `newa`, `newa-unicode`, `noto-sans-newa`, `nithyaranjananu` and aliases | NFC normalization and assigned Newa-repertoire validation. Nithya Ranjana NU displays Ranjana glyphs over Newa codepoints. |
-| Brahmi representation for Magar Akkha | `transliterate_magar_akkha()`; `magar-akkha-brahmi` and `akkha-brahmi` | Devanagari/Brahmi transliteration is lossless over its supported inventory, and already-Brahmi text can be validated. Optional minimal-inventory folding is explicit and lossy. This is not a legacy-font converter. |
+| Brahmi representation for Magar Akkha | `transliterate_magar_akkha()`; `magar-akkha-brahmi` and `akkha-brahmi` | Pinned 69-pair reversible project transliteration to semantically corresponding Brahmi characters. The optional project-defined eight-pair fold is explicit and lossy. The font keys validate already-Brahmi text; this is neither a standardized Magar Akkha encoding nor a legacy-font converter. |
 | Gurung Khema | Noto Sans Gurung Khema and `gurung-khema-unicode` | Validation covers the 58 characters assigned in Unicode 17.0, U+16100–U+16139. No legacy-font mapping or linguistic corpus claim is made. |
 
 The result of `supported_fonts()` is the authoritative list of normalized
@@ -223,7 +223,8 @@ loading.
 The original package source is MIT licensed; see [`LICENSE`](LICENSE). The SIL
 mapping resources are MIT licensed and retain their notices. Devanagari support
 depends on GPL-3.0-licensed `npttf2utf`; the Magar Akkha transliteration map is
-adapted from MIT-licensed `magar-toolkit`. See
+derived from MIT-licensed `magar-toolkit` with dependent-vowel targets corrected
+to their Unicode character identities. See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for distribution details.
 The main license, third-party notice, and bundled third-party license texts are
 also declared as wheel metadata license files.

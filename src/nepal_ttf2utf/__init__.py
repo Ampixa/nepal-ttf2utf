@@ -4,7 +4,7 @@ The package converts evidenced Devanagari, Limbu, Kirat Rai, Sunuwar, Lepcha,
 Ol Chiki, Tirhuta, and Tibetan legacy layouts. It also provides NFC
 normalization and version-stable assigned-repertoire validation for its Unicode
 output scripts and Gurung Khema. Specialized APIs provide hash-pinned Janaki
-PDF glyph-ID recovery and proposal-aligned Magar Akkha Devanagari/Brahmi
+PDF glyph-ID recovery and an explicit project Magar Akkha Devanagari/Brahmi
 transliteration. Unresolved input is surfaced instead of guessed.
 
     from nepal_ttf2utf import convert
