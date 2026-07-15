@@ -49,7 +49,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Text Processing :: Linguistic",
 ]
-dependencies = ["npttf2utf>=0.3,<0.4"]
+dependencies = ["npttf2utf==0.3.7"]
 
 [project.scripts]
 nepal-ttf2utf = "nepal_ttf2utf.cli:main"

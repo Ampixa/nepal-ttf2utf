@@ -23,24 +23,31 @@ DIST_INFO = "nepal_ttf2utf-0.3.0.dist-info"
 SDIST_ROOT = "nepal_ttf2utf-0.3.0"
 
 
-def _metadata(body: str = "") -> bytes:
+def _metadata(
+    body: str = "",
+    requires_dist: tuple[str, ...] = verifier.EXPECTED_REQUIRES_DIST,
+) -> bytes:
     headers = [
         "Metadata-Version: 2.4",
         "Name: nepal-ttf2utf",
         "Version: 0.3.0",
         *(f"License-File: {name}" for name in verifier.LICENSE_FILES),
+        *(f"Requires-Dist: {requirement}" for requirement in requires_dist),
     ]
     return ("\n".join(headers) + f"\n\n{body}").encode()
 
 
-def _wheel_members(metadata_body: str = "") -> dict[str, bytes]:
+def _wheel_members(
+    metadata_body: str = "",
+    requires_dist: tuple[str, ...] = verifier.EXPECTED_REQUIRES_DIST,
+) -> dict[str, bytes]:
     members = {
         f"nepal_ttf2utf/{name}": data
         for name, data in verifier._source_files(verifier.PACKAGE_SOURCE).items()
     }
     members.update(
         {
-            f"{DIST_INFO}/METADATA": _metadata(metadata_body),
+            f"{DIST_INFO}/METADATA": _metadata(metadata_body, requires_dist),
             f"{DIST_INFO}/WHEEL": b"Wheel-Version: 1.0\nTag: py3-none-any\n",
             f"{DIST_INFO}/entry_points.txt": (
                 b"[console_scripts]\nnepal-ttf2utf = nepal_ttf2utf.cli:main\n"
@@ -72,8 +79,9 @@ def _write_wheel(
     duplicate: str | None = None,
     symlink: str | None = None,
     directory: str | None = None,
+    requires_dist: tuple[str, ...] = verifier.EXPECTED_REQUIRES_DIST,
 ) -> None:
-    members = _wheel_members(metadata_body)
+    members = _wheel_members(metadata_body, requires_dist)
     if extra is not None:
         members[extra[0]] = extra[1]
     if missing != f"{DIST_INFO}/RECORD":
@@ -95,9 +103,12 @@ def _write_wheel(
             archive.writestr(directory.rstrip("/") + "/", b"payload")
 
 
-def _sdist_members(metadata_body: str = "") -> dict[str, bytes]:
+def _sdist_members(
+    metadata_body: str = "",
+    requires_dist: tuple[str, ...] = verifier.EXPECTED_REQUIRES_DIST,
+) -> dict[str, bytes]:
     members = {
-        f"{SDIST_ROOT}/PKG-INFO": _metadata(metadata_body),
+        f"{SDIST_ROOT}/PKG-INFO": _metadata(metadata_body, requires_dist),
         **{
             f"{SDIST_ROOT}/{name}": (verifier.REPOSITORY_ROOT / name).read_bytes()
             for name in verifier.REQUIRED_SDIST_FILES
@@ -127,8 +138,9 @@ def _write_sdist(
     missing: str | None = None,
     duplicate: str | None = None,
     special: tuple[str, bytes] | None = None,
+    requires_dist: tuple[str, ...] = verifier.EXPECTED_REQUIRES_DIST,
 ) -> None:
-    members = _sdist_members(metadata_body)
+    members = _sdist_members(metadata_body, requires_dist)
     if extra is not None:
         members[extra[0]] = extra[1]
     if missing is not None:
@@ -282,6 +294,42 @@ def test_license_like_metadata_body_text_is_not_a_header(tmp_path: Path) -> None
 
     verifier.verify_wheel(wheel)
     verifier.verify_sdist(sdist)
+
+
+@pytest.mark.parametrize(
+    "requires_dist",
+    [
+        ("pytest>=7; extra == 'dev'",),
+        ("npttf2utf>=0.3,<0.4", "pytest>=7; extra == 'dev'"),
+        ("npttf2utf==0.3.6", "pytest>=7; extra == 'dev'"),
+        (
+            'npttf2utf==0.3.7; python_version >= "3.9"',
+            "pytest>=7; extra == 'dev'",
+        ),
+        (
+            "npttf2utf==0.3.7",
+            "npttf2utf==0.3.7",
+            "pytest>=7; extra == 'dev'",
+        ),
+        (
+            "npttf2utf==0.3.7",
+            "requests==2.32.4",
+            "pytest>=7; extra == 'dev'",
+        ),
+    ],
+)
+def test_artifacts_reject_nonexact_runtime_dependency_metadata(
+    tmp_path: Path, requires_dist: tuple[str, ...]
+) -> None:
+    wheel = tmp_path / "package.whl"
+    sdist = tmp_path / "package.tar.gz"
+    _write_wheel(wheel, requires_dist=requires_dist)
+    _write_sdist(sdist, requires_dist=requires_dist)
+
+    with pytest.raises(AssertionError, match="Requires-Dist metadata"):
+        verifier.verify_wheel(wheel)
+    with pytest.raises(AssertionError, match="Requires-Dist metadata"):
+        verifier.verify_sdist(sdist)
 
 
 def test_main_ignores_outer_appledouble_companions(tmp_path: Path) -> None:

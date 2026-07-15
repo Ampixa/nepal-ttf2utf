@@ -5,11 +5,14 @@ The original `nepal-ttf2utf` source is licensed under the MIT License in
 
 ## npttf2utf
 
-Devanagari conversion delegates to
-[`npttf2utf`](https://pypi.org/project/npttf2utf/), which is distributed under
-the GNU General Public License v3.0. It is installed as a runtime dependency,
-not copied into this repository. Distributors should assess the GPL's terms for
-their use and distribution of the combined environment.
+Devanagari conversion reads and validates the maps supplied by
+[`npttf2utf`](https://pypi.org/project/npttf2utf/) 0.3.7, which is distributed
+under the GNU General Public License v3.0. Its 34,197-byte `map.json` has
+SHA-256
+`66a0a91f1209eb1c73540e443144f306d6daf27c426c09d24ec307a1506212e5`.
+The dependency is installed at runtime; its mapping data is not copied into
+this repository. Distributors should assess the GPL's terms for their use and
+distribution of the combined environment.
 
 ## SIL writing-system resources
 

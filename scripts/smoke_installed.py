@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from importlib import metadata, resources
 from pathlib import Path
@@ -198,6 +199,30 @@ def main() -> int:
     else:
         raise AssertionError("strict Herald Lepcha conversion accepted unresolved input")
     assert convert_devanagari("g]kfn", strict=True).unicode_text == "नेपाल"
+    dependency = metadata.distribution("npttf2utf")
+    assert dependency.version == "0.3.7"
+    dependency_map = Path(dependency.locate_file("npttf2utf/map.json")).read_bytes()
+    assert len(dependency_map) == 34_197
+    assert hashlib.sha256(dependency_map).hexdigest() == (
+        "66a0a91f1209eb1c73540e443144f306d6daf27c426c09d24ec307a1506212e5"
+    )
+    devanagari_anchors = {
+        "preeti": ("¥", "्र"),
+        "kantipur": ("¨", "ङ्ग"),
+        "sagarmatha": ("¤", "!"),
+        "pcs-nepali": ("<", "्र"),
+        "fontasy-himali": ("~", "ञ"),
+    }
+    for font, (source, expected) in devanagari_anchors.items():
+        assert convert_devanagari(source, font=font, strict=True).unicode_text == expected
+    for font in ("nayanepal", "gorkhapatra"):
+        assert convert_devanagari("l†", font=font, strict=True).unicode_text == "ि्"
+        extension_deletion = convert_devanagari("†f", font=font)
+        assert extension_deletion.unicode_text == ""
+        assert extension_deletion.leftover == ["f", "†"]
+        embedded_extension = convert_devanagari("s†f", font=font)
+        assert embedded_extension.unicode_text == "क"
+        assert embedded_extension.leftover == ["f", "†"]
     assigned_devanagari = "\u0903\U00011b00"
     assert convert_devanagari(assigned_devanagari, strict=True).unicode_text == (
         assigned_devanagari
@@ -212,6 +237,10 @@ def main() -> int:
 
     package_metadata = metadata.metadata("nepal-ttf2utf")
     assert set(package_metadata.get_all("License-File") or ()) == EXPECTED_LICENSE_FILES
+    assert tuple(package_metadata.get_all("Requires-Dist") or ()) == (
+        "npttf2utf==0.3.7",
+        "pytest>=7; extra == 'dev'",
+    )
     completed = subprocess.run(
         ["nepal-ttf2utf", "--font", "jg-lepcha", "k"],
         check=False,

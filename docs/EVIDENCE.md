@@ -55,6 +55,75 @@ An exhaustive dispatcher regression covers all 29 values across the eleven
 legacy routes. Detailed-result tests separately pin Preeti cleanup diagnostics
 and Limbu/Kirat Rai/JG Lepcha identity output and TAB/CR/LF map counts.
 
+## Pinned Devanagari dependency contract
+
+The five base Devanagari routes require `npttf2utf` 0.3.7. Its installed
+34,197-byte `map.json` has SHA-256
+`66a0a91f1209eb1c73540e443144f306d6daf27c426c09d24ec307a1506212e5`.
+The package checks the dependency version, bounded file size, raw hash,
+duplicate-free JSON, exact schema, font inventory, internal versions, scalar
+and rule bounds, structural-whitespace behavior, compiled patterns, numbered
+replacement references, and a separate functional digest before conversion.
+Validated maps and compiled post-rules are copied into transitively immutable
+runtime snapshots. The GPL-3.0 dependency remains installed separately; none
+of its mapping rows are copied into this repository.
+
+| Dependency record | Internal version | Character-map entries | Empty entries | Pre-rules | Ordered post-rules |
+|---|---:|---:|---:|---:|---:|
+| `FONTASY_HIMALI_TT` | `v0.01` | 124 | 1 | 0 | 32 |
+| `Kantipur` | `v0.01` | 144 | 0 | 0 | 32 |
+| `PCS NEPALI` | `v0.1a` | 120 | 0 | 0 | 32 |
+| `Preeti` | `v0.01` | 136 | 0 | 0 | 32 |
+| `Sagarmatha` | `v0.1a` | 144 | 0 | 0 | 32 |
+
+All five records contain the same ordered 32 post-rules. The functional digest
+payload is a font-name-sorted outer JSON array. Each row contains the font
+name, internal version, character-map pairs sorted by source, ordered pre-rule
+pairs, and ordered post-rule pairs. Every string is represented as an array of
+decimal Unicode codepoints. Serialization uses compact separators `(",",
+":")`, `ensure_ascii=True`, and ASCII encoding. The resulting 18,263-byte
+payload has SHA-256
+`d908813c55a66726534a3d617cf4b13d0f94134e1e7d563ad5ab5dce9938313e`.
+
+The NayaNepal and Gorkhapatra routes add two project mappings to the Preeti
+character-map stage: `ƒ` has the same target as Preeti `/`, and `†` has the same
+target as Preeti `\`. Applying those targets before the shared post-rules makes
+extension glyphs participate in reordering and deletion. The actual extension
+source remains attached to its mapped tokens, so a wholly deleted `†f` reports
+U+2020 and U+0066 rather than the canonical Preeti source. Regression tests
+cover every U+0000..U+00FF value immediately before and after each extension,
+along with explicit reorder and deletion contexts.
+
+The dependency post-rules contain fixed expressions with quadratic near-miss
+behavior. Conversion therefore rejects a whitespace-free source segment over
+4,096 codepoints and also rejects a mapped token stream over 4,096 codepoints
+before evaluating the first post-rule. The token bound is checked again after
+every rule, so an expanding rule cannot expose a later expression to a larger
+subject. The boundary is independent of strict mode and resets at whitespace.
+Tests accept a 4,096-codepoint source segment, a 4,096-token character-map
+expansion, and a 4,096-token post-rule expansion; reject the corresponding
+over-limit cases; and cover segmentation after C0 cleanup.
+
+The ordered U+0000..U+00FF aggregate independently pins output and diagnostics
+for all seven routes. The Devanagari count below covers U+0900..U+097F; the
+diagnostic digest payload is the compact ASCII JSON array of ordered leftover
+codepoints. Each output SHA-256 is calculated over the UTF-8 output bytes.
+
+| Route | Output characters | UTF-8 bytes | Devanagari-block characters | Unique leftovers | Output SHA-256 | Leftover payload SHA-256 |
+|---|---:|---:|---:|---:|---|---|
+| `fontasy-himali` | 290 | 747 | 177 | 132 | `14a85e92c514eb8c205b8f5c095659da2c76a5c31c15bf549d59e39e0f4173d4` | `8a9e5c0b7103ca72aa87b56a3e286fe2d85bf523476466ccae4951d699058645` |
+| `gorkhapatra` | 299 | 767 | 184 | 130 | `f533df25050685b6a7417575da8aa913b90bf17222a7df4fe335d1b4a86304ed` | `57a24105c0f223df7dc9fe483222a806472f6b0cec0fef8591c90b32b11495b5` |
+| `kantipur` | 301 | 784 | 192 | 126 | `ce497ef1c98d47cf382771bab104c50f895a0662cb1d94d381f772fc12e8ed52` | `c21ed7c177ead28cc354588d9e5308e68956ad7a94dda6f815642d1ae4a9ffd6` |
+| `nayanepal` | 299 | 767 | 184 | 130 | `f533df25050685b6a7417575da8aa913b90bf17222a7df4fe335d1b4a86304ed` | `57a24105c0f223df7dc9fe483222a806472f6b0cec0fef8591c90b32b11495b5` |
+| `pcs-nepali` | 291 | 749 | 176 | 134 | `b531e673e085b9d19eadf3133821d7d79f5533f7c3d856b3c656ccb4fb535659` | `2f239007993a3057ca417ae2666a52c79555a123483c629a0f4c4cbc65dd4791` |
+| `preeti` | 299 | 767 | 184 | 130 | `f533df25050685b6a7417575da8aa913b90bf17222a7df4fe335d1b4a86304ed` | `57a24105c0f223df7dc9fe483222a806472f6b0cec0fef8591c90b32b11495b5` |
+| `sagarmatha` | 299 | 776 | 190 | 126 | `0358195c277f097e76f39022378cd1561607846bf3074a17191f1cd5a9d58569` | `864820e82809251f000d79c2e34a58ffdb8fa1bc9ecad5d1ece8813cf56e649c` |
+
+The extension sources U+0192 and U+2020 lie outside that byte-domain aggregate,
+so their contextual tests are a separate contract. Compatibility with the
+dependency's legacy-byte output applies to the five base routes; the two
+extension routes intentionally add the project mappings described above.
+
 The bundled `Limbu.map` has SHA-256
 `2e9f6b8205a7facc0732f54c3dd4cc64f8344c7767acdbc12dd3c11cfb535f58`
 and matches

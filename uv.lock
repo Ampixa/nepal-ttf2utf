@@ -75,7 +75,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "npttf2utf", specifier = ">=0.3,<0.4" },
+    { name = "npttf2utf", specifier = "==0.3.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7" },
 ]
 provides-extras = ["dev"]

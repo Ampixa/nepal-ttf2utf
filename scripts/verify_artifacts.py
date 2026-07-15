@@ -101,6 +101,7 @@ EXPECTED_SDIST_DIRECTORY_FILES = {
 }
 FORBIDDEN_COMPONENTS = {".pytest_cache", ".ruff_cache", "__pycache__"}
 FORBIDDEN_FILENAMES = {".DS_Store", "BLOG_DRAFT.md"}
+EXPECTED_REQUIRES_DIST = ("npttf2utf==0.3.7", "pytest>=7; extra == 'dev'")
 
 
 def _sha256(data: bytes) -> str:
@@ -159,6 +160,11 @@ def _prefixed_files(members: dict[str, bytes], prefix: str) -> dict[str, bytes]:
 def _declared_license_files(metadata: str) -> set[str]:
     message = Parser().parsestr(metadata, headersonly=True)
     return set(message.get_all("License-File", ()))
+
+
+def _declared_runtime_requirements(metadata: str) -> tuple[str, ...]:
+    message = Parser().parsestr(metadata, headersonly=True)
+    return tuple(message.get_all("Requires-Dist", ()))
 
 
 def _verify_package_files(actual: dict[str, bytes], context: str) -> None:
@@ -224,6 +230,11 @@ def verify_wheel(path: Path) -> None:
     metadata = members[metadata_name].decode("utf-8")
     declared_licenses = _declared_license_files(metadata)
     _require_equal(declared_licenses, set(LICENSE_FILES), "wheel License-File metadata")
+    _require_equal(
+        _declared_runtime_requirements(metadata),
+        EXPECTED_REQUIRES_DIST,
+        "wheel Requires-Dist metadata",
+    )
     for relative in LICENSE_FILES:
         member = f"{dist_info}/licenses/{relative}"
         _require_equal(members[member], (REPOSITORY_ROOT / relative).read_bytes(), member)
@@ -281,6 +292,11 @@ def verify_sdist(path: Path) -> None:
         _declared_license_files(package_info),
         set(LICENSE_FILES),
         "sdist License-File metadata",
+    )
+    _require_equal(
+        _declared_runtime_requirements(package_info),
+        EXPECTED_REQUIRES_DIST,
+        "sdist Requires-Dist metadata",
     )
     package_files = _prefixed_files(members, f"{root}/src/nepal_ttf2utf/")
     _verify_package_files(package_files, "sdist")

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pin the five legacy Devanagari maps to the exact `npttf2utf` 0.3.7 raw and
+  functional contracts, load them into immutable snapshots, and bound source
+  and mapped post-rule segments to 4,096 codepoints. NayaNepal and Gorkhapatra
+  extension glyphs now enter Preeti processing before reordering and deletion,
+  correcting extension behavior while retaining the actual source in diagnostics.
 - Bound and freeze the canonical SIL Kirat Rai forward-map parser and runtime
   contract, make its longest-source-first precedence explicit, exhaustively
   classify all 256 byte values, and pin the ordered byte-domain aggregate.

@@ -19,8 +19,8 @@ convert('!"#$', font="tibetanmachine")       # ཀཁགང
 
 | Output script | Font keys or API | Evidence and current limits |
 |---|---|---|
-| Devanagari | `preeti`, `kantipur`, `sagarmatha`, `pcs-nepali`, `fontasy-himali` | Delegates to the tested `npttf2utf` maps. Strict diagnostics include explicit empty mappings and fully consumed deleting-rule inputs, and assigned Unicode Devanagari is preserved in mixed spans. |
-| Devanagari | `nayanepal`, `gorkhapatra` | Preeti-family map plus two observed newspaper extension glyphs. |
+| Devanagari | `preeti`, `kantipur`, `sagarmatha`, `pcs-nepali`, `fontasy-himali` | Exact `npttf2utf` 0.3.7 map bytes and functional content are validated before immutable runtime snapshots are built. Strict diagnostics include explicit empty mappings and fully consumed deleting-rule inputs, and assigned Unicode Devanagari is preserved in mixed spans. |
+| Devanagari | `nayanepal`, `gorkhapatra` | Preeti-family map plus the project `ƒ`→र and `†`→् extension mappings. Extensions enter the character-map stage before Preeti's shared post-rules. |
 | Devanagari | `madan2`, `annapurnasilnepal`, Noto Sans/Serif Devanagari, `nithyaranjanadu` and aliases | NFC normalization and assigned-repertoire validation for text that is already Unicode. `madan2` is the exact internal name in Language Technology Kendra's Unicode-font archive; Nithya Ranjana DU displays Ranjana glyphs over Devanagari codepoints. |
 | Limbu / Sirijonga | `namdhinggo`, `namdhinggosill`, `sirijonga`, `limbu` | Native reader for SIL's hash-pinned [`Limbu.map`](src/nepal_ttf2utf/maps/Limbu.map), including positional class rules. Its two Unicode-order repairs apply only to complete windows emitted by the legacy byte pass; native and mixed-provenance windows are not custom reordered. The supported forward `Byte_Unicode` subset fails closed on malformed or ambiguous rules. The source map explicitly leaves legacy `#` and `X` undefined. |
 | Limbu / Sirijonga | `namdhinggo-regular`, `namdhinggo-unicode`, Noto Sans Limbu and aliases | Unicode Limbu validation for modern Namdhinggo 3.100 and Noto fonts. Bare `namdhinggo` remains the legacy route for compatibility. |
@@ -126,10 +126,19 @@ The other 29 C0 control values are always diagnostics and fail strict legacy
 conversion. Most routes preserve them in lenient output. Legacy Devanagari
 routes retain their established lenient cleanup but now include every removed
 control in `DevanagariConversion.leftover` instead of reporting a clean result.
-They also retain dependency-compatible legacy-byte output while recording
-explicit empty mappings and deleting-rule inputs whose participating source
-values make no surviving contribution in `leftover`; strict mode cannot report
-those lossy cases as clean.
+The five base routes retain dependency-compatible legacy-byte output while
+recording explicit empty mappings and deleting-rule inputs whose participating
+source values make no surviving contribution in `leftover`; strict mode cannot
+report those lossy cases as clean. NayaNepal and Gorkhapatra apply their two
+project extension mappings before the same Preeti post-rules, so extension
+glyphs participate in reordering and deletion exactly like their canonical
+Preeti counterparts.
+
+Devanagari post-rules run only when both the whitespace-free source segment
+after C0 cleanup and its mapped token stream contain at most 4,096 codepoints.
+Longer segments raise `ValueError` in lenient and strict modes. The bound resets
+at whitespace and prevents adversarial near-miss inputs from driving unbounded
+dependency-regex work.
 
 Detailed converters expose counts and unresolved values:
 
@@ -233,7 +242,7 @@ loading.
 
 The original package source is MIT licensed; see [`LICENSE`](LICENSE). The SIL
 mapping resources are MIT licensed and retain their notices. Devanagari support
-depends on GPL-3.0-licensed `npttf2utf`; the Magar Akkha transliteration map is
+depends on GPL-3.0-licensed `npttf2utf` 0.3.7; the Magar Akkha transliteration map is
 derived from MIT-licensed `magar-toolkit` with dependent-vowel targets corrected
 to their Unicode character identities. See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for distribution details.
