@@ -16,6 +16,7 @@ from nepal_ttf2utf import (
     VIDEHA_2008_04_15,
     VIDEHA_ISSUE_001,
     LimbuConverter,
+    TibetanMachineConverter,
     TirhutaConverter,
     convert_devanagari,
     convert_jg_lepcha,
@@ -359,6 +360,9 @@ def main() -> int:
     )
     assert convert_tibetanmachine("!", strict=True).unicode_text == "ཀ"
     assert nepal_ttf2utf.convert("!", font="tibetan-machine", strict=True) == "ཀ"
+    decoded_cp1252 = TibetanMachineConverter({0x20AC: "ཀ"})
+    assert dict(decoded_cp1252._table) == {0x80: "ཀ", 0x20AC: "ཀ"}
+    assert decoded_cp1252.convert("\x80€").unicode_text == "ཀཀ"
     try:
         convert_tibetanmachine("Ž", strict=True)
     except ValueError as error:

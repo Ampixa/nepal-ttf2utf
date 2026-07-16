@@ -818,9 +818,10 @@ distributed under Apache-2.0. Its 2,270 bytes and 221 physical lines are pinned
 to SHA-256
 `eabcdd119ee7fa81ca221e3879745d3886ec4293b1bca72801a18498972cbc24`.
 The raw inventory has 217 unique sources and target-length counts of 12 empty,
-105 singleton, 82 two-codepoint, and 18 three-codepoint values. The parser adds
-27 non-conflicting raw-byte aliases for decoded CP1252 sources, producing a
-244-entry post-alias lookup snapshot with 166 unique target strings. Compact
+105 singleton, 82 two-codepoint, and 18 three-codepoint values. Contract
+normalization adds 27 non-conflicting raw-byte aliases for decoded CP1252
+sources, producing a 244-entry post-alias lookup snapshot with 166 unique target
+strings. Compact
 sorted ASCII JSON of `[source, [target codepoints]]` pairs from that snapshot is
 3,832 bytes with SHA-256
 `0601c7fafb91066fdbc5b5c7ac0d320494236b78fb176b04b74a4c93723208e8`.
@@ -832,9 +833,13 @@ Custom construction and CSV parsing are limited to a project-permitted
 250-value source domain: raw values U+0021 through U+00FF plus the 27 defined
 CP1252 decodings of bytes 0x80 through 0x9F. Tables are nonempty, bounded,
 copied into an immutable runtime snapshot, and restricted to targets of at most
-three assigned Tibetan codepoints. Malformed entries, duplicate sources,
-conflicting decoded/raw CP1252 pairs, a nonempty U+00A0 target, oversized files,
-and excessive row counts fail closed. The six permitted sources absent from the
+three assigned Tibetan codepoints. Both construction paths complete a decoded
+CP1252 source with its raw-byte equivalent; a raw-byte-only entry does not imply
+a decoded-character assignment. CSV input is read as at most 1,000,001 bytes,
+rejected above the 1,000,000-byte limit, and decoded as UTF-8 only after that
+bounded read. Malformed entries, duplicate sources, conflicting decoded/raw
+CP1252 pairs, invalid UTF-8, a nonempty U+00A0 target, oversized files, and
+excessive row counts fail closed. The six permitted sources absent from the
 default post-alias snapshot are U+0081, U+008D, U+008F, U+0090, U+009D, and
 U+00FF; the distributed default has no mapping evidence for them.
 

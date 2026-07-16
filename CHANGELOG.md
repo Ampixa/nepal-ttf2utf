@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Unify TibetanMachine custom construction and CSV loading so every decoded
+  CP1252 source gains the same non-conflicting raw-byte alias. Replace the
+  check-before-read size gate with a bounded binary read and contextual UTF-8
+  validation. The vendored 217 rows, 244-entry default snapshot, outputs, and
+  diagnostics are unchanged.
 - Freeze the Unicode repertoire and the dispatcher's 22 route groups; reject
   non-normalized or overlapping aliases and pin all 146 supported keys, the 100
   Unicode-validation aliases, and the eleven supported script names without

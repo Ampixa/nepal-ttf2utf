@@ -11,6 +11,7 @@ this legacy-byte table.
 from __future__ import annotations
 
 import csv
+import io
 import unicodedata
 from collections.abc import Mapping, Set
 from dataclasses import dataclass
@@ -101,17 +102,21 @@ def _normalize_table(table: object) -> dict[int, str]:
         normalized[source] = _validate_target(pair[1], source)
     if not normalized:
         raise ValueError("TibetanMachineConverter requires a non-empty map")
+    # Extractors may expose WinAnsi values as decoded CP1252 characters or raw
+    # byte scalars. A decoded source therefore owns the equivalent raw alias in
+    # every construction path; an explicitly conflicting pair fails closed.
     for decoded_source in _DECODED_CP1252_SOURCES:
         raw_source = chr(decoded_source).encode("cp1252")[0]
-        if (
-            decoded_source in normalized
-            and raw_source in normalized
-            and normalized[decoded_source] != normalized[raw_source]
-        ):
-            raise ValueError(
-                "conflicting TibetanMachine decoded/raw CP1252 targets for "
-                f"U+{decoded_source:04X} and U+{raw_source:04X}"
-            )
+        if decoded_source not in normalized:
+            continue
+        if raw_source in normalized:
+            if normalized[decoded_source] != normalized[raw_source]:
+                raise ValueError(
+                    "conflicting TibetanMachine decoded/raw CP1252 targets for "
+                    f"U+{decoded_source:04X} and U+{raw_source:04X}"
+                )
+            continue
+        normalized[raw_source] = normalized[decoded_source]
     return normalized
 
 
@@ -137,11 +142,17 @@ class TibetanMachineConverter:
         map_path = Path(path)
         if not map_path.is_file():
             raise FileNotFoundError(f"TibetanMachine map does not exist: {map_path}")
-        if map_path.stat().st_size > _MAX_MAP_FILE_BYTES:
+        with map_path.open("rb") as map_file:
+            map_bytes = map_file.read(_MAX_MAP_FILE_BYTES + 1)
+        if len(map_bytes) > _MAX_MAP_FILE_BYTES:
             raise ValueError(f"TibetanMachine map exceeds {_MAX_MAP_FILE_BYTES} bytes: {map_path}")
+        try:
+            map_text = map_bytes.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(f"invalid UTF-8 in TibetanMachine map {map_path}") from error
 
         table: dict[int, str] = {}
-        with map_path.open(encoding="utf-8", newline="") as stream:
+        with io.StringIO(map_text, newline="") as stream:
             rows = (line for line in stream if not line.startswith("#"))
             try:
                 reader = csv.DictReader(rows, strict=True)
@@ -178,33 +189,6 @@ class TibetanMachineConverter:
                     table[source] = target
             except csv.Error as error:
                 raise ValueError(f"invalid TibetanMachine CSV: {error}") from error
-
-        table = _normalize_table(table)
-
-        # PDF/text extractors may expose WinAnsi values either as their decoded
-        # CP1252 character (for example U+20AC) or as the raw byte value. BDRC's
-        # converter supports both representations; add the non-conflicting raw
-        # aliases for CP1252's 0x80..0x9F region here too.
-        aliases: dict[int, str] = {}
-        for source, target in table.items():
-            if source <= 0xFF:
-                continue
-            try:
-                encoded = chr(source).encode("cp1252")
-            except UnicodeEncodeError:
-                continue
-            if len(encoded) != 1:
-                continue
-            raw_source = encoded[0]
-            if raw_source in table:
-                if table[raw_source] != target:
-                    raise ValueError(
-                        "conflicting TibetanMachine decoded/raw CP1252 targets for "
-                        f"U+{source:04X} and U+{raw_source:04X}"
-                    )
-                continue
-            aliases[raw_source] = target
-        table.update(aliases)
         return cls(table)
 
     @classmethod

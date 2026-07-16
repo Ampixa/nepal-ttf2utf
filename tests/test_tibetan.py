@@ -2,6 +2,7 @@
 
 import csv
 import hashlib
+import io
 import json
 import unicodedata
 from collections import Counter
@@ -338,6 +339,51 @@ def test_tibetanmachine_parser_rejects_oversized_files_and_row_inventories(tmp_p
         TibetanMachineConverter.from_map_file(too_many_rows)
 
 
+def test_tibetanmachine_parser_accepts_the_exact_file_size_limit(tmp_path):
+    base = "source_codepoint,target\n33,ཀ\n".encode()
+    payload = base + b"#" + b"x" * (_MAX_MAP_FILE_BYTES - len(base) - 1)
+    assert len(payload) == _MAX_MAP_FILE_BYTES
+    exact = tmp_path / "exact-limit.csv"
+    exact.write_bytes(payload)
+
+    converter = TibetanMachineConverter.from_map_file(exact)
+    assert dict(converter._table) == {0x21: "ཀ"}
+
+
+def test_tibetanmachine_parser_bounds_the_open_stream_instead_of_trusting_stat(
+    tmp_path, monkeypatch
+):
+    map_path = tmp_path / "growing.csv"
+    map_path.write_text("source_codepoint,target\n33,ཀ\n", encoding="utf-8")
+    oversized = b"x" * (_MAX_MAP_FILE_BYTES + 1)
+    path_type = type(map_path)
+    original_open = path_type.open
+    observed_sizes = []
+
+    class ObservedStream(io.BytesIO):
+        def read(self, size=-1):
+            observed_sizes.append(size)
+            return super().read(size)
+
+    def growing_open(self, mode="r", *args, **kwargs):
+        if self == map_path and mode == "rb":
+            return ObservedStream(oversized)
+        return original_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(path_type, "open", growing_open)
+    with pytest.raises(ValueError, match="map exceeds 1000000 bytes"):
+        TibetanMachineConverter.from_map_file(map_path)
+    assert observed_sizes == [_MAX_MAP_FILE_BYTES + 1]
+
+
+def test_tibetanmachine_parser_normalizes_invalid_utf8(tmp_path):
+    invalid = tmp_path / "invalid-utf8.csv"
+    invalid.write_bytes(b"source_codepoint,target\n33,\xff\n")
+
+    with pytest.raises(ValueError, match="invalid UTF-8 in TibetanMachine map"):
+        TibetanMachineConverter.from_map_file(invalid)
+
+
 def test_tibetanmachine_parser_requires_consistent_explicit_cp1252_aliases(tmp_path):
     conflicting = tmp_path / "conflicting.csv"
     conflicting.write_text(
@@ -362,6 +408,32 @@ def test_tibetanmachine_parser_adds_a_missing_raw_cp1252_alias(tmp_path):
     map_path.write_text("source_codepoint,target\n8364,ཀ\n", encoding="utf-8")
     converter = TibetanMachineConverter.from_map_file(map_path)
     assert dict(converter._table) == {128: "ཀ", 8364: "ཀ"}
+
+
+def test_constructor_and_parser_complete_every_decoded_cp1252_raw_alias_identically(tmp_path):
+    decoded_table = {source: "ཀ" for source in _DECODED_CP1252_SOURCES}
+    map_path = tmp_path / "decoded-cp1252.csv"
+    rows = ["source_codepoint,target", *(f"{source},ཀ" for source in sorted(decoded_table))]
+    map_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    direct = TibetanMachineConverter(decoded_table)
+    parsed = TibetanMachineConverter.from_map_file(map_path)
+    assert dict(direct._table) == dict(parsed._table)
+    assert len(direct._table) == 54
+
+    for decoded_source in sorted(_DECODED_CP1252_SOURCES):
+        raw_source = chr(decoded_source).encode("cp1252")[0]
+        assert direct._table[decoded_source] == direct._table[raw_source] == "ཀ"
+        assert direct.convert(chr(decoded_source)) == parsed.convert(chr(decoded_source))
+        assert direct.convert(chr(raw_source)) == parsed.convert(chr(raw_source))
+
+
+def test_constructor_does_not_invent_a_decoded_alias_from_a_raw_only_source():
+    converter = TibetanMachineConverter({0x80: "ཀ"})
+
+    assert dict(converter._table) == {0x80: "ཀ"}
+    assert converter.convert("\x80").unicode_text == "ཀ"
+    assert converter.convert("€").unmapped_codepoints == ["U+20AC"]
 
 
 @pytest.mark.parametrize(
