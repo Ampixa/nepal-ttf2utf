@@ -54,6 +54,11 @@ class _IntSubclass(int):
     pass
 
 
+class _ExplosiveTruthiness:
+    def __bool__(self):
+        raise AssertionError("Videha Boolean validation invoked user truthiness")
+
+
 class _StringSubclass(str):
     pass
 
@@ -458,10 +463,34 @@ def test_page_count_requires_an_exact_integer(page_count):
         recover_videha_janaki_trace((), **values)
 
 
-@pytest.mark.parametrize("strict", [None, 0, 1, "false", []])
+@pytest.mark.parametrize(
+    "strict",
+    [
+        None,
+        0,
+        1,
+        -1,
+        0.0,
+        1.0,
+        "",
+        "false",
+        (),
+        [],
+        {},
+        object(),
+        _IntSubclass(1),
+        _ExplosiveTruthiness(),
+    ],
+)
 def test_strict_flag_requires_a_boolean(strict):
     with pytest.raises(VidehaProfileError, match="strict flag"):
         recover_videha_janaki_trace((), strict=strict, **ISSUE_001)
+
+
+def test_videha_preserves_profile_first_order_for_an_invalid_strict_flag():
+    bad_profile = {**ISSUE_001, "pdf_sha256": "0" * 64}
+    with pytest.raises(VidehaProfileError, match="PDF SHA-256"):
+        recover_videha_janaki_trace((), strict=[], **bad_profile)
 
 
 @pytest.mark.parametrize(

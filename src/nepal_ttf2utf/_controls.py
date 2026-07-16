@@ -8,6 +8,12 @@ STRUCTURAL_C0 = frozenset("\t\r\n")
 DIAGNOSTIC_C0 = frozenset(chr(codepoint) for codepoint in range(0x20)) - STRUCTURAL_C0
 
 
+def require_boolean(value: object, name: str) -> None:
+    """Reject truthy and falsy substitutes for a public Boolean option."""
+    if type(value) is not bool:
+        raise ValueError(f"{name} must be a bool")
+
+
 def diagnostic_c0_codepoints(text: str) -> set[str]:
     """Return C0 values outside the structural allowlist as code-point labels."""
     return {f"U+{ord(char):04X}" for char in text if char in DIAGNOSTIC_C0}

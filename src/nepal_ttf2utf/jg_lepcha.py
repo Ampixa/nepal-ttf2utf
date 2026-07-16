@@ -20,7 +20,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import diagnostic_c0_codepoints
+from ._controls import diagnostic_c0_codepoints, require_boolean
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
@@ -912,6 +912,7 @@ _DEFAULT: JGLepchaConverter | None = None
 
 def convert_jg_lepcha(text: str, *, strict: bool = False) -> JGLepchaConversion:
     """Convert JG-Lepcha-encoded text to Unicode Lepcha (NFC)."""
+    require_boolean(strict, "strict")
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = JGLepchaConverter.default()

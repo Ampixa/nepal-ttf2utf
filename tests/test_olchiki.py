@@ -843,6 +843,27 @@ def test_public_olchiki_functions_require_boolean_apply_uncertain(public_convert
         public_convert("a", apply_uncertain=apply_uncertain)
 
 
+@pytest.mark.parametrize("converter_class", [OLChikiConverter, OLChikiLaticConverter])
+def test_olchiki_factories_validate_apply_uncertain_before_file_or_resource_access(
+    converter_class, monkeypatch, tmp_path
+):
+    missing = tmp_path / "missing.json"
+    with pytest.raises(ValueError, match=r"^Ol Chiki apply_uncertain must be a bool$"):
+        converter_class.from_map_file(missing, apply_uncertain=[])
+
+    def unexpected_resource_access(*args, **kwargs):
+        raise AssertionError("resource access ran before Boolean validation")
+
+    monkeypatch.setattr(olchiki_module.resources, "files", unexpected_resource_access)
+    with pytest.raises(ValueError, match=r"^Ol Chiki apply_uncertain must be a bool$"):
+        converter_class.default(apply_uncertain=[])
+
+
+def test_latic_constructor_validates_apply_uncertain_before_map_normalization():
+    with pytest.raises(ValueError, match=r"^Ol Chiki apply_uncertain must be a bool$"):
+        OLChikiLaticConverter([], apply_uncertain=[])
+
+
 @pytest.mark.parametrize(
     "passthrough",
     [

@@ -42,6 +42,30 @@ and an isolated Python 3.9 installation whose distribution name, version,
 Python requirement, dependency and license inventories, runtime `__version__`,
 and installed console entry point must agree.
 
+## Public Boolean option invariant
+
+Every public conversion and Unicode-validation Boolean option accepts only the
+built-in `False` and `True` objects. Numerically equal integers, strings,
+containers, subclasses of `int`, and objects with custom truthiness are
+rejected without invoking their truthiness. The shared contract covers the
+dispatcher and thirteen detailed conversion or validation entry points. The
+Videha trace-recovery API retains its specialized exception type and
+profile-first validation order while enforcing the same exact-Boolean rule.
+
+The same boundary applies to Devanagari glottal-stop normalization, Sunuwar and
+Ol Chiki uncertain mappings, and Magar Akkha minimal-inventory folding. APIs
+with multiple Boolean options validate them in signature order. Ol Chiki map
+factories validate the option before parsing a supplied map or loading the
+bundled resource, and the dispatcher validates strict mode before font-name
+normalization or route selection. CLI flags remain compatible because argument
+parsing produces built-in Boolean values.
+
+Regression tests cover invalid values at every public strict-mode entry point,
+all 146 dispatcher aliases, early-failure order, and unchanged lenient and
+strict behavior for built-in Booleans. All 100 Unicode span aliases retain
+their default, explicit-lenient, and strict NFC behavior. This invariant does
+not change mappings, normalization, diagnostics, or output for valid options.
+
 ## Structural whitespace invariant
 
 ASCII space, TAB, CR, and LF delimit words, columns, and lines; they are not

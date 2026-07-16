@@ -20,6 +20,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
+from ._controls import require_boolean
 from .unicode_span import _is_assigned_script_codepoint
 
 TIBETAN_LO, TIBETAN_HI = 0x0F00, 0x0FFF
@@ -250,6 +251,7 @@ def convert_tibetanmachine(text: str, *, strict: bool = False) -> TibetanMachine
     reported in ``empty_codepoints``. Strict mode raises on either an empty
     entry or an unknown character so corpus pipelines can gate lossless output.
     """
+    require_boolean(strict, "strict")
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = TibetanMachineConverter.default()

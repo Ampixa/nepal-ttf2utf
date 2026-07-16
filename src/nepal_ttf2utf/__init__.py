@@ -28,6 +28,7 @@ import re
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from ._controls import require_boolean
 from .devanagari import (
     DevanagariConversion,
     convert_devanagari,
@@ -436,6 +437,7 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
     glyph-ID recovery and Magar Akkha transliteration use their specialized
     APIs rather than this dispatcher.
     """
+    require_boolean(strict, "strict")
     key = _normalize_font_key(font)
     unicode_script = _UNICODE_FONT_SCRIPTS.get(key)
     if unicode_script is not None:

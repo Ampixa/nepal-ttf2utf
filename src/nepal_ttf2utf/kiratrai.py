@@ -31,7 +31,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import diagnostic_c0_codepoints
+from ._controls import diagnostic_c0_codepoints, require_boolean
 from .unicode_span import _is_assigned_script_codepoint, _normalize_nfc
 
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
@@ -672,6 +672,7 @@ def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
     This function applies SIL's map directly. Use :func:`convert_kiratrai_herald` for
     text extracted from the older/permuted Sikkim Herald PDF font.
     """
+    require_boolean(strict, "strict")
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = KiratRaiConverter.default()
@@ -686,6 +687,7 @@ def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
 
 def convert_kiratrai_herald(text: str, *, strict: bool = False) -> KiratRaiConversion:
     """Convert Sikkim Herald's permuted Kirat Rai PDF text to Unicode (NFC)."""
+    require_boolean(strict, "strict")
     global _HERALD_DEFAULT
     if _HERALD_DEFAULT is None:
         _HERALD_DEFAULT = KiratRaiHeraldConverter.default()

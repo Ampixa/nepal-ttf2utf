@@ -124,7 +124,10 @@ fonts_by_script = supported_fonts()
 Lenient mode generally preserves unresolved input. `strict=True` raises
 `ValueError` if anything remains unresolved, making it suitable as a
 corpus-cleanliness gate. The legacy Devanagari control-cleanup exception is
-described below.
+described below. Public conversion and Unicode-validation Boolean options
+accept only the built-in `False` and `True` values. Integers, strings,
+containers, and custom truthiness objects are rejected instead of being
+coerced.
 Every converter preserves ASCII space, TAB, CR, and LF exactly, including CRLF
 and lone-CR input. CLI file conversion decodes and encodes bytes explicitly so
 the host language runtime cannot normalize line endings during I/O.

@@ -20,6 +20,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from ._controls import require_boolean
 from .unicode_span import _is_assigned_script_codepoint
 
 
@@ -163,8 +164,8 @@ def transliterate_magar_akkha(
     project-defined fold of retroflex and extra-sibilant distinctions is lossy
     and forward-only.
     """
-    if not isinstance(fold_to_minimal_inventory, bool):
-        raise ValueError("Magar Akkha fold_to_minimal_inventory must be a bool")
+    require_boolean(fold_to_minimal_inventory, "Magar Akkha fold_to_minimal_inventory")
+    require_boolean(strict, "strict")
     if type(target) is not str or target not in {"brahmi", "devanagari"}:
         raise ValueError("target must be 'brahmi' or 'devanagari'")
     if target == "brahmi":

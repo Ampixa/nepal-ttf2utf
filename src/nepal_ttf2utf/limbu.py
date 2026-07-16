@@ -17,7 +17,7 @@ from importlib import resources
 from itertools import islice
 from pathlib import Path
 
-from ._controls import diagnostic_c0_codepoints
+from ._controls import diagnostic_c0_codepoints, require_boolean
 from .unicode_span import _is_assigned_script_codepoint
 
 _BYTE_RULE_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
@@ -730,6 +730,7 @@ def convert_limbu(text: str, *, strict: bool = False) -> str:
     With ``strict=True``, input absent from the SIL map or the pinned assigned
     Limbu repertoire raises ``ValueError``.
     """
+    require_boolean(strict, "strict")
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = LimbuConverter.default()

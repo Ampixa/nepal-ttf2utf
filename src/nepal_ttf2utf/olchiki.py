@@ -31,7 +31,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import codepoint_labels
+from ._controls import codepoint_labels, require_boolean
 from .unicode_span import _is_assigned_script_codepoint
 
 OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
@@ -259,8 +259,7 @@ class OLChikiConverter:
         passthrough: Iterable[str] = OLCHIKI_PASSTHROUGH,
     ) -> None:
         """Freeze a validated custom contract; explicit map entries precede passthrough."""
-        if not isinstance(apply_uncertain, bool):
-            raise ValueError("Ol Chiki apply_uncertain must be a bool")
+        require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
         confirmed = _normalize_map(confirmed_map, "confirmed map")
         uncertain = _normalize_map(
             uncertain_map if uncertain_map is not None else {}, "uncertain map"
@@ -285,11 +284,13 @@ class OLChikiConverter:
     def from_map_file(
         cls, path: str | Path, *, apply_uncertain: bool = False
     ) -> "OLChikiConverter":
+        require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
         confirmed, uncertain = _load_map_file(path)
         return cls(confirmed, uncertain, apply_uncertain=apply_uncertain)
 
     @classmethod
     def default(cls, *, apply_uncertain: bool = False) -> "OLChikiConverter":
+        require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
         with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
             return cls.from_map_file(p, apply_uncertain=apply_uncertain)
 
@@ -357,6 +358,7 @@ class OLChikiLaticConverter(OLChikiConverter):
         *,
         apply_uncertain: bool = False,
     ) -> None:
+        require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
         confirmed = _normalize_map(confirmed_map, "confirmed map")
         uncertain = _normalize_map(
             uncertain_map if uncertain_map is not None else {}, "uncertain map"
@@ -377,11 +379,13 @@ class OLChikiLaticConverter(OLChikiConverter):
     def from_map_file(
         cls, path: str | Path, *, apply_uncertain: bool = False
     ) -> "OLChikiLaticConverter":
+        require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
         confirmed, uncertain = _load_map_file(path)
         return cls(confirmed, uncertain, apply_uncertain=apply_uncertain)
 
     @classmethod
     def default(cls, *, apply_uncertain: bool = False) -> "OLChikiLaticConverter":
+        require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
         with resources.as_file(resources.files("nepal_ttf2utf.maps") / "olck_optimum.json") as p:
             return cls.from_map_file(p, apply_uncertain=apply_uncertain)
 
@@ -401,8 +405,8 @@ def convert_olchiki(
     the presence of any uncertain or unmapped byte raises ``ValueError`` instead of
     passing silently.
     """
-    if not isinstance(apply_uncertain, bool):
-        raise ValueError("Ol Chiki apply_uncertain must be a bool")
+    require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
+    require_boolean(strict, "strict")
     global _DEFAULT
     if _DEFAULT is None or apply_uncertain:
         converter = OLChikiConverter.default(apply_uncertain=apply_uncertain)
@@ -424,8 +428,8 @@ def convert_olchiki_latic(
     text: str, *, apply_uncertain: bool = False, strict: bool = False
 ) -> OLChikiConversion:
     """Convert an OLCKLatic legacy span to Unicode Ol Chiki (NFC)."""
-    if not isinstance(apply_uncertain, bool):
-        raise ValueError("Ol Chiki apply_uncertain must be a bool")
+    require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
+    require_boolean(strict, "strict")
     global _LATIC_DEFAULT
     if _LATIC_DEFAULT is None or apply_uncertain:
         converter = OLChikiLaticConverter.default(apply_uncertain=apply_uncertain)

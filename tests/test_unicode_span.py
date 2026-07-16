@@ -177,6 +177,34 @@ def test_every_unicode_font_alias_strictly_routes_only_its_declared_script():
     assert checked == 100
 
 
+def test_every_unicode_font_alias_preserves_nfc_for_all_builtin_strict_values():
+    checked = 0
+    for alias, script in _UNICODE_FONT_SCRIPTS.items():
+        source = chr(_SCRIPT_ANCHORS[script]) + " e\u0301"
+        expected = chr(_SCRIPT_ANCHORS[script]) + " é"
+        assert convert(source, font=alias) == expected, (alias, script)
+        assert convert(source, font=alias, strict=False) == expected, (alias, script)
+        assert convert(source, font=alias, strict=True) == expected, (alias, script)
+        checked += 1
+
+    assert checked == 100
+
+
+def test_unicode_validator_rejects_invalid_strict_before_script_or_normalization(
+    monkeypatch,
+):
+    def unexpected_work(*args, **kwargs):
+        raise AssertionError("Unicode validation work ran before Boolean validation")
+
+    monkeypatch.setattr(
+        "nepal_ttf2utf.unicode_span._canonical_script_name",
+        unexpected_work,
+    )
+    monkeypatch.setattr("nepal_ttf2utf.unicode_span._normalize_nfc", unexpected_work)
+    with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+        validate_unicode_span("", script="Newa", strict=[])
+
+
 def test_unicode17_contract_digest_and_complete_inventory():
     contract = {
         "version": UNICODE_REPERTOIRE_VERSION,

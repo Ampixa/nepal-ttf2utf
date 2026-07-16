@@ -7,6 +7,7 @@ from types import MappingProxyType
 import pytest
 
 import nepal_ttf2utf as package_module
+import nepal_ttf2utf.lepcha as lepcha_module
 from nepal_ttf2utf import __version__, convert, convert_devanagari, supported_fonts
 
 _EXPECTED_ROUTE_GROUPS = {
@@ -35,8 +36,209 @@ _EXPECTED_ROUTE_GROUPS = {
 }
 
 
+class _IntSubclass(int):
+    pass
+
+
+class _ExplosiveTruthiness:
+    def __bool__(self):
+        raise AssertionError("Boolean validation invoked user truthiness")
+
+
+_INVALID_BOOLEAN_VALUES = (
+    None,
+    0,
+    1,
+    -1,
+    0.0,
+    1.0,
+    "",
+    "false",
+    (),
+    [],
+    {},
+    object(),
+    _IntSubclass(1),
+    _ExplosiveTruthiness(),
+)
+
+_STRICT_PUBLIC_SURFACES = (
+    ("dispatcher", lambda strict: package_module.convert("", font="preeti", strict=strict)),
+    (
+        "unicode-span",
+        lambda strict: package_module.validate_unicode_span("", script="Newa", strict=strict),
+    ),
+    ("devanagari", lambda strict: package_module.convert_devanagari("", strict=strict)),
+    ("limbu", lambda strict: package_module.convert_limbu("", strict=strict)),
+    ("kirat-rai", lambda strict: package_module.convert_kiratrai("", strict=strict)),
+    (
+        "kirat-rai-herald",
+        lambda strict: package_module.convert_kiratrai_herald("", strict=strict),
+    ),
+    ("sunuwar", lambda strict: package_module.convert_sunuwar("", strict=strict)),
+    (
+        "tibetanmachine",
+        lambda strict: package_module.convert_tibetanmachine("", strict=strict),
+    ),
+    ("lepcha", lambda strict: package_module.convert_lepcha("", strict=strict)),
+    ("jg-lepcha", lambda strict: package_module.convert_jg_lepcha("", strict=strict)),
+    ("ol-chiki", lambda strict: package_module.convert_olchiki("", strict=strict)),
+    (
+        "ol-chiki-latic",
+        lambda strict: package_module.convert_olchiki_latic("", strict=strict),
+    ),
+    ("tirhuta", lambda strict: package_module.convert_tirhuta("", strict=strict)),
+    (
+        "magar-akkha",
+        lambda strict: package_module.transliterate_magar_akkha("", strict=strict),
+    ),
+)
+
+_STRICT_DIAGNOSTIC_SURFACES = (
+    (
+        "dispatcher",
+        lambda strict: package_module.convert("~", font="jg-lepcha", strict=strict),
+    ),
+    (
+        "unicode-span",
+        lambda strict: package_module.validate_unicode_span("Latin", script="Newa", strict=strict),
+    ),
+    ("devanagari", lambda strict: package_module.convert_devanagari("á", strict=strict)),
+    ("limbu", lambda strict: package_module.convert_limbu("#", strict=strict)),
+    ("kirat-rai", lambda strict: package_module.convert_kiratrai("☃", strict=strict)),
+    (
+        "kirat-rai-herald",
+        lambda strict: package_module.convert_kiratrai_herald("☃", strict=strict),
+    ),
+    ("sunuwar", lambda strict: package_module.convert_sunuwar("@", strict=strict)),
+    (
+        "tibetanmachine",
+        lambda strict: package_module.convert_tibetanmachine("☃", strict=strict),
+    ),
+    ("lepcha", lambda strict: package_module.convert_lepcha("*", strict=strict)),
+    ("jg-lepcha", lambda strict: package_module.convert_jg_lepcha("~", strict=strict)),
+    ("ol-chiki", lambda strict: package_module.convert_olchiki("@", strict=strict)),
+    (
+        "ol-chiki-latic",
+        lambda strict: package_module.convert_olchiki_latic("@", strict=strict),
+    ),
+    ("tirhuta", lambda strict: package_module.convert_tirhuta("ऎ", strict=strict)),
+    (
+        "magar-akkha",
+        lambda strict: package_module.transliterate_magar_akkha("ऎ", strict=strict),
+    ),
+)
+
+
 def test_version_matches_release():
     assert __version__ == "0.3.0"
+
+
+@pytest.mark.parametrize(("surface", "call"), _STRICT_PUBLIC_SURFACES)
+@pytest.mark.parametrize("strict", _INVALID_BOOLEAN_VALUES)
+def test_every_public_strict_surface_requires_an_exact_boolean(surface, call, strict):
+    with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+        call(strict)
+
+
+@pytest.mark.parametrize(("surface", "call"), _STRICT_PUBLIC_SURFACES)
+@pytest.mark.parametrize("strict", [False, True])
+def test_every_public_strict_surface_accepts_builtin_booleans(surface, call, strict):
+    call(strict)
+
+
+@pytest.mark.parametrize(("surface", "call"), _STRICT_DIAGNOSTIC_SURFACES)
+def test_exact_booleans_retain_lenient_and_strict_semantics(surface, call):
+    call(False)
+    with pytest.raises(ValueError) as error:
+        call(True)
+    assert "must be a bool" not in str(error.value)
+
+
+@pytest.mark.parametrize("strict", _INVALID_BOOLEAN_VALUES)
+def test_dispatcher_rejects_invalid_strict_before_every_route(strict):
+    for font in supported_fonts():
+        with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+            convert("", font=font, strict=strict)
+
+
+def test_dispatcher_validates_strict_before_font_normalization(monkeypatch):
+    def unexpected_normalization(_font):
+        raise AssertionError("font normalization ran before strict validation")
+
+    monkeypatch.setattr(package_module, "_normalize_font_key", unexpected_normalization)
+    with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+        convert("", font="preeti", strict=[])
+
+
+@pytest.mark.parametrize("normalize_glottal_stop", _INVALID_BOOLEAN_VALUES)
+def test_devanagari_glottal_stop_option_requires_an_exact_boolean(
+    normalize_glottal_stop,
+):
+    with pytest.raises(
+        ValueError,
+        match=r"^Devanagari normalize_glottal_stop must be a bool$",
+    ):
+        convert_devanagari("", normalize_glottal_stop=normalize_glottal_stop)
+
+
+def test_devanagari_glottal_stop_option_retains_exact_boolean_behavior():
+    assert convert_devanagari("ʻ").unicode_text == "ʻ"
+    assert convert_devanagari("ʻ", normalize_glottal_stop=False).unicode_text == "ʻ"
+    assert convert_devanagari("ʻ", normalize_glottal_stop=True).unicode_text == "ॽ"
+
+
+def test_devanagari_boolean_options_validate_in_signature_order():
+    with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+        convert_devanagari("", strict=[], normalize_glottal_stop=[])
+    with pytest.raises(
+        ValueError,
+        match=r"^Devanagari normalize_glottal_stop must be a bool$",
+    ):
+        convert_devanagari("", strict=False, normalize_glottal_stop=[])
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        (
+            lambda: package_module.convert_sunuwar("", apply_uncertain=[], strict=[]),
+            "Sunuwar apply_uncertain",
+        ),
+        (
+            lambda: package_module.convert_olchiki("", apply_uncertain=[], strict=[]),
+            "Ol Chiki apply_uncertain",
+        ),
+        (
+            lambda: package_module.convert_olchiki_latic("", apply_uncertain=[], strict=[]),
+            "Ol Chiki apply_uncertain",
+        ),
+        (
+            lambda: package_module.transliterate_magar_akkha(
+                "", fold_to_minimal_inventory=[], strict=[]
+            ),
+            "Magar Akkha fold_to_minimal_inventory",
+        ),
+    ],
+)
+def test_multi_boolean_apis_preserve_option_precedence(call, message):
+    with pytest.raises(ValueError, match=message):
+        call()
+
+
+def test_direct_converter_validates_strict_before_default_resource_loading(monkeypatch):
+    monkeypatch.setattr(lepcha_module, "_DEFAULT", None)
+
+    def unexpected_default():
+        raise AssertionError("default resource loaded before strict validation")
+
+    monkeypatch.setattr(
+        lepcha_module.LepchaConverter,
+        "default",
+        staticmethod(unexpected_default),
+    )
+    with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+        lepcha_module.convert_lepcha("", strict=[])
 
 
 @pytest.mark.parametrize(

@@ -38,6 +38,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
+from ._controls import require_boolean
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
@@ -498,6 +499,7 @@ def convert_lepcha(text: str, *, strict: bool = False) -> LepchaConversion:
     With ``strict=True`` any such leftover raises ``ValueError`` instead of passing
     silently.
     """
+    require_boolean(strict, "strict")
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = LepchaConverter.default()

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Require the built-in `False` or `True` values for every public conversion and
+  Unicode-validation Boolean option. Truthy and falsy substitutes now fail
+  before font routing, normalization, map parsing, or resource access. Valid
+  Boolean behavior, conversion output, diagnostics, and Videha's specialized
+  profile-first error contract are unchanged.
 - Complete the Sikkim Herald Lepcha custom-map boundary: cap mapping item
   streams, reject malformed entries and duplicate semantic source bytes,
   and normalize excessive JSON nesting to contextual validation errors. The
