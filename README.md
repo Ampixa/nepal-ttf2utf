@@ -205,6 +205,11 @@ runtime contracts. The JG TECkit reader produces built-in identifiers from
 validated decoded text, while the default Ol Chiki passthrough strings are
 fixed module-defined built-in strings.
 
+The Ol Chiki Optimum and Latic map-file factories share a bounded binary read,
+UTF-8 validation, and a string-aware JSON pre-scan. Map files may contain at
+most 1,000,000 bytes and 64 nested JSON containers; brackets and braces inside
+JSON strings do not count toward the nesting limit.
+
 `recover_videha_janaki_trace()` is the profile-gated companion API for PyMuPDF
 `get_texttrace()` character tuples. Callers must securely compute and supply a
 built-in profile name, the exact PDF SHA-256, the complete embedded Janaki font

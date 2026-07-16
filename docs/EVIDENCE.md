@@ -766,6 +766,10 @@ four structural-whitespace, nine byte-range passthrough, and 176 unmapped
 values. Custom constructors and JSON files fail closed on unsafe sources,
 unassigned targets, ambiguous confirmed/uncertain state, noncanonical or
 duplicate keys, inconsistent uncertainty metadata, and unbounded iterables.
+Both layout factories share the same map reader. It limits input to 1,000,000
+bytes, rejects JSON above 64 container-nesting levels before JSON decoding, and
+caps each confirmed, uncertain, and uncertainty-inventory section at 128
+entries. The depth scan ignores brackets and braces inside JSON strings.
 
 ## OLCKLatic Ol Chiki
 

@@ -656,7 +656,7 @@ def test_olchiki_map_loader_rejects_duplicate_json_keys(raw_json, tmp_path):
         OLChikiConverter.from_map_file(map_path)
 
 
-def test_olchiki_map_loader_rejects_invalid_utf8_json_and_size(tmp_path):
+def test_olchiki_map_loader_rejects_invalid_utf8_and_json(tmp_path):
     invalid_utf8 = tmp_path / "invalid-utf8.json"
     invalid_utf8.write_bytes(b"\xff")
     with pytest.raises(ValueError, match="invalid UTF-8"):
@@ -667,32 +667,122 @@ def test_olchiki_map_loader_rejects_invalid_utf8_json_and_size(tmp_path):
     with pytest.raises(ValueError, match="invalid JSON"):
         OLChikiConverter.from_map_file(invalid_json)
 
-    oversized = tmp_path / "oversized.json"
-    oversized.write_bytes(b" " * 1_000_001)
-    with pytest.raises(ValueError, match="exceeds 1000000 bytes"):
-        OLChikiConverter.from_map_file(oversized)
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+def test_olchiki_map_loader_accepts_exact_file_size_and_rejects_next_byte(
+    converter_type, monkeypatch, tmp_path
+):
+    map_path = tmp_path / "bounded-olchiki.json"
+    prefix = b'{"_doc":"'
+    suffix = b'","map":{"61":["1C5F"]},"uncertain_map":{}}'
+    padding = b"x" * (olchiki_module._MAX_MAP_FILE_BYTES - len(prefix) - len(suffix))
+    exact_payload = prefix + padding + suffix
+    assert len(exact_payload) == olchiki_module._MAX_MAP_FILE_BYTES
+    map_path.write_bytes(exact_payload)
+
+    assert converter_type.from_map_file(map_path).convert("a").unicode_text == "ᱟ"
+
+    def unexpected_decoder(*args, **kwargs):
+        raise AssertionError("oversized input reached the JSON decoder")
+
+    monkeypatch.setattr(olchiki_module.json, "loads", unexpected_decoder)
+    map_path.write_bytes(exact_payload + b" ")
+    with pytest.raises(ValueError) as error:
+        converter_type.from_map_file(map_path)
+    assert str(error.value) == f"Ol Chiki map exceeds 1000000 bytes: {map_path}"
 
 
-def test_olchiki_map_loader_fails_closed_on_deep_json(tmp_path):
-    deeply_nested = tmp_path / "deeply-nested.json"
-    deeply_nested.write_text(
-        '{"map":' + "[" * 10_000 + "0" + "]" * 10_000 + ',"uncertain_map":{}}',
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize(
+    ("opening", "closing", "downstream_error"),
+    [
+        ("[", "]", "Ol Chiki map missing 'map' object"),
+        ('{"x":', "}", "invalid byte key in Ol Chiki map: 'x'"),
+    ],
+)
+def test_olchiki_json_depth_64_reaches_schema_validation(
+    converter_type, opening, closing, downstream_error, monkeypatch, tmp_path
+):
+    map_path = tmp_path / "depth-64.json"
+    map_text = '{"map":' + opening * 63 + "0" + closing * 63 + ',"uncertain_map":{}}'
+    map_path.write_text(map_text, encoding="utf-8")
+    real_json_loads = json.loads
+    decoder_calls = []
+
+    def tracked_decoder(*args, **kwargs):
+        decoder_calls.append((args, kwargs))
+        return real_json_loads(*args, **kwargs)
+
+    monkeypatch.setattr(olchiki_module.json, "loads", tracked_decoder)
+    with pytest.raises(ValueError, match=downstream_error):
+        converter_type.from_map_file(map_path)
+
+    assert decoder_calls == [
+        ((map_text,), {"object_pairs_hook": olchiki_module._unique_json_object})
+    ]
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize(("opening", "closing"), [("[", "]"), ('{"x":', "}")])
+def test_olchiki_json_depth_65_is_rejected_before_decoding(
+    converter_type, opening, closing, monkeypatch, tmp_path
+):
+    map_path = tmp_path / "depth-65.json"
+    map_path.write_text(
+        '{"map":' + opening * 64 + "0" + closing * 64 + ',"uncertain_map":{}}',
         encoding="utf-8",
     )
-    with pytest.raises(ValueError):
-        OLChikiConverter.from_map_file(deeply_nested)
+
+    def unexpected_decoder(*args, **kwargs):
+        raise AssertionError("excessively nested input reached the JSON decoder")
+
+    monkeypatch.setattr(olchiki_module.json, "loads", unexpected_decoder)
+    with pytest.raises(ValueError) as error:
+        converter_type.from_map_file(map_path)
+    assert str(error.value) == f"Ol Chiki map exceeds 64 JSON nesting levels: {map_path}"
 
 
-def test_olchiki_map_loader_normalizes_decoder_recursion_error(monkeypatch, tmp_path):
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+def test_olchiki_json_depth_scan_ignores_container_tokens_inside_strings(converter_type, tmp_path):
+    map_path = tmp_path / "brackets-in-metadata.json"
+    metadata = 'literal []{} "quoted" \\ escaped ' * 100
+    assert sum(metadata.count(character) for character in "[]{}") > 64
+    map_path.write_text(
+        json.dumps(
+            {
+                "_doc": metadata,
+                "map": {"61": ["1C5F"]},
+                "uncertain_map": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert converter_type.from_map_file(map_path).convert("a").unicode_text == "ᱟ"
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+def test_olchiki_map_loader_normalizes_decoder_recursion_error(
+    converter_type, monkeypatch, tmp_path
+):
     map_path = tmp_path / "recursive-decoder.json"
     map_path.write_text('{"map":{},"uncertain_map":{}}', encoding="utf-8")
+    decoder_calls = []
 
     def recursive_decoder(*args, **kwargs):
+        decoder_calls.append((args, kwargs))
         raise RecursionError("decoder nesting limit")
 
     monkeypatch.setattr(olchiki_module.json, "loads", recursive_decoder)
-    with pytest.raises(ValueError, match="invalid nested JSON"):
-        OLChikiConverter.from_map_file(map_path)
+    with pytest.raises(ValueError) as error:
+        converter_type.from_map_file(map_path)
+    assert str(error.value) == f"invalid nested JSON in Ol Chiki map {map_path}"
+    assert decoder_calls == [
+        (
+            ('{"map":{},"uncertain_map":{}}',),
+            {"object_pairs_hook": olchiki_module._unique_json_object},
+        )
+    ]
 
 
 def test_olchiki_map_loader_bounds_section_inventory(tmp_path):

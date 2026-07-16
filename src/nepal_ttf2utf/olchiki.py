@@ -38,6 +38,7 @@ OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
 _BYTE_KEY_RE = re.compile(r"[0-9A-F]{2}")
 _TARGET_KEY_RE = re.compile(r"[0-9A-F]{4}")
 _MAX_MAP_FILE_BYTES = 1_000_000
+_MAX_MAP_JSON_DEPTH = 64
 _MAX_MAP_ENTRIES = 128
 _MAX_PASSTHROUGH = 128
 _MAP_FIELDS = frozenset(
@@ -141,6 +142,31 @@ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def _reject_excessive_json_depth(map_text: str, map_path: Path) -> None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for character in map_text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character in "[{":
+            depth += 1
+            if depth > _MAX_MAP_JSON_DEPTH:
+                raise ValueError(
+                    f"Ol Chiki map exceeds {_MAX_MAP_JSON_DEPTH} JSON nesting levels: {map_path}"
+                )
+        elif character in "]}":
+            depth = max(0, depth - 1)
+
+
 def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
     map_path = Path(path)
     if not map_path.is_file():
@@ -153,6 +179,7 @@ def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
         map_text = map_bytes.decode("utf-8")
     except UnicodeDecodeError as error:
         raise ValueError(f"invalid UTF-8 in Ol Chiki map {map_path}") from error
+    _reject_excessive_json_depth(map_text, map_path)
     try:
         raw = json.loads(map_text, object_pairs_hook=_unique_json_object)
     except json.JSONDecodeError as error:

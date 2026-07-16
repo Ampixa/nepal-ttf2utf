@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Bound caller-supplied Ol Chiki Optimum and Latic JSON maps to 64 container-
+  nesting levels with a string-aware scan before JSON decoding. Depth 64
+  reaches normal JSON and schema validation, and valid exact 1,000,000-byte
+  inputs remain accepted. Over-limit input now fails with the same deterministic
+  contextual error across supported Python versions. The bundled resource, map
+  schema, effective layouts, outputs, diagnostics, precedence, and routing are
+  unchanged.
 - Require exact built-in strings for caller-supplied JG Lepcha Unicode-class
   names and reorder identifiers and for Ol Chiki passthrough members. String
   subclasses and coercible proxies now fail before converter-side length,
