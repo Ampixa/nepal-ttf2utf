@@ -20,7 +20,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import require_boolean, require_text
+from ._controls import require_boolean, require_integer, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 TIBETAN_LO, TIBETAN_HI = 0x0F00, 0x0FFF
@@ -63,7 +63,8 @@ def _bounded_tuple(values: object, limit: int, label: str) -> tuple[object, ...]
 
 
 def _validate_source(source: object) -> int:
-    if type(source) is not int or source not in _ALLOWED_SOURCES:
+    source = require_integer(source, "invalid TibetanMachine source")
+    if source not in _ALLOWED_SOURCES:
         raise ValueError(
             f"invalid TibetanMachine source {source!r}; expected raw byte 0x21..0xFF "
             "or a decoded CP1252 character"

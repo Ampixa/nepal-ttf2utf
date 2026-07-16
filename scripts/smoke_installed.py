@@ -15,7 +15,12 @@ from nepal_ttf2utf import (
     UNICODE_REPERTOIRE_VERSION,
     VIDEHA_2008_04_15,
     VIDEHA_ISSUE_001,
+    JGLepchaConverter,
+    KiratRaiConverter,
+    LepchaConverter,
     LimbuConverter,
+    OLChikiConverter,
+    OLChikiLaticConverter,
     TibetanMachineConverter,
     TirhutaConverter,
     convert_devanagari,
@@ -59,6 +64,10 @@ EXPECTED_LICENSE_FILES = {
     "src/nepal_ttf2utf/maps/LICENSE.unicode-data.txt",
     "src/nepal_ttf2utf/maps/LICENSE.wsresources-MIT.txt",
 }
+
+
+class _IntSubclass(int):
+    pass
 
 
 def main() -> int:
@@ -128,6 +137,29 @@ def main() -> int:
             assert str(error) == message, surface
         else:
             raise AssertionError(f"installed {surface} accepted a non-string selector")
+
+    invalid_integer_contracts = (
+        (
+            "Kirat Rai",
+            lambda: KiratRaiConverter([((_IntSubclass(0x41),), (0x16D43,))]),
+        ),
+        ("Limbu", lambda: LimbuConverter([((_IntSubclass(0x41),), (0x1901,))])),
+        (
+            "JG Lepcha",
+            lambda: JGLepchaConverter([((_IntSubclass(0x41),), (0x1C00,))], [], {}, None),
+        ),
+        ("Herald Lepcha", lambda: LepchaConverter({_IntSubclass(0x41): (0x1C00,)})),
+        ("Ol Chiki", lambda: OLChikiConverter({_IntSubclass(0x61): 0x1C5F})),
+        ("Ol Chiki Latic", lambda: OLChikiLaticConverter({_IntSubclass(0x61): 0x1C5F})),
+        ("TibetanMachine", lambda: TibetanMachineConverter({_IntSubclass(0x21): "ཀ"})),
+    )
+    for surface, call in invalid_integer_contracts:
+        try:
+            call()
+        except ValueError as error:
+            assert str(error).endswith("must be an int"), surface
+        else:
+            raise AssertionError(f"installed {surface} accepted an integer subclass")
 
     font_inventory_payload = json.dumps(
         font_inventory, sort_keys=True, separators=(",", ":")

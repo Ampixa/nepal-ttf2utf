@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Require exact built-in integers for every caller-supplied byte and Unicode
+  scalar in the Kirat Rai, Limbu, JG Lepcha, Herald Lepcha, and Ol Chiki custom
+  converter contracts. Integer subclasses and numeric proxies now fail before
+  scalar comparison, hashing, formatting, coercion, or storage; TibetanMachine
+  source-type errors follow the same hook-safe path. Default resources,
+  functional digests, outputs, diagnostics, precedence, and routing are unchanged.
 - Bound the canonical SIL Kirat Rai source reader to 4,096 physical lines and
   4,096 decoded codepoints per line, closing source-structure gaps within the
   existing 1,000,000-byte limit. Exact boundaries remain accepted, and the

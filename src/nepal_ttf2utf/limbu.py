@@ -17,7 +17,7 @@ from importlib import resources
 from itertools import islice
 from pathlib import Path
 
-from ._controls import diagnostic_c0_codepoints, require_boolean, require_text
+from ._controls import diagnostic_c0_codepoints, require_boolean, require_integer, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 _BYTE_RULE_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
@@ -86,18 +86,15 @@ def _tokens(body: str) -> list[str]:
 
 
 def _validate_unicode_scalar(codepoint: object) -> int:
-    if (
-        isinstance(codepoint, bool)
-        or not isinstance(codepoint, int)
-        or not (0 <= codepoint <= 0x10FFFF)
-        or 0xD800 <= codepoint <= 0xDFFF
-    ):
+    codepoint = require_integer(codepoint, "invalid Unicode scalar in Limbu map")
+    if not (0 <= codepoint <= 0x10FFFF) or 0xD800 <= codepoint <= 0xDFFF:
         raise ValueError(f"invalid Unicode scalar in Limbu map: {codepoint!r}")
     return codepoint
 
 
 def _validate_byte(value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 0xFF):
+    value = require_integer(value, "invalid Limbu source byte")
+    if not (0 <= value <= 0xFF):
         raise ValueError(f"invalid Limbu source byte: {value!r}")
     return value
 

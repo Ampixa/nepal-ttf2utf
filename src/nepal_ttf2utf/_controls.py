@@ -25,6 +25,13 @@ def require_text(value: object) -> None:
     require_string(value, "text")
 
 
+def require_integer(value: object, name: str) -> int:
+    """Reject non-integers and integer subclasses without numeric coercion."""
+    if type(value) is not int:
+        raise ValueError(f"{name} must be an int")
+    return value
+
+
 def diagnostic_c0_codepoints(text: str) -> set[str]:
     """Return C0 values outside the structural allowlist as code-point labels."""
     return {f"U+{ord(char):04X}" for char in text if char in DIAGNOSTIC_C0}

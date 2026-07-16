@@ -125,6 +125,28 @@ strict behavior for built-in Booleans. All 100 Unicode span aliases retain
 their default, explicit-lenient, and strict NFC behavior. This invariant does
 not change mappings, normalization, diagnostics, or output for valid options.
 
+## Public custom-contract integer invariant
+
+Caller-supplied source bytes and Unicode scalars must be exact built-in integers
+in the Kirat Rai, Limbu, JG Lepcha, Sikkim Herald Lepcha, Ol Chiki Optimum, and
+Ol Chiki Latic custom constructors. The rule covers byte-rule sources and
+targets, JG class members, uncertainty metadata and context fields, and both
+confirmed and uncertain Ol Chiki maps. TibetanMachine
+source keys follow the same exact-integer contract. Boolean values, integer
+subclasses, and numeric proxies fail with `ValueError` before converter-side
+scalar comparison, hashing, equality, representation, formatting, numeric
+coercion, or immutable storage. Container shape and size validation retains its
+existing order; its hooks are necessarily used to obtain entries before each
+yielded scalar is checked.
+
+The TECkit, JSON, and CSV readers produce built-in integers from validated text
+tokens and pass them through the same constructors. Regression tests exercise
+every public caller-supplied scalar position with hostile subclass hooks, verify
+that numeric proxies are not coerced, check private Limbu reorder snapshot
+exactness, and require exact integers throughout every default runtime snapshot.
+The vendored resources, parsed contracts, functional
+digests, mapping output, diagnostics, precedence, and routing are unchanged.
+
 ## Structural whitespace invariant
 
 ASCII space, TAB, CR, and LF delimit words, columns, and lines; they are not

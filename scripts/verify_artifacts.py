@@ -169,6 +169,7 @@ EXPECTED_SDIST_DIRECTORY_FILES = {
         "test_cli.py",
         "test_controls.py",
         "test_devanagari.py",
+        "test_exact_integer_contracts.py",
         "test_jg_lepcha.py",
         "test_kiratrai.py",
         "test_lepcha.py",

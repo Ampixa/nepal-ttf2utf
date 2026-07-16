@@ -188,6 +188,15 @@ contains an explicitly uncertain U+25CC placeholder rather than an established
 Unicode assignment. These values retain the upstream lenient output but fail
 strict conversion.
 
+Custom contracts passed to `KiratRaiConverter`, `LimbuConverter`,
+`JGLepchaConverter`, `LepchaConverter`, `OLChikiConverter`, and
+`OLChikiLaticConverter` require exact built-in integers for source bytes,
+Unicode targets, and format-specific class, context, or uncertainty
+values. Boolean values, integer subclasses, and numeric proxies are rejected
+without coercion. `TibetanMachineConverter` applies the same exact source-key
+rule. Map-file readers parse their documented text schemas into built-in
+integers before constructing these immutable contracts.
+
 `recover_videha_janaki_trace()` is the profile-gated companion API for PyMuPDF
 `get_texttrace()` character tuples. Callers must securely compute and supply a
 built-in profile name, the exact PDF SHA-256, the complete embedded Janaki font

@@ -20,7 +20,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import diagnostic_c0_codepoints, require_boolean, require_text
+from ._controls import diagnostic_c0_codepoints, require_boolean, require_integer, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
@@ -78,18 +78,15 @@ def _tokens(body: str) -> list[str]:
 
 
 def _validate_unicode_scalar(codepoint: object) -> int:
-    if (
-        isinstance(codepoint, bool)
-        or not isinstance(codepoint, int)
-        or not (0 <= codepoint <= 0x10FFFF)
-        or 0xD800 <= codepoint <= 0xDFFF
-    ):
+    codepoint = require_integer(codepoint, "invalid Unicode scalar in JG Lepcha map")
+    if not (0 <= codepoint <= 0x10FFFF) or 0xD800 <= codepoint <= 0xDFFF:
         raise ValueError(f"invalid Unicode scalar in JG Lepcha map: {codepoint!r}")
     return codepoint
 
 
 def _validate_byte(value: object, label: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not (0 <= value <= 0xFF):
+    value = require_integer(value, f"invalid JG Lepcha {label} byte")
+    if not (0 <= value <= 0xFF):
         raise ValueError(f"invalid JG Lepcha {label} byte: {value!r}")
     return value
 

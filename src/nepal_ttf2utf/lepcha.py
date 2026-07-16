@@ -38,7 +38,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import require_boolean, require_text
+from ._controls import require_boolean, require_integer, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
@@ -117,7 +117,8 @@ class _LepchaContract:
 
 
 def _validate_source_byte(source: object) -> int:
-    if isinstance(source, bool) or not isinstance(source, int) or not (0 <= source <= 0xFF):
+    source = require_integer(source, "invalid Lepcha source byte")
+    if not (0 <= source <= 0xFF):
         raise ValueError(f"invalid Lepcha source byte: {source!r}")
     if source in _FORBIDDEN_SOURCE_BYTES:
         raise ValueError(f"Lepcha source byte must not be C0, SPACE, or DEL: 0x{source:02X}")
@@ -127,11 +128,10 @@ def _validate_source_byte(source: object) -> int:
 
 
 def _validate_target_codepoint(codepoint: object, source: int) -> int:
-    if (
-        isinstance(codepoint, bool)
-        or not isinstance(codepoint, int)
-        or not _is_assigned_script_codepoint(codepoint, "Lepcha")
-    ):
+    codepoint = require_integer(
+        codepoint, f"invalid or unassigned Lepcha target for source 0x{source:02X}"
+    )
+    if not _is_assigned_script_codepoint(codepoint, "Lepcha"):
         raise ValueError(
             f"invalid or unassigned Lepcha target {codepoint!r} for source 0x{source:02X}"
         )

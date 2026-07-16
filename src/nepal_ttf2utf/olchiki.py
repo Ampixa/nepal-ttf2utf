@@ -31,7 +31,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import codepoint_labels, require_boolean, require_text
+from ._controls import codepoint_labels, require_boolean, require_integer, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
@@ -80,7 +80,8 @@ def _bounded_tuple(values: object, limit: int, label: str) -> tuple[object, ...]
 
 
 def _validate_source_byte(source: object, label: str) -> int:
-    if isinstance(source, bool) or not isinstance(source, int) or not (0x21 <= source <= 0x7E):
+    source = require_integer(source, f"invalid Ol Chiki {label} source")
+    if not (0x21 <= source <= 0x7E):
         raise ValueError(
             f"invalid Ol Chiki {label} source {source!r}; expected printable ASCII 0x21..0x7E"
         )
@@ -88,11 +89,10 @@ def _validate_source_byte(source: object, label: str) -> int:
 
 
 def _validate_target_codepoint(target: object, source: int, label: str) -> int:
-    if (
-        isinstance(target, bool)
-        or not isinstance(target, int)
-        or not _is_assigned_script_codepoint(target, "Ol Chiki")
-    ):
+    target = require_integer(
+        target, f"invalid or unassigned Ol Chiki {label} target for source 0x{source:02X}"
+    )
+    if not _is_assigned_script_codepoint(target, "Ol Chiki"):
         raise ValueError(
             f"invalid or unassigned Ol Chiki {label} target {target!r} for source 0x{source:02X}"
         )
