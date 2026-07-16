@@ -20,7 +20,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import diagnostic_c0_codepoints, require_boolean
+from ._controls import diagnostic_c0_codepoints, require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
@@ -892,6 +892,7 @@ class JGLepchaConverter:
         return "".join(output)
 
     def convert(self, text: str) -> JGLepchaConversion:
+        require_text(text)
         mapped, derived, replacements, unmapped, uncertain = self._byte_pass_with_provenance(text)
         converted = unicodedata.normalize("NFC", self._reorder_pass(mapped, derived))
         # The source CTL class maps every C0 value to itself. Preserve that
@@ -913,6 +914,7 @@ _DEFAULT: JGLepchaConverter | None = None
 def convert_jg_lepcha(text: str, *, strict: bool = False) -> JGLepchaConversion:
     """Convert JG-Lepcha-encoded text to Unicode Lepcha (NFC)."""
     require_boolean(strict, "strict")
+    require_text(text)
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = JGLepchaConverter.default()

@@ -31,7 +31,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import diagnostic_c0_codepoints, require_boolean
+from ._controls import diagnostic_c0_codepoints, require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint, _normalize_nfc
 
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
@@ -500,6 +500,7 @@ class KiratRaiConverter:
             return cls.from_map_file(p)
 
     def convert(self, text: str) -> KiratRaiConversion:
+        require_text(text)
         output: list[str] = []
         unmapped: list[str] = []
         replacements = 0
@@ -617,6 +618,7 @@ class KiratRaiHeraldConverter:
         return cls(KiratRaiConverter.default())
 
     def convert(self, text: str) -> KiratRaiConversion:
+        require_text(text)
         output: list[str] = []
         canonical_run: list[str] = []
         unmapped: set[str] = set()
@@ -673,6 +675,7 @@ def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
     text extracted from the older/permuted Sikkim Herald PDF font.
     """
     require_boolean(strict, "strict")
+    require_text(text)
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = KiratRaiConverter.default()
@@ -688,6 +691,7 @@ def convert_kiratrai(text: str, *, strict: bool = False) -> KiratRaiConversion:
 def convert_kiratrai_herald(text: str, *, strict: bool = False) -> KiratRaiConversion:
     """Convert Sikkim Herald's permuted Kirat Rai PDF text to Unicode (NFC)."""
     require_boolean(strict, "strict")
+    require_text(text)
     global _HERALD_DEFAULT
     if _HERALD_DEFAULT is None:
         _HERALD_DEFAULT = KiratRaiHeraldConverter.default()

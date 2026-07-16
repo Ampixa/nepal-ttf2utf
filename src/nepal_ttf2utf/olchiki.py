@@ -31,7 +31,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import codepoint_labels, require_boolean
+from ._controls import codepoint_labels, require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 OLCHIKI_LO, OLCHIKI_HI = 0x1C50, 0x1C7F
@@ -295,6 +295,7 @@ class OLChikiConverter:
             return cls.from_map_file(p, apply_uncertain=apply_uncertain)
 
     def convert(self, text: str) -> OLChikiConversion:
+        require_text(text)
         out: list[str] = []
         replacements = 0
         confirmed = 0
@@ -407,6 +408,7 @@ def convert_olchiki(
     """
     require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
     require_boolean(strict, "strict")
+    require_text(text)
     global _DEFAULT
     if _DEFAULT is None or apply_uncertain:
         converter = OLChikiConverter.default(apply_uncertain=apply_uncertain)
@@ -430,6 +432,7 @@ def convert_olchiki_latic(
     """Convert an OLCKLatic legacy span to Unicode Ol Chiki (NFC)."""
     require_boolean(apply_uncertain, "Ol Chiki apply_uncertain")
     require_boolean(strict, "strict")
+    require_text(text)
     global _LATIC_DEFAULT
     if _LATIC_DEFAULT is None or apply_uncertain:
         converter = OLChikiLaticConverter.default(apply_uncertain=apply_uncertain)

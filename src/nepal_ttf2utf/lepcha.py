@@ -38,7 +38,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import require_boolean
+from ._controls import require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 LEPCHA_LO, LEPCHA_HI = 0x1C00, 0x1C4F
@@ -476,6 +476,7 @@ class LepchaConverter:
     # ----- public --------------------------------------------------------------
 
     def convert(self, text: str) -> LepchaConversion:
+        require_text(text)
         mapped, derived, replacements, unmapped = self._byte_pass_with_provenance(text)
         converted = unicodedata.normalize("NFC", self._reorder_pass(mapped, derived))
         return LepchaConversion(
@@ -500,6 +501,7 @@ def convert_lepcha(text: str, *, strict: bool = False) -> LepchaConversion:
     silently.
     """
     require_boolean(strict, "strict")
+    require_text(text)
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = LepchaConverter.default()

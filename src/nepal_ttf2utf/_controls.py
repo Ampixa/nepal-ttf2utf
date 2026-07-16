@@ -14,6 +14,12 @@ def require_boolean(value: object, name: str) -> None:
         raise ValueError(f"{name} must be a bool")
 
 
+def require_text(value: object) -> None:
+    """Reject non-string and string-subclass conversion input."""
+    if type(value) is not str:
+        raise TypeError("text must be a string")
+
+
 def diagnostic_c0_codepoints(text: str) -> set[str]:
     """Return C0 values outside the structural allowlist as code-point labels."""
     return {f"U+{ord(char):04X}" for char in text if char in DIAGNOSTIC_C0}

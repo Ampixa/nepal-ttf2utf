@@ -20,7 +20,7 @@ from itertools import islice
 from pathlib import Path
 from types import MappingProxyType
 
-from ._controls import require_boolean
+from ._controls import require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 TIBETAN_LO, TIBETAN_HI = 0x0F00, 0x0FFF
@@ -200,6 +200,7 @@ class TibetanMachineConverter:
             return cls.from_map_file(path)
 
     def convert(self, text: str) -> TibetanMachineConversion:
+        require_text(text)
         output: list[str] = []
         empty: set[str] = set()
         missing: set[str] = set()
@@ -252,6 +253,7 @@ def convert_tibetanmachine(text: str, *, strict: bool = False) -> TibetanMachine
     entry or an unknown character so corpus pipelines can gate lossless output.
     """
     require_boolean(strict, "strict")
+    require_text(text)
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = TibetanMachineConverter.default()

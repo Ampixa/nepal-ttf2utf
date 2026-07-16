@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
-from ._controls import require_boolean
+from ._controls import require_boolean, require_text
 
 UNICODE_REPERTOIRE_VERSION = "17.0.0"
 
@@ -311,6 +311,7 @@ def validate_unicode_span(
     script.
     """
     require_boolean(strict, "strict")
+    require_text(text)
     canonical_script = _canonical_script_name(script)
     normalized = _normalize_nfc(text)
     invalid: set[str] = set()

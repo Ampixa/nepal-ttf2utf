@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Require exact built-in strings for every public conversion and Unicode-
+  validation text input, including exported converter methods. Non-string
+  iterables and string subclasses now fail before routing, normalization,
+  resource loading, or conversion instead of being consumed as character
+  sequences. Built-in-string output, counts, diagnostics, and normalization
+  are unchanged.
 - Require the built-in `False` or `True` values for every public conversion and
   Unicode-validation Boolean option. Truthy and falsy substitutes now fail
   before font routing, normalization, map parsing, or resource access. Valid

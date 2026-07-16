@@ -23,7 +23,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from ._controls import require_boolean
+from ._controls import require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 TIRHUTA_LO, TIRHUTA_HI = 0x11480, 0x114DF
@@ -416,6 +416,7 @@ class TirhutaConverter:
         self._contract = _DEFAULT_CONTRACT
 
     def convert(self, text: str) -> TirhutaConversion:
+        require_text(text)
         mapped: list[int] = []
         derived: list[bool] = []
         unmapped: set[str] = set()
@@ -459,6 +460,7 @@ _DEFAULT = TirhutaConverter()
 def convert_tirhuta(text: str, *, strict: bool = False) -> TirhutaConversion:
     """Convert Janaki-font text to Unicode Tirhuta (NFC)."""
     require_boolean(strict, "strict")
+    require_text(text)
     result = _DEFAULT.convert(text)
     if strict and result.unmapped_codepoints:
         raise ValueError(

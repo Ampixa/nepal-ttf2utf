@@ -28,7 +28,7 @@ import re
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from ._controls import require_boolean
+from ._controls import require_boolean, require_text
 from .devanagari import (
     DevanagariConversion,
     convert_devanagari,
@@ -438,6 +438,7 @@ def convert(text: str, font: str, *, strict: bool = False) -> str:
     APIs rather than this dispatcher.
     """
     require_boolean(strict, "strict")
+    require_text(text)
     key = _normalize_font_key(font)
     unicode_script = _UNICODE_FONT_SCRIPTS.get(key)
     if unicode_script is not None:

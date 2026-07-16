@@ -45,6 +45,28 @@ class _ExplosiveTruthiness:
         raise AssertionError("Boolean validation invoked user truthiness")
 
 
+class _ExplosiveTextIterable:
+    def __iter__(self):
+        raise AssertionError("text validation invoked user iteration")
+
+    def __len__(self):
+        raise AssertionError("text validation invoked user length")
+
+    def __getitem__(self, key):
+        raise AssertionError("text validation invoked user indexing")
+
+
+class _HostileString(str):
+    def __iter__(self):
+        raise AssertionError("text validation invoked string-subclass iteration")
+
+    def __len__(self):
+        raise AssertionError("text validation invoked string-subclass length")
+
+    def __getitem__(self, key):
+        raise AssertionError("text validation invoked string-subclass indexing")
+
+
 _INVALID_BOOLEAN_VALUES = (
     None,
     0,
@@ -60,6 +82,23 @@ _INVALID_BOOLEAN_VALUES = (
     object(),
     _IntSubclass(1),
     _ExplosiveTruthiness(),
+)
+
+_INVALID_TEXT_FACTORIES = (
+    ("none", lambda: None),
+    ("bytes", lambda: b"A"),
+    ("bytearray", lambda: bytearray(b"A")),
+    ("memoryview", lambda: memoryview(b"A")),
+    ("integer", lambda: 1),
+    ("float", lambda: 1.0),
+    ("list", lambda: ["A"]),
+    ("tuple", lambda: ("A",)),
+    ("mapping", lambda: {"A": 1}),
+    ("set", lambda: {"A"}),
+    ("generator", lambda: iter(("A",))),
+    ("object", object),
+    ("explosive-iterable", _ExplosiveTextIterable),
+    ("hostile-string-subclass", lambda: _HostileString("A")),
 )
 
 _STRICT_PUBLIC_SURFACES = (
@@ -129,9 +168,158 @@ _STRICT_DIAGNOSTIC_SURFACES = (
     ),
 )
 
+_TEXT_PUBLIC_SURFACES = (
+    ("dispatcher", lambda text: package_module.convert(text, font="preeti")),
+    (
+        "unicode-span",
+        lambda text: package_module.validate_unicode_span(text, script="Newa"),
+    ),
+    ("devanagari", package_module.convert_devanagari),
+    ("limbu", package_module.convert_limbu),
+    ("kirat-rai", package_module.convert_kiratrai),
+    ("kirat-rai-herald", package_module.convert_kiratrai_herald),
+    ("sunuwar", package_module.convert_sunuwar),
+    ("tibetanmachine", package_module.convert_tibetanmachine),
+    ("lepcha", package_module.convert_lepcha),
+    ("jg-lepcha", package_module.convert_jg_lepcha),
+    ("ol-chiki", package_module.convert_olchiki),
+    ("ol-chiki-latic", package_module.convert_olchiki_latic),
+    ("tirhuta", package_module.convert_tirhuta),
+    ("magar-akkha", package_module.transliterate_magar_akkha),
+)
+
+_TEXT_STRICT_PRECEDENCE_SURFACES = (
+    ("dispatcher", lambda: package_module.convert([], font="preeti", strict=[])),
+    (
+        "unicode-span",
+        lambda: package_module.validate_unicode_span([], script="Newa", strict=[]),
+    ),
+    ("devanagari", lambda: package_module.convert_devanagari([], strict=[])),
+    ("limbu", lambda: package_module.convert_limbu([], strict=[])),
+    ("kirat-rai", lambda: package_module.convert_kiratrai([], strict=[])),
+    (
+        "kirat-rai-herald",
+        lambda: package_module.convert_kiratrai_herald([], strict=[]),
+    ),
+    ("sunuwar", lambda: package_module.convert_sunuwar([], strict=[])),
+    (
+        "tibetanmachine",
+        lambda: package_module.convert_tibetanmachine([], strict=[]),
+    ),
+    ("lepcha", lambda: package_module.convert_lepcha([], strict=[])),
+    ("jg-lepcha", lambda: package_module.convert_jg_lepcha([], strict=[])),
+    ("ol-chiki", lambda: package_module.convert_olchiki([], strict=[])),
+    (
+        "ol-chiki-latic",
+        lambda: package_module.convert_olchiki_latic([], strict=[]),
+    ),
+    ("tirhuta", lambda: package_module.convert_tirhuta([], strict=[])),
+    (
+        "magar-akkha",
+        lambda: package_module.transliterate_magar_akkha([], strict=[]),
+    ),
+)
+
 
 def test_version_matches_release():
     assert __version__ == "0.3.0"
+
+
+@pytest.fixture(scope="module")
+def public_converter_methods():
+    converters = (
+        ("limbu", package_module.LimbuConverter.default()),
+        ("kirat-rai", package_module.KiratRaiConverter.default()),
+        ("kirat-rai-herald", package_module.KiratRaiHeraldConverter.default()),
+        ("sunuwar", package_module.SunuwarConverter()),
+        ("tibetanmachine", package_module.TibetanMachineConverter.default()),
+        ("lepcha", package_module.LepchaConverter.default()),
+        ("jg-lepcha", package_module.JGLepchaConverter.default()),
+        ("ol-chiki", package_module.OLChikiConverter.default()),
+        ("ol-chiki-latic", package_module.OLChikiLaticConverter.default()),
+        ("tirhuta", package_module.TirhutaConverter()),
+    )
+    return tuple((surface, converter.convert) for surface, converter in converters)
+
+
+@pytest.mark.parametrize(("surface", "call"), _TEXT_PUBLIC_SURFACES)
+@pytest.mark.parametrize(("value_name", "factory"), _INVALID_TEXT_FACTORIES)
+def test_every_public_text_surface_requires_an_exact_builtin_string(
+    surface,
+    call,
+    value_name,
+    factory,
+):
+    with pytest.raises(TypeError, match=r"^text must be a string$"):
+        call(factory())
+
+
+@pytest.mark.parametrize(("value_name", "factory"), _INVALID_TEXT_FACTORIES)
+def test_dispatcher_rejects_invalid_text_before_every_route(value_name, factory):
+    for font in supported_fonts():
+        with pytest.raises(TypeError, match=r"^text must be a string$"):
+            convert(factory(), font=font)
+
+
+@pytest.mark.parametrize(("value_name", "factory"), _INVALID_TEXT_FACTORIES)
+def test_every_exported_converter_method_requires_an_exact_builtin_string(
+    public_converter_methods,
+    value_name,
+    factory,
+):
+    for _surface, call in public_converter_methods:
+        with pytest.raises(TypeError, match=r"^text must be a string$"):
+            call(factory())
+
+
+@pytest.mark.parametrize(("surface", "call"), _TEXT_STRICT_PRECEDENCE_SURFACES)
+def test_invalid_strict_retains_precedence_over_invalid_text(surface, call):
+    with pytest.raises(ValueError, match=r"^strict must be a bool$"):
+        call()
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        (
+            lambda: package_module.convert_devanagari([], normalize_glottal_stop=[]),
+            "Devanagari normalize_glottal_stop",
+        ),
+        (
+            lambda: package_module.convert_sunuwar([], apply_uncertain=[]),
+            "Sunuwar apply_uncertain",
+        ),
+        (
+            lambda: package_module.convert_olchiki([], apply_uncertain=[]),
+            "Ol Chiki apply_uncertain",
+        ),
+        (
+            lambda: package_module.convert_olchiki_latic([], apply_uncertain=[]),
+            "Ol Chiki apply_uncertain",
+        ),
+        (
+            lambda: package_module.transliterate_magar_akkha([], fold_to_minimal_inventory=[]),
+            "Magar Akkha fold_to_minimal_inventory",
+        ),
+    ],
+)
+def test_invalid_format_boolean_retains_precedence_over_invalid_text(call, message):
+    with pytest.raises(ValueError, match=message):
+        call()
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: package_module.convert([], font=object()),
+        lambda: package_module.convert_devanagari([], font=object()),
+        lambda: package_module.validate_unicode_span([], script=object()),
+        lambda: package_module.transliterate_magar_akkha([], target=object()),
+    ],
+)
+def test_invalid_text_precedes_format_selector_validation(call):
+    with pytest.raises(TypeError, match=r"^text must be a string$"):
+        call()
 
 
 @pytest.mark.parametrize(("surface", "call"), _STRICT_PUBLIC_SURFACES)
@@ -239,6 +427,21 @@ def test_direct_converter_validates_strict_before_default_resource_loading(monke
     )
     with pytest.raises(ValueError, match=r"^strict must be a bool$"):
         lepcha_module.convert_lepcha("", strict=[])
+
+
+def test_direct_converter_validates_text_before_default_resource_loading(monkeypatch):
+    monkeypatch.setattr(lepcha_module, "_DEFAULT", None)
+
+    def unexpected_default():
+        raise AssertionError("default resource loaded before text validation")
+
+    monkeypatch.setattr(
+        lepcha_module.LepchaConverter,
+        "default",
+        staticmethod(unexpected_default),
+    )
+    with pytest.raises(TypeError, match=r"^text must be a string$"):
+        lepcha_module.convert_lepcha([])
 
 
 @pytest.mark.parametrize(

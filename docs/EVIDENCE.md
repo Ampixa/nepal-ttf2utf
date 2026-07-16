@@ -42,6 +42,34 @@ and an isolated Python 3.9 installation whose distribution name, version,
 Python requirement, dependency and license inventories, runtime `__version__`,
 and installed console entry point must agree.
 
+## Public source-text invariant
+
+The fourteen public conversion and Unicode-validation function entry points
+accept only exact built-in strings as source text. The same boundary applies to
+the ten exported legacy converter classes, including the inherited Ol Chiki
+Latic conversion method. Lists, tuples, mappings, sets, bytes, byte arrays,
+memory views, generators, arbitrary iterables, and string subclasses raise
+`TypeError` without being iterated, indexed, measured, normalized, or retained
+in a conversion result. Videha trace recovery is outside this invariant because
+its input is a bounded structured sequence of glyph-trace records rather than
+text.
+
+Public functions validate their exact Boolean options first, preserving the
+Boolean error contract, and then validate source text before font or script
+normalization, route selection, default-resource loading, or conversion.
+Exported converter methods validate source text independently so custom
+instances cannot bypass the boundary. Command-line and file conversion remain
+compatible because they decode input bytes to built-in strings before calling
+the dispatcher.
+
+Regression tests apply the invalid-type matrix to all fourteen functions and
+ten class surfaces, exercise every one of the 146 dispatcher aliases, and use
+objects with hostile iteration and indexing hooks to prove fail-before-access
+behavior. The installed-wheel smoke test covers both the dispatcher and a
+direct converter method. Built-in-string conversion output, source fields,
+counts, diagnostics, normalization, strict behavior, route inventories, and
+mapping contracts are unchanged.
+
 ## Public Boolean option invariant
 
 Every public conversion and Unicode-validation Boolean option accepts only the

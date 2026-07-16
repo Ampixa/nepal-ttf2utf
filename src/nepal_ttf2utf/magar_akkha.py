@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from ._controls import require_boolean
+from ._controls import require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 
@@ -166,6 +166,7 @@ def transliterate_magar_akkha(
     """
     require_boolean(fold_to_minimal_inventory, "Magar Akkha fold_to_minimal_inventory")
     require_boolean(strict, "strict")
+    require_text(text)
     if type(target) is not str or target not in {"brahmi", "devanagari"}:
         raise ValueError("target must be 'brahmi' or 'devanagari'")
     if target == "brahmi":

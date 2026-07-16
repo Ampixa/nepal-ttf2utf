@@ -21,7 +21,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
-from ._controls import codepoint_labels, require_boolean
+from ._controls import codepoint_labels, require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 # Digits: byte '0'..'9' -> U+11BF0..U+11BF9 in order.
@@ -174,6 +174,7 @@ class SunuwarConverter:
         self._apply_uncertain = apply_uncertain
 
     def convert(self, text: str) -> SunuwarConversion:
+        require_text(text)
         out: list[str] = []
         replacements = 0
         confirmed = 0
@@ -226,6 +227,7 @@ def convert_sunuwar(
     """
     require_boolean(apply_uncertain, "Sunuwar apply_uncertain")
     require_boolean(strict, "strict")
+    require_text(text)
     result = SunuwarConverter(apply_uncertain=apply_uncertain).convert(text)
     if strict and (result.uncertain_bytes or result.unmapped_bytes):
         flagged = result.uncertain_bytes + result.unmapped_bytes

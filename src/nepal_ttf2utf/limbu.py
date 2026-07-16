@@ -17,7 +17,7 @@ from importlib import resources
 from itertools import islice
 from pathlib import Path
 
-from ._controls import diagnostic_c0_codepoints, require_boolean
+from ._controls import diagnostic_c0_codepoints, require_boolean, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 _BYTE_RULE_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
@@ -645,6 +645,7 @@ class LimbuConverter:
         return "".join(output), tuple(derived), replacements, unmapped
 
     def convert(self, text: str) -> LimbuConversion:
+        require_text(text)
         mapped, derived, replacements, unmapped = self._byte_pass_with_provenance(text)
         converted = _reorder_limbu(mapped, derived, contract=self._contract.reorder)
         converted = unicodedata.normalize("NFC", converted)
@@ -731,6 +732,7 @@ def convert_limbu(text: str, *, strict: bool = False) -> str:
     Limbu repertoire raises ``ValueError``.
     """
     require_boolean(strict, "strict")
+    require_text(text)
     global _DEFAULT
     if _DEFAULT is None:
         _DEFAULT = LimbuConverter.default()

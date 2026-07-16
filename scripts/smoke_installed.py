@@ -96,6 +96,18 @@ def main() -> int:
     second_font_inventory["installed-smoke-mutation"] = "Newa"
     assert supported_fonts() == font_inventory
 
+    invalid_text_calls = (
+        ("dispatcher", lambda: nepal_ttf2utf.convert([], font="preeti")),
+        ("converter method", lambda: LimbuConverter.default().convert([])),
+    )
+    for surface, call in invalid_text_calls:
+        try:
+            call()
+        except TypeError as error:
+            assert str(error) == "text must be a string", surface
+        else:
+            raise AssertionError(f"installed {surface} accepted non-string text")
+
     font_inventory_payload = json.dumps(
         font_inventory, sort_keys=True, separators=(",", ":")
     ).encode("ascii")
