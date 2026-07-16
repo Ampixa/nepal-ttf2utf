@@ -108,6 +108,27 @@ def main() -> int:
         else:
             raise AssertionError(f"installed {surface} accepted non-string text")
 
+    invalid_selector_calls = (
+        ("dispatcher font", "font must be a string", lambda: nepal_ttf2utf.convert("", font=[])),
+        (
+            "Devanagari font",
+            "font must be a string",
+            lambda: convert_devanagari("", font=[]),
+        ),
+        (
+            "Unicode script",
+            "script must be a string",
+            lambda: validate_unicode_span("", script=[]),
+        ),
+    )
+    for surface, message, call in invalid_selector_calls:
+        try:
+            call()
+        except TypeError as error:
+            assert str(error) == message, surface
+        else:
+            raise AssertionError(f"installed {surface} accepted a non-string selector")
+
     font_inventory_payload = json.dumps(
         font_inventory, sort_keys=True, separators=(",", ":")
     ).encode("ascii")

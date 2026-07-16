@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
-from ._controls import require_boolean, require_text
+from ._controls import require_boolean, require_string, require_text
 
 UNICODE_REPERTOIRE_VERSION = "17.0.0"
 
@@ -176,6 +176,7 @@ def _in_ranges(codepoint: int, ranges: tuple[tuple[int, int], ...]) -> bool:
 
 
 def _canonical_script_name(script: str) -> str:
+    require_string(script, "script")
     key = " ".join(script.strip().replace("_", " ").replace("-", " ").split()).casefold()
     names = {name.casefold(): name for name in _ASSIGNED_BLOCK_RANGES}
     try:

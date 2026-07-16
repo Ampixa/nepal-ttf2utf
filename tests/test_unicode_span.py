@@ -107,6 +107,38 @@ def test_unicode_repertoire_is_version_pinned_and_discoverable():
     )
 
 
+def test_every_unicode_script_retains_all_builtin_selector_variants():
+    for script in supported_unicode_scripts():
+        text = chr(_SCRIPT_ANCHORS[script])
+        variants = {
+            script,
+            script.lower(),
+            script.upper(),
+            f"\t{script}\r\n",
+            script.replace(" ", "_"),
+            script.replace(" ", "-"),
+            "   ".join(script.split()),
+        }
+        for variant in variants:
+            result = validate_unicode_span(text, script=variant, strict=True)
+            assert result.script == script
+            assert result.unicode_text == text
+
+
+def test_unsupported_builtin_script_retains_its_specialized_error():
+    with pytest.raises(ValueError, match="unsupported Unicode span script"):
+        validate_unicode_span("", script="does-not-exist")
+
+
+def test_invalid_script_type_fails_before_nfc_normalization(monkeypatch):
+    def unexpected_normalization(_text):
+        raise AssertionError("NFC normalization ran before script validation")
+
+    monkeypatch.setattr("nepal_ttf2utf.unicode_span._normalize_nfc", unexpected_normalization)
+    with pytest.raises(TypeError, match=r"^script must be a string$"):
+        validate_unicode_span("", script=[])
+
+
 @pytest.mark.parametrize(
     "table",
     (_ASSIGNED_BLOCK_RANGES, _SCRIPT_RANGES, _SCRIPT_BLOCK_RANGES),

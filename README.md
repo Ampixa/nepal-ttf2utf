@@ -129,7 +129,9 @@ only built-in strings; callers using byte input must decode it explicitly.
 Bytes, containers, generators, and string subclasses are rejected rather than
 being consumed as character sequences. Boolean options accept only the
 built-in `False` and `True` values. Integers, strings, containers, and custom
-truthiness objects are rejected instead of being coerced.
+truthiness objects are rejected instead of being coerced. Font, script, Magar
+target, and Videha profile selectors also require built-in strings; their
+format-specific unsupported-value errors remain distinct.
 Every converter preserves ASCII space, TAB, CR, and LF exactly, including CRLF
 and lone-CR input. CLI file conversion decodes and encodes bytes explicitly so
 the host language runtime cannot normalize line endings during I/O.

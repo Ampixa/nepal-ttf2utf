@@ -19,7 +19,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
 
-from ._controls import DIAGNOSTIC_C0, require_boolean, require_text
+from ._controls import DIAGNOSTIC_C0, require_boolean, require_string, require_text
 from .unicode_span import _is_assigned_script_codepoint
 
 # Strip C0 values outside the package's structural allowlist. TAB, LF, and CR
@@ -448,6 +448,7 @@ def convert_devanagari(
     require_boolean(strict, "strict")
     require_boolean(normalize_glottal_stop, "Devanagari normalize_glottal_stop")
     require_text(text)
+    require_string(font, "font")
     key = font.strip().lower()
     if key in _PREETI_FAMILY_EXT:
         base_font = "Preeti"

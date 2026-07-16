@@ -14,10 +14,15 @@ def require_boolean(value: object, name: str) -> None:
         raise ValueError(f"{name} must be a bool")
 
 
+def require_string(value: object, name: str) -> None:
+    """Reject non-string and string-subclass scalar input without coercion."""
+    if type(value) is not str:
+        raise TypeError(f"{name} must be a string")
+
+
 def require_text(value: object) -> None:
     """Reject non-string and string-subclass conversion input."""
-    if type(value) is not str:
-        raise TypeError("text must be a string")
+    require_string(value, "text")
 
 
 def diagnostic_c0_codepoints(text: str) -> set[str]:

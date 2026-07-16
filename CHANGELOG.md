@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Complete the exact built-in-string contract for public format and script
+  selectors. Dispatcher and direct Devanagari fonts now share an explicit
+  `TypeError`, and Unicode script names fail likewise before user-overridable
+  normalization hooks. Existing built-in selector normalization, aliases,
+  routes, outputs, Magar target errors, and Videha profile errors are unchanged.
 - Require exact built-in strings for every public conversion and Unicode-
   validation text input, including exported converter methods. Non-string
   iterables and string subclasses now fail before routing, normalization,

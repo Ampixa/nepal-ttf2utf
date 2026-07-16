@@ -70,6 +70,37 @@ direct converter method. Built-in-string conversion output, source fields,
 counts, diagnostics, normalization, strict behavior, route inventories, and
 mapping contracts are unchanged.
 
+## Public selector invariant
+
+The six public font, script, transliteration-target, and recovery-profile
+selector surfaces accept only exact built-in strings. Dispatcher and direct
+Devanagari font type failures raise `TypeError("font must be a string")`;
+Unicode validation raises `TypeError("script must be a string")`. Magar Akkha
+target selection retains its specialized `ValueError`, while both Videha
+profile entry points retain `VidehaProfileError` and the recovery API's
+profile-first metadata validation order. Unsupported built-in selector values
+continue to use their existing format-specific errors.
+
+The dispatcher validates strict mode and source text before the font selector.
+Its 146 supported aliases are ASCII and case-insensitive; surrounding
+whitespace is removed, underscores become hyphens, and one leading six-letter
+PDF subset tag is removed. Direct Devanagari selection accepts its seven
+returned keys case-insensitively with surrounding whitespace removed, without
+applying the dispatcher's broader normalization. Unicode script selection is
+case-insensitive, removes surrounding whitespace, collapses internal
+whitespace, and treats underscores and hyphens as word separators. No family,
+weight, file-suffix, or partial-name inference is applied.
+
+Regression tests reject scalar and container substitutes, selector impostors,
+and string subclasses without invoking their normalization or representation
+hooks. They retain Boolean-before-text-before-selector precedence, exercise
+normalized variants of all 146 dispatcher aliases and seven Devanagari keys,
+and validate canonical and normalized variants of all eleven Unicode script
+names. Installed-wheel smoke covers all three newly completed selector
+boundaries. Alias inventories, route digests, Unicode repertoire tables,
+normalization data, mappings, and built-in-string conversion behavior are
+unchanged.
+
 ## Public Boolean option invariant
 
 Every public conversion and Unicode-validation Boolean option accepts only the

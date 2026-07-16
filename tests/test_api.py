@@ -67,6 +67,22 @@ class _HostileString(str):
         raise AssertionError("text validation invoked string-subclass indexing")
 
 
+class _SelectorImpostor:
+    def strip(self):
+        raise AssertionError("selector validation invoked impostor normalization")
+
+    def __repr__(self):
+        raise AssertionError("selector validation invoked impostor representation")
+
+
+class _HostileSelectorString(str):
+    def strip(self):
+        raise AssertionError("selector validation invoked string-subclass normalization")
+
+    def __repr__(self):
+        raise AssertionError("selector validation invoked string-subclass representation")
+
+
 _INVALID_BOOLEAN_VALUES = (
     None,
     0,
@@ -99,6 +115,23 @@ _INVALID_TEXT_FACTORIES = (
     ("object", object),
     ("explosive-iterable", _ExplosiveTextIterable),
     ("hostile-string-subclass", lambda: _HostileString("A")),
+)
+
+_INVALID_SELECTOR_FACTORIES = (
+    ("none", lambda: None),
+    ("bytes", lambda: b"preeti"),
+    ("bytearray", lambda: bytearray(b"preeti")),
+    ("memoryview", lambda: memoryview(b"preeti")),
+    ("integer", lambda: 1),
+    ("float", lambda: 1.0),
+    ("list", lambda: ["preeti"]),
+    ("tuple", lambda: ("preeti",)),
+    ("mapping", lambda: {"preeti": 1}),
+    ("set", lambda: {"preeti"}),
+    ("generator", lambda: iter(("preeti",))),
+    ("object", object),
+    ("selector-impostor", _SelectorImpostor),
+    ("hostile-string-subclass", lambda: _HostileSelectorString("preeti")),
 )
 
 _STRICT_PUBLIC_SURFACES = (
@@ -220,6 +253,24 @@ _TEXT_STRICT_PRECEDENCE_SURFACES = (
     ),
 )
 
+_SELECTOR_TYPE_SURFACES = (
+    (
+        "dispatcher-font",
+        "font",
+        lambda selector: package_module.convert("", font=selector),
+    ),
+    (
+        "devanagari-font",
+        "font",
+        lambda selector: package_module.convert_devanagari("", font=selector),
+    ),
+    (
+        "unicode-script",
+        "script",
+        lambda selector: package_module.validate_unicode_span("", script=selector),
+    ),
+)
+
 
 def test_version_matches_release():
     assert __version__ == "0.3.0"
@@ -240,6 +291,70 @@ def public_converter_methods():
         ("tirhuta", package_module.TirhutaConverter()),
     )
     return tuple((surface, converter.convert) for surface, converter in converters)
+
+
+@pytest.mark.parametrize(("surface", "name", "call"), _SELECTOR_TYPE_SURFACES)
+@pytest.mark.parametrize(("value_name", "factory"), _INVALID_SELECTOR_FACTORIES)
+def test_general_conversion_selectors_require_exact_builtin_strings(
+    surface,
+    name,
+    call,
+    value_name,
+    factory,
+):
+    with pytest.raises(TypeError, match=rf"^{name} must be a string$"):
+        call(factory())
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        (
+            lambda: package_module.convert("", font=[], strict=[]),
+            "strict must be a bool",
+        ),
+        (
+            lambda: package_module.convert_devanagari("", font=[], strict=[]),
+            "strict must be a bool",
+        ),
+        (
+            lambda: package_module.convert_devanagari("", font=[], normalize_glottal_stop=[]),
+            "Devanagari normalize_glottal_stop must be a bool",
+        ),
+        (
+            lambda: package_module.validate_unicode_span("", script=[], strict=[]),
+            "strict must be a bool",
+        ),
+    ],
+)
+def test_boolean_validation_retains_precedence_over_selector_validation(call, message):
+    with pytest.raises(ValueError, match=rf"^{message}$"):
+        call()
+
+
+def test_every_builtin_font_alias_retains_all_normalized_selector_variants():
+    for alias in supported_fonts():
+        assert type(alias) is str
+        assert alias.isascii()
+        variants = {
+            alias,
+            alias.upper(),
+            f"\t{alias}\r\n",
+            alias.replace("-", "_"),
+            f"ABCDEF+{alias}",
+        }
+        for variant in variants:
+            assert package_module._normalize_font_key(variant) == alias
+            assert convert("", font=variant) == ""
+
+
+def test_direct_devanagari_fonts_retain_case_and_outer_whitespace_normalization():
+    for font in package_module.supported_devanagari_fonts():
+        assert type(font) is str
+        for variant in {font, font.upper(), f"\t{font}\r\n"}:
+            result = package_module.convert_devanagari("", font=variant)
+            assert result.legacy_text == ""
+            assert result.unicode_text == ""
 
 
 @pytest.mark.parametrize(("surface", "call"), _TEXT_PUBLIC_SURFACES)

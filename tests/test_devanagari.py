@@ -125,6 +125,15 @@ def test_dependency_and_route_snapshots_are_transitively_immutable():
         devanagari._PREETI_FAMILY_EXT["nayanepal"]["†"] = "x"
 
 
+def test_invalid_font_type_fails_before_dependency_access(monkeypatch):
+    def unexpected_dependency_access():
+        raise AssertionError("dependency loaded before font validation")
+
+    monkeypatch.setattr(devanagari, "_dependency_contract", unexpected_dependency_access)
+    with pytest.raises(TypeError, match=r"^font must be a string$"):
+        convert_devanagari("", font=[])
+
+
 def test_dependency_contract_rejects_altered_bytes_and_duplicate_json_keys(monkeypatch):
     raw = _installed_dependency_map()
     with pytest.raises(RuntimeError, match="size"):

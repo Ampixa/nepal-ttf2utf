@@ -28,7 +28,7 @@ import re
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from ._controls import require_boolean, require_text
+from ._controls import require_boolean, require_string, require_text
 from .devanagari import (
     DevanagariConversion,
     convert_devanagari,
@@ -333,8 +333,7 @@ _GURUNG_KHEMA_UNICODE_FONTS = frozenset(
 
 def _normalize_font_key(font: str) -> str:
     """Normalize a user/PDF font name while preserving meaningful family text."""
-    if not isinstance(font, str):
-        raise TypeError("font must be a string")
+    require_string(font, "font")
     key = font.strip().lower().replace("_", "-")
     return re.sub(r"^[a-z]{6}\+", "", key)
 
