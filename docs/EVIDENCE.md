@@ -5,6 +5,43 @@ defined by a public conversion table. Exact outline identity, labeled regional
 glyphs, or native-reader evidence can establish a mapping. A nearest visual
 match by itself cannot.
 
+## Distribution artifact contract
+
+The build contract binds installer-facing artifacts to project version 0.3.0.
+The only accepted archive names are
+`nepal_ttf2utf-0.3.0-py3-none-any.whl` and
+`nepal_ttf2utf-0.3.0.tar.gz`; their internal distribution-info and source roots
+are `nepal_ttf2utf-0.3.0.dist-info` and `nepal_ttf2utf-0.3.0`. The wheel tag is
+`py3-none-any`, `Root-Is-Purelib` is true, and the declared Python requirement
+is `>=3.9`.
+
+Wheel `METADATA` and sdist `PKG-INFO` must each contain one exact value for Core
+Metadata 2.4, the project name, version, summary, author, SPDX license
+expression, Python requirement, description content type, and serialized
+keyword inventory. Project URLs, classifiers, license files, dependencies, and
+the `dev` extra are checked for their exact duplicate-free inventories. The
+complete metadata header-name inventory is fixed, so legacy, maintainer,
+dynamic, relationship, external-dependency, extension, and other undeclared
+fields are rejected. The metadata description body must equal the repository
+README, while package files, required sdist files, notices, and mapping
+resources retain their existing source-byte parity and resource-hash checks.
+
+`WHEEL` is parsed as header metadata rather than accepted by presence alone. It
+must contain only its four declared header families, identify Wheel 1.0, a
+pure-Python install, one `py3-none-any` tag, no payload, and a syntactically
+versioned Hatchling generator. The Hatchling version is not pinned.
+`entry_points.txt` is parsed as strict, non-interpolating INI and must contain
+only the `console_scripts` binding
+`nepal-ttf2utf = nepal_ttf2utf.cli:main`; comments, whitespace, and line-ending
+style do not affect that semantic comparison.
+
+Archive compression, timestamps, member order, metadata header order and
+folding, and the exact build-backend version are intentionally not pinned.
+Fresh artifact verification includes `twine`, wheel `RECORD` digests and sizes,
+and an isolated Python 3.9 installation whose distribution name, version,
+Python requirement, dependency and license inventories, runtime `__version__`,
+and installed console entry point must agree.
+
 ## Structural whitespace invariant
 
 ASCII space, TAB, CR, and LF delimit words, columns, and lines; they are not

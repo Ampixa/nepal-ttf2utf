@@ -4,18 +4,103 @@
 from __future__ import annotations
 
 import base64
+import configparser
 import csv
 import hashlib
 import io
+import re
 import stat
 import sys
 import tarfile
 import zipfile
+from email import policy
 from email.parser import Parser
 from pathlib import Path, PurePosixPath
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_SOURCE = REPOSITORY_ROOT / "src" / "nepal_ttf2utf"
+
+EXPECTED_PROJECT_NAME = "nepal-ttf2utf"
+EXPECTED_PROJECT_VERSION = "0.3.0"
+EXPECTED_REQUIRES_PYTHON = ">=3.9"
+EXPECTED_METADATA_VERSION = "2.4"
+EXPECTED_PROJECT_SUMMARY = (
+    "Legacy-font conversion and Unicode span validation for scripts of Nepal and Sikkim."
+)
+EXPECTED_PROJECT_AUTHOR = "Ampixa"
+EXPECTED_LICENSE_EXPRESSION = "MIT"
+EXPECTED_DESCRIPTION_CONTENT_TYPE = "text/markdown"
+EXPECTED_DIST_INFO = "nepal_ttf2utf-0.3.0.dist-info"
+EXPECTED_SDIST_ROOT = "nepal_ttf2utf-0.3.0"
+EXPECTED_WHEEL_FILENAME = "nepal_ttf2utf-0.3.0-py3-none-any.whl"
+EXPECTED_SDIST_FILENAME = "nepal_ttf2utf-0.3.0.tar.gz"
+EXPECTED_WHEEL_TAG = "py3-none-any"
+EXPECTED_CONSOLE_ENTRY_POINTS = {"nepal-ttf2utf": "nepal_ttf2utf.cli:main"}
+EXPECTED_PROJECT_URLS = {
+    "Homepage, https://github.com/Ampixa/nepal-ttf2utf",
+    "Repository, https://github.com/Ampixa/nepal-ttf2utf",
+    "Issues, https://github.com/Ampixa/nepal-ttf2utf/issues",
+}
+EXPECTED_CLASSIFIERS = {
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Text Processing :: Linguistic",
+}
+EXPECTED_KEYWORDS = {
+    "brahmi",
+    "devanagari",
+    "gurung-khema",
+    "kirat-rai",
+    "legacy-font",
+    "lepcha",
+    "limbu",
+    "magar-akkha",
+    "nepal",
+    "nepali",
+    "newa",
+    "ocr",
+    "ol-chiki",
+    "olcklatic",
+    "preeti",
+    "sikkim",
+    "sirijonga",
+    "sunuwar",
+    "tibetan",
+    "tirhuta",
+    "unicode",
+    "unicode-validation",
+}
+EXPECTED_CORE_METADATA_HEADERS = {
+    "Metadata-Version",
+    "Name",
+    "Version",
+    "Summary",
+    "Project-URL",
+    "Author",
+    "License-Expression",
+    "License-File",
+    "Keywords",
+    "Classifier",
+    "Requires-Python",
+    "Requires-Dist",
+    "Provides-Extra",
+    "Description-Content-Type",
+}
+EXPECTED_WHEEL_HEADERS = {
+    "Wheel-Version",
+    "Generator",
+    "Root-Is-Purelib",
+    "Tag",
+}
 
 EXPECTED_PACKAGE_FILES = {
     "__init__.py",
@@ -102,6 +187,7 @@ EXPECTED_SDIST_DIRECTORY_FILES = {
 FORBIDDEN_COMPONENTS = {".pytest_cache", ".ruff_cache", "__pycache__"}
 FORBIDDEN_FILENAMES = {".DS_Store", "BLOG_DRAFT.md"}
 EXPECTED_REQUIRES_DIST = ("npttf2utf==0.3.7", "pytest>=7; extra == 'dev'")
+EXPECTED_PROVIDES_EXTRA = ("dev",)
 
 
 def _sha256(data: bytes) -> str:
@@ -157,14 +243,150 @@ def _prefixed_files(members: dict[str, bytes], prefix: str) -> dict[str, bytes]:
     return {name[len(prefix) :]: data for name, data in members.items() if name.startswith(prefix)}
 
 
-def _declared_license_files(metadata: str) -> set[str]:
-    message = Parser().parsestr(metadata, headersonly=True)
-    return set(message.get_all("License-File", ()))
+def _decode_utf8(data: bytes, context: str) -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise AssertionError(f"{context} is not valid UTF-8") from error
 
 
-def _declared_runtime_requirements(metadata: str) -> tuple[str, ...]:
-    message = Parser().parsestr(metadata, headersonly=True)
-    return tuple(message.get_all("Requires-Dist", ()))
+def _parse_headers(data: bytes, context: str):
+    message = Parser(policy=policy.default).parsestr(_decode_utf8(data, context))
+    if message.defects:
+        raise AssertionError(f"{context} has malformed headers: {message.defects!r}")
+    return message
+
+
+def _single_header(message, name: str, context: str) -> str:
+    values = tuple(message.get_all(name, ()))
+    _require_equal(len(values), 1, f"{context} {name} count")
+    return values[0]
+
+
+def _verify_header_inventory(message, expected: set[str], context: str) -> None:
+    actual_names = tuple(message.keys())
+    expected_by_normalized = {name.casefold(): name for name in expected}
+    actual_by_normalized = {name.casefold(): name for name in actual_names}
+    missing = sorted(
+        expected_by_normalized[name]
+        for name in expected_by_normalized.keys() - actual_by_normalized.keys()
+    )
+    unexpected = sorted(
+        actual_by_normalized[name]
+        for name in actual_by_normalized.keys() - expected_by_normalized.keys()
+    )
+    if missing or unexpected:
+        raise AssertionError(
+            f"{context} header inventory: missing {missing!r}; unexpected {unexpected!r}"
+        )
+
+
+def _verify_core_metadata(data: bytes, context: str) -> None:
+    message = _parse_headers(data, context)
+    _verify_header_inventory(message, EXPECTED_CORE_METADATA_HEADERS, context)
+    expected_singletons = {
+        "Metadata-Version": EXPECTED_METADATA_VERSION,
+        "Name": EXPECTED_PROJECT_NAME,
+        "Version": EXPECTED_PROJECT_VERSION,
+        "Summary": EXPECTED_PROJECT_SUMMARY,
+        "Author": EXPECTED_PROJECT_AUTHOR,
+        "License-Expression": EXPECTED_LICENSE_EXPRESSION,
+        "Requires-Python": EXPECTED_REQUIRES_PYTHON,
+        "Description-Content-Type": EXPECTED_DESCRIPTION_CONTENT_TYPE,
+    }
+    for name, expected in expected_singletons.items():
+        _require_equal(_single_header(message, name, context), expected, f"{context} {name}")
+
+    license_files = tuple(message.get_all("License-File", ()))
+    _require_equal(
+        len(license_files), len(set(license_files)), f"{context} License-File uniqueness"
+    )
+    _require_equal(set(license_files), set(LICENSE_FILES), f"{context} License-File metadata")
+    requirements = tuple(message.get_all("Requires-Dist", ()))
+    _require_equal(len(requirements), len(set(requirements)), f"{context} Requires-Dist uniqueness")
+    _require_equal(
+        set(requirements), set(EXPECTED_REQUIRES_DIST), f"{context} Requires-Dist metadata"
+    )
+    _require_equal(
+        tuple(message.get_all("Provides-Extra", ())),
+        EXPECTED_PROVIDES_EXTRA,
+        f"{context} Provides-Extra metadata",
+    )
+    for name, expected in (
+        ("Project-URL", EXPECTED_PROJECT_URLS),
+        ("Classifier", EXPECTED_CLASSIFIERS),
+    ):
+        values = tuple(message.get_all(name, ()))
+        _require_equal(len(values), len(set(values)), f"{context} {name} uniqueness")
+        _require_equal(set(values), expected, f"{context} {name} metadata")
+
+    serialized_keywords = _single_header(message, "Keywords", context)
+    keywords = tuple(part.strip() for part in serialized_keywords.split(","))
+    _require_equal(len(keywords), len(set(keywords)), f"{context} Keywords uniqueness")
+    _require_equal(set(keywords), EXPECTED_KEYWORDS, f"{context} Keywords metadata")
+    _require_equal(
+        message.get_payload(),
+        (REPOSITORY_ROOT / "README.md").read_text("utf-8"),
+        f"{context} description body",
+    )
+
+
+def _verify_wheel_metadata(data: bytes) -> None:
+    context = "wheel WHEEL metadata"
+    message = _parse_headers(data, context)
+    _verify_header_inventory(message, EXPECTED_WHEEL_HEADERS, context)
+    _require_equal(
+        _single_header(message, "Wheel-Version", context),
+        "1.0",
+        f"{context} Wheel-Version",
+    )
+    _require_equal(
+        _single_header(message, "Root-Is-Purelib", context),
+        "true",
+        f"{context} Root-Is-Purelib",
+    )
+    _require_equal(
+        tuple(message.get_all("Tag", ())),
+        (EXPECTED_WHEEL_TAG,),
+        f"{context} Tag",
+    )
+    generator = _single_header(message, "Generator", context)
+    generator_version = generator.removeprefix("hatchling ")
+    if (
+        not generator.startswith("hatchling ")
+        or re.fullmatch(
+            r"\d+(?:\.\d+)*(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?"
+            r"(?:\+[a-z0-9]+(?:[._-][a-z0-9]+)*)?",
+            generator_version,
+            flags=re.IGNORECASE,
+        )
+        is None
+    ):
+        raise AssertionError(f"{context} Generator is not a versioned hatchling identifier")
+    _require_equal(message.get_payload(), "", f"{context} payload")
+
+
+def _verify_entry_points(data: bytes) -> None:
+    context = "wheel entry_points.txt"
+    parser = configparser.ConfigParser(
+        interpolation=None,
+        strict=True,
+        delimiters=("=",),
+        allow_no_value=False,
+        empty_lines_in_values=False,
+    )
+    parser.optionxform = str
+    try:
+        parser.read_string(_decode_utf8(data, context))
+    except configparser.Error as error:
+        raise AssertionError(f"{context} is malformed: {error}") from error
+    _require_equal(parser.defaults(), {}, f"{context} defaults")
+    _require_equal(parser.sections(), ["console_scripts"], f"{context} sections")
+    _require_equal(
+        dict(parser.items("console_scripts", raw=True)),
+        EXPECTED_CONSOLE_ENTRY_POINTS,
+        f"{context} console scripts",
+    )
 
 
 def _verify_package_files(actual: dict[str, bytes], context: str) -> None:
@@ -193,6 +415,7 @@ def _verify_record(members: dict[str, bytes], dist_info: str) -> None:
 
 
 def verify_wheel(path: Path) -> None:
+    _require_equal(path.name, EXPECTED_WHEEL_FILENAME, "wheel filename")
     with zipfile.ZipFile(path) as archive:
         entries = archive.infolist()
         names = [info.filename for info in entries]
@@ -213,8 +436,8 @@ def verify_wheel(path: Path) -> None:
     _verify_package_files(_prefixed_files(members, "nepal_ttf2utf/"), "wheel")
 
     dist_infos = {name.split("/", 1)[0] for name in members if ".dist-info/" in name}
-    _require_equal(len(dist_infos), 1, "wheel dist-info directory count")
-    dist_info = next(iter(dist_infos))
+    _require_equal(dist_infos, {EXPECTED_DIST_INFO}, "wheel dist-info identity")
+    dist_info = EXPECTED_DIST_INFO
     expected_members = {f"nepal_ttf2utf/{name}" for name in EXPECTED_PACKAGE_FILES}
     expected_members.update(
         {
@@ -226,26 +449,18 @@ def verify_wheel(path: Path) -> None:
         }
     )
     _require_equal(set(members), expected_members, "wheel complete member inventory")
-    metadata_name = f"{dist_info}/METADATA"
-    metadata = members[metadata_name].decode("utf-8")
-    declared_licenses = _declared_license_files(metadata)
-    _require_equal(declared_licenses, set(LICENSE_FILES), "wheel License-File metadata")
-    _require_equal(
-        _declared_runtime_requirements(metadata),
-        EXPECTED_REQUIRES_DIST,
-        "wheel Requires-Dist metadata",
-    )
+    _verify_core_metadata(members[f"{dist_info}/METADATA"], "wheel METADATA")
+    _verify_wheel_metadata(members[f"{dist_info}/WHEEL"])
     for relative in LICENSE_FILES:
         member = f"{dist_info}/licenses/{relative}"
         _require_equal(members[member], (REPOSITORY_ROOT / relative).read_bytes(), member)
 
-    entry_points = members[f"{dist_info}/entry_points.txt"].decode("utf-8")
-    if "nepal-ttf2utf = nepal_ttf2utf.cli:main" not in entry_points:
-        raise AssertionError("wheel console entry point is missing or incorrect")
+    _verify_entry_points(members[f"{dist_info}/entry_points.txt"])
     _verify_record(members, dist_info)
 
 
 def verify_sdist(path: Path) -> None:
+    _require_equal(path.name, EXPECTED_SDIST_FILENAME, "sdist filename")
     with tarfile.open(path, "r:*") as archive:
         entries = archive.getmembers()
         names = [member.name for member in entries]
@@ -264,8 +479,8 @@ def verify_sdist(path: Path) -> None:
             members[member.name] = extracted.read()
 
     roots = {name.split("/", 1)[0] for name in members}
-    _require_equal(len(roots), 1, "sdist top-level directory count")
-    root = next(iter(roots))
+    _require_equal(roots, {EXPECTED_SDIST_ROOT}, "sdist root identity")
+    root = EXPECTED_SDIST_ROOT
     expected_directories = {}
     for directory, expected_names in EXPECTED_SDIST_DIRECTORY_FILES.items():
         source_files = _source_files(REPOSITORY_ROOT / directory)
@@ -287,17 +502,7 @@ def verify_sdist(path: Path) -> None:
     }
     _require_equal(set(members), expected_members, "sdist complete member inventory")
 
-    package_info = members[f"{root}/PKG-INFO"].decode("utf-8")
-    _require_equal(
-        _declared_license_files(package_info),
-        set(LICENSE_FILES),
-        "sdist License-File metadata",
-    )
-    _require_equal(
-        _declared_runtime_requirements(package_info),
-        EXPECTED_REQUIRES_DIST,
-        "sdist Requires-Dist metadata",
-    )
+    _verify_core_metadata(members[f"{root}/PKG-INFO"], "sdist PKG-INFO")
     package_files = _prefixed_files(members, f"{root}/src/nepal_ttf2utf/")
     _verify_package_files(package_files, "sdist")
 

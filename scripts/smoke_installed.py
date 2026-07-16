@@ -472,12 +472,25 @@ def main() -> int:
     else:
         raise AssertionError("strict Devanagari conversion accepted deleted input")
 
-    package_metadata = metadata.metadata("nepal-ttf2utf")
-    assert set(package_metadata.get_all("License-File") or ()) == EXPECTED_LICENSE_FILES
-    assert tuple(package_metadata.get_all("Requires-Dist") or ()) == (
+    package_distribution = metadata.distribution("nepal-ttf2utf")
+    package_metadata = package_distribution.metadata
+    assert tuple(package_metadata.get_all("Name") or ()) == ("nepal-ttf2utf",)
+    assert tuple(package_metadata.get_all("Version") or ()) == ("0.3.0",)
+    assert package_distribution.version == nepal_ttf2utf.__version__ == "0.3.0"
+    assert tuple(package_metadata.get_all("Requires-Python") or ()) == (">=3.9",)
+    license_files = tuple(package_metadata.get_all("License-File") or ())
+    assert len(license_files) == len(set(license_files))
+    assert set(license_files) == EXPECTED_LICENSE_FILES
+    requirements = tuple(package_metadata.get_all("Requires-Dist") or ())
+    assert len(requirements) == len(set(requirements))
+    assert set(requirements) == {
         "npttf2utf==0.3.7",
         "pytest>=7; extra == 'dev'",
-    )
+    }
+    assert tuple(package_metadata.get_all("Provides-Extra") or ()) == ("dev",)
+    assert {
+        (entry.group, entry.name, entry.value) for entry in package_distribution.entry_points
+    } == {("console_scripts", "nepal-ttf2utf", "nepal_ttf2utf.cli:main")}
     completed = subprocess.run(
         ["nepal-ttf2utf", "--font", "jg-lepcha", "k"],
         check=False,

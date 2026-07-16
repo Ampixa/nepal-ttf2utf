@@ -241,8 +241,9 @@ hash-pinned glyph-ID
 recovery, version-stable assigned-repertoire validation, cross-script routing,
 exact structural-whitespace preservation, exhaustive diagnostic C0 and
 reserved-position rejection, CLI behavior, mapping-resource validation,
-source-to-wheel/sdist byte parity, and isolated installed-wheel resource
-loading.
+source-to-wheel/sdist byte parity, exact distribution identity and metadata,
+semantic wheel/entry-point validation, and isolated installed-wheel resource
+and metadata loading.
 
 ## Licenses
 

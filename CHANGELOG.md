@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Bind built artifacts to the complete 0.3.0 distribution identity: exact wheel
+  and sdist names and roots, duplicate-free core metadata, Python requirement,
+  README description, pure-Python wheel tag, Hatchling generator family, and a
+  single structurally parsed console entry point. Installed-wheel smoke now
+  checks metadata/runtime version parity and the installed entry-point set.
 - Unify TibetanMachine custom construction and CSV loading so every decoded
   CP1252 source gains the same non-conflicting raw-byte alias. Replace the
   check-before-read size gate with a bounded binary read and contextual UTF-8
