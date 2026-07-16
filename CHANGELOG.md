@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Complete the Sikkim Herald Lepcha custom-map boundary: cap mapping item
+  streams, reject malformed entries and duplicate semantic source bytes,
+  and normalize excessive JSON nesting to contextual validation errors. The
+  bundled map, conversion output, reordering, and diagnostics are unchanged.
 - Bind built artifacts to the complete 0.3.0 distribution identity: exact wheel
   and sdist names and roots, duplicate-free core metadata, Python requirement,
   README description, pure-Python wheel tag, Hatchling generator family, and a

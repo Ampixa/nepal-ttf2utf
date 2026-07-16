@@ -444,9 +444,11 @@ codepoints; every bundled target is a singleton. The targets comprise 36
 letters, ten nonspacing marks, nine spacing marks, and ten digits. Tests pin
 every mapping's exact isolated output and classify all 256 single-byte inputs,
 including structural whitespace, literal hyphen passthrough, and unsupported
-input. The custom-map reader rejects duplicate or noncanonical keys, unknown
-fields, empty or non-list targets, unsafe source bytes, and targets outside
-the pinned assigned Lepcha repertoire.
+input. The custom-map reader rejects duplicate or noncanonical JSON keys,
+unknown fields, empty or non-list targets, unsafe source bytes, targets outside
+the pinned assigned Lepcha repertoire, excessive JSON nesting, malformed
+mapping items, duplicate semantic source bytes, and bounded-item-stream
+violations.
 
 The functional-digest payload is an outer JSON array of
 `[source-byte, target-codepoint-array]` pairs sorted by source byte, serialized
@@ -479,7 +481,10 @@ characters with 65 Lepcha characters, 65 replacements, and 186 distinct
 diagnostics; its UTF-8 output has SHA-256
 `bd7cd93d6e0a683440b903a80c159fa8c036880d2e5f8da92b3ae62220115ee1`.
 Custom maps are limited to 256 source entries, 256 target codepoints per source,
-and 1,000,000 map-file bytes.
+64 JSON container-nesting levels, and 1,000,000 map-file bytes.
+Direct-constructor item and target iterables are consumed through explicit
+bounds; malformed or unordered entry shapes and noniterable item streams fail
+with contextual validation errors.
 
 ## JG Lepcha placeholders
 

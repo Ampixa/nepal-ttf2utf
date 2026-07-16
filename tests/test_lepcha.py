@@ -328,6 +328,39 @@ def test_lepcha_map_parser_rejects_oversized_files_before_decoding(tmp_path):
         LepchaConverter.from_map_file(map_path)
 
 
+def test_lepcha_map_parser_fails_closed_on_deep_json(tmp_path):
+    map_path = tmp_path / "deeply-nested.json"
+    map_path.write_text(
+        '{"map":' + "[" * 10_000 + "0" + "]" * 10_000 + "}",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="exceeds 64 JSON nesting levels"):
+        LepchaConverter.from_map_file(map_path)
+
+
+def test_lepcha_map_parser_normalizes_decoder_recursion_error(monkeypatch, tmp_path):
+    map_path = tmp_path / "recursive-decoder.json"
+    map_path.write_text('{"map":{"41":["1C00"]}}', encoding="utf-8")
+
+    def recursive_decoder(*args, **kwargs):
+        raise RecursionError("decoder nesting limit")
+
+    monkeypatch.setattr(lepcha_module.json, "loads", recursive_decoder)
+    with pytest.raises(ValueError, match="invalid nested JSON in Lepcha legacy map"):
+        LepchaConverter.from_map_file(map_path)
+
+
+def test_lepcha_json_depth_scan_ignores_container_tokens_inside_strings(tmp_path):
+    map_path = tmp_path / "brackets-in-metadata.json"
+    map_path.write_text(
+        json.dumps({"_doc": '[\\"]{' * 1_000, "map": {"41": ["1C00"]}}),
+        encoding="utf-8",
+    )
+
+    assert LepchaConverter.from_map_file(map_path).convert("A").unicode_text == "ᰀ"
+
+
 @pytest.mark.parametrize(
     "byte_map",
     [
@@ -415,6 +448,62 @@ def test_lepcha_constructor_rejects_an_unbounded_mapping_without_hanging():
 
     with pytest.raises(ValueError, match="source map exceeds 256 entries"):
         LepchaConverter(EndlessMapping())
+
+
+class _PathologicalLepchaItemsMapping(Mapping):
+    def __init__(self, items):
+        self._items = items
+
+    def __getitem__(self, key):
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return 1
+
+    def items(self):
+        return self._items
+
+
+@pytest.mark.parametrize(
+    "raw_item",
+    [
+        0x41,
+        {0x41, 0x1C00},
+        (0x41,),
+        (0x41, (0x1C00,), "extra"),
+        {0x41: (0x1C00,)},
+        "AB",
+    ],
+)
+def test_lepcha_constructor_rejects_malformed_mapping_items(raw_item):
+    byte_map = _PathologicalLepchaItemsMapping((raw_item,))
+
+    with pytest.raises(ValueError, match="invalid Lepcha source map entry"):
+        LepchaConverter(byte_map)
+
+
+def test_lepcha_constructor_rejects_duplicate_semantic_sources():
+    byte_map = _PathologicalLepchaItemsMapping(((0x41, (0x1C00,)), (0x41, (0x1C01,))))
+
+    with pytest.raises(ValueError, match="duplicate Lepcha source byte: 0x41"):
+        LepchaConverter(byte_map)
+
+
+@pytest.mark.parametrize(
+    ("items", "message"),
+    [
+        (None, "invalid Lepcha source map item sequence"),
+        (repeat((0x41, (0x1C00,))), "source map exceeds 256 entries"),
+    ],
+)
+def test_lepcha_constructor_rejects_invalid_or_unbounded_item_sequences(items, message):
+    byte_map = _PathologicalLepchaItemsMapping(items)
+
+    with pytest.raises(ValueError, match=message):
+        LepchaConverter(byte_map)
 
 
 def test_complete_byte_aggregate_retains_the_corrected_pinned_output():

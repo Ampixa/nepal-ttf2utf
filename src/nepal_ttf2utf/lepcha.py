@@ -47,6 +47,7 @@ _TARGET_KEY_RE = re.compile(r"[0-9A-F]{4}")
 _FORBIDDEN_SOURCE_BYTES = frozenset(range(0x21)) | {0x7F}
 _MAX_MAP_ENTRIES = 256
 _MAX_MAP_FILE_BYTES = 1_000_000
+_MAX_MAP_JSON_DEPTH = 64
 _MAX_TARGET_CODEPOINTS = 256
 
 # Pre-base dependent vowel signs (keyed before the base in the legacy visual stream;
@@ -145,6 +146,44 @@ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def _reject_excessive_json_depth(map_text: str, map_path: Path) -> None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for character in map_text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character in "[{":
+            depth += 1
+            if depth > _MAX_MAP_JSON_DEPTH:
+                raise ValueError(
+                    f"Lepcha legacy map exceeds {_MAX_MAP_JSON_DEPTH} JSON nesting levels: "
+                    f"{map_path}"
+                )
+        elif character in "]}":
+            depth = max(0, depth - 1)
+
+
+def _bounded_map_items(byte_map: Mapping[object, object]) -> tuple[object, ...]:
+    try:
+        map_items = tuple(islice(iter(byte_map.items()), _MAX_MAP_ENTRIES + 1))
+    except (TypeError, ValueError) as error:
+        raise ValueError("invalid Lepcha source map item sequence") from error
+    if not map_items:
+        raise ValueError("LepchaConverter requires a non-empty map")
+    if len(map_items) > _MAX_MAP_ENTRIES:
+        raise ValueError(f"Lepcha source map exceeds {_MAX_MAP_ENTRIES} entries")
+    return map_items
+
+
 class LepchaConverter:
     """Byte->Unicode converter for the Sikkim Herald live-text Lepcha body font.
 
@@ -156,14 +195,20 @@ class LepchaConverter:
     """
 
     def __init__(self, byte_map: Mapping[int, Iterable[int]]) -> None:
-        if not isinstance(byte_map, Mapping) or not byte_map:
+        if not isinstance(byte_map, Mapping):
             raise ValueError("LepchaConverter requires a non-empty map")
-        map_items = tuple(islice(byte_map.items(), _MAX_MAP_ENTRIES + 1))
-        if len(map_items) > _MAX_MAP_ENTRIES:
-            raise ValueError(f"Lepcha source map exceeds {_MAX_MAP_ENTRIES} entries")
+        map_items = _bounded_map_items(byte_map)
         normalized: dict[int, tuple[int, ...]] = {}
-        for raw_source, raw_target in map_items:
+        for raw_item in map_items:
+            if isinstance(raw_item, (str, bytes, Mapping, Set)):
+                raise ValueError(f"invalid Lepcha source map entry: {raw_item!r}")
+            try:
+                raw_source, raw_target = raw_item  # type: ignore[misc]
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"invalid Lepcha source map entry: {raw_item!r}") from error
             source = _validate_source_byte(raw_source)
+            if source in normalized:
+                raise ValueError(f"duplicate Lepcha source byte: 0x{source:02X}")
             if isinstance(raw_target, (str, bytes, Mapping, Set)):
                 raise ValueError(f"invalid Lepcha target sequence for source 0x{source:02X}")
             try:
@@ -205,12 +250,15 @@ class LepchaConverter:
             map_text = map_bytes.decode("utf-8")
         except UnicodeDecodeError as error:
             raise ValueError(f"invalid UTF-8 in Lepcha legacy map {map_path}") from error
+        _reject_excessive_json_depth(map_text, map_path)
         try:
             raw = json.loads(map_text, object_pairs_hook=_unique_json_object)
         except json.JSONDecodeError as error:
             raise ValueError(
                 f"invalid JSON in Lepcha legacy map {map_path}: {error.msg}"
             ) from error
+        except RecursionError as error:
+            raise ValueError(f"invalid nested JSON in Lepcha legacy map {map_path}") from error
         if not isinstance(raw, dict):
             raise ValueError(f"Lepcha legacy map root must be an object: {map_path}")
         unexpected_fields = set(raw) - {"_doc", "_confidence", "_unresolved_bytes", "map"}
