@@ -61,6 +61,7 @@ def test_kiratrai_map_matches_the_pinned_sil_source_and_parser_inventory():
 
     lines = map_bytes.decode("utf-8-sig").splitlines()
     assert len(lines) == 59
+    assert max(map(len, lines)) == 190
     assert sum(line.strip().startswith("ByteClass") for line in lines) == 8
     assert sum(line.strip().startswith("UniClass") for line in lines) == 8
 
@@ -374,6 +375,47 @@ def test_kiratrai_parser_bounds_file_size(tmp_path):
     map_path.write_bytes(b";" * (kiratrai_module._MAX_MAP_FILE_BYTES + 1))
     with pytest.raises(ValueError, match="Kirat Rai map exceeds 1000000 bytes"):
         KiratRaiConverter.from_map_file(map_path)
+
+
+@pytest.mark.parametrize(
+    ("map_text", "message"),
+    [
+        (";\n" * (kiratrai_module._MAX_MAP_LINES + 1), "map exceeds 4096 lines"),
+        (
+            ";" + "é" * kiratrai_module._MAX_MAP_LINE_CODEPOINTS,
+            "map line exceeds 4096 codepoints",
+        ),
+    ],
+)
+def test_kiratrai_parser_bounds_physical_source_structure(tmp_path, map_text, message):
+    map_path = tmp_path / "over-limit.map"
+    map_path.write_text(map_text, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        KiratRaiConverter.from_map_file(map_path)
+
+
+def test_kiratrai_parser_accepts_exact_line_and_line_count_limits(tmp_path):
+    base_map = "Pass(Byte_Unicode)\n0x41 > U+16D43\n"
+    base_lines = base_map.splitlines()
+
+    exact_lines = tmp_path / "exact-lines.map"
+    exact_lines.write_text(
+        base_map + ";\n" * (kiratrai_module._MAX_MAP_LINES - len(base_lines)),
+        encoding="utf-8",
+    )
+    assert len(exact_lines.read_text(encoding="utf-8").splitlines()) == 4096
+    assert KiratRaiConverter.from_map_file(exact_lines).convert("A").unicode_text == "\U00016d43"
+
+    exact_line = tmp_path / "exact-line-codepoints.map"
+    boundary_comment = ";" + "é" * (kiratrai_module._MAX_MAP_LINE_CODEPOINTS - 1)
+    assert len(boundary_comment) == kiratrai_module._MAX_MAP_LINE_CODEPOINTS
+    assert len(boundary_comment.encode("utf-8")) > kiratrai_module._MAX_MAP_LINE_CODEPOINTS
+    exact_line.write_text(
+        base_map + boundary_comment + "\n",
+        encoding="utf-8",
+    )
+    assert max(len(line) for line in exact_line.read_text(encoding="utf-8").splitlines()) == 4096
+    assert KiratRaiConverter.from_map_file(exact_line).convert("A").unicode_text == "\U00016d43"
 
 
 @pytest.mark.parametrize(

@@ -349,8 +349,10 @@ single-byte rules, four double-byte rules, and one triple-byte rule with 115
 unique source sequences. Tests exercise every flattened rule. The native reader
 requires exact tokens and pass syntax, valid Unicode scalar targets, and unique,
 nonempty class names and source sequences in the supported forward
-`Byte_Unicode` subset. Map bytes, class and rule inventories, class expansion,
-and direct-constructor iterables are bounded. Duplicate or misordered passes,
+`Byte_Unicode` subset. A source file is limited to 1,000,000 bytes, 4,096
+physical lines, and 4,096 decoded codepoints per line. Class and rule
+inventories, class expansion, and direct-constructor iterables are also bounded.
+Duplicate or misordered passes,
 unsupported active-pass syntax, malformed or ambiguous rules, and structural
 C0 or SPACE rewrites fail closed. The immutable runtime contract records
 longest-source-first precedence; the six prefix relations required by the SIL

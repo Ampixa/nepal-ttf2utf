@@ -36,6 +36,8 @@ from .unicode_span import _is_assigned_script_codepoint, _normalize_nfc
 
 _KIRATRAI_CODEPOINT_RE = re.compile(r"[\U00016D40-\U00016D7F]")
 _MAX_MAP_FILE_BYTES = 1_000_000
+_MAX_MAP_LINES = 4_096
+_MAX_MAP_LINE_CODEPOINTS = 4_096
 _MAX_BYTE_RULES = 512
 _MAX_BYTE_CLASSES = 128
 _MAX_UNICODE_CLASSES = 128
@@ -371,6 +373,12 @@ class KiratRaiConverter:
         except UnicodeDecodeError as error:
             raise ValueError(f"invalid UTF-8 in Kirat Rai map {map_path}") from error
 
+        physical_lines = map_text.splitlines()
+        if len(physical_lines) > _MAX_MAP_LINES:
+            raise ValueError(f"Kirat Rai map exceeds {_MAX_MAP_LINES} lines")
+        if any(len(line) > _MAX_MAP_LINE_CODEPOINTS for line in physical_lines):
+            raise ValueError(f"Kirat Rai map line exceeds {_MAX_MAP_LINE_CODEPOINTS} codepoints")
+
         byte_classes: dict[str, tuple[int, ...]] = {}
         uni_classes: dict[str, tuple[int, ...]] = {}
         rules: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
@@ -380,7 +388,7 @@ class KiratRaiConverter:
         # First parse class declarations; collect rule lines for a second pass so class
         # rules can reference classes regardless of declaration order.
         rule_lines: list[str] = []
-        for raw_line in map_text.splitlines():
+        for raw_line in physical_lines:
             line = raw_line.split(";", 1)[0].strip()
             if not line:
                 continue

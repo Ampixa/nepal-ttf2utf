@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bound the canonical SIL Kirat Rai source reader to 4,096 physical lines and
+  4,096 decoded codepoints per line, closing source-structure gaps within the
+  existing 1,000,000-byte limit. Exact boundaries remain accepted, and the
+  vendored map, functional digest, outputs, diagnostics, and routing are unchanged.
 - Complete the exact built-in-string contract for public format and script
   selectors. Dispatcher and direct Devanagari fonts now share an explicit
   `TypeError`, and Unicode script names fail likewise before user-overridable
