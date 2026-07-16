@@ -1,11 +1,13 @@
-"""Project Janaki/Devanagari crosswalk -> Unicode Tirhuta.
+"""Project Janaki/Devanagari and Videha extension crosswalk -> Unicode Tirhuta.
 
 Audited Videha Janaki spans draw Tirhuta/Mithilakshar glyphs while storing
 semantically corresponding characters in the Devanagari block. PDF extraction
-can additionally expose two visual-order artifacts: U+093F before its consonant
-and a trailing RA+VIRAMA after the consonant that carries the reph. The fixed
-project crosswalk remaps the supported shared Indic repertoire and applies those
-repairs only to Devanagari-derived output, never to pre-existing Unicode Tirhuta.
+can expose Janaki Identity-H glyph IDs as C1 or Latin-extension codepoints and
+two visual-order artifacts: U+093F before its consonant and a trailing RA+VIRAMA
+after the consonant that carries the reph. The fixed project crosswalk remaps the
+supported shared Indic repertoire and the audited Videha extension glyphs, then
+applies those repairs only to mapped output, never to pre-existing Unicode
+Tirhuta.
 
 This is not a published or universal Janaki encoding table. Devanagari
 characters without a direct Tirhuta equivalent, including independent SHORT E
@@ -34,8 +36,11 @@ _TIRHUTA_RA = 0x114A9
 _TIRHUTA_VIRAMA = 0x114C2
 _TIRHUTA_NUKTA = 0x114C3
 _TIRHUTA_DEPENDENTS = frozenset(range(0x114B0, 0x114C2)) | {_TIRHUTA_NUKTA}
-_TIRHUTA_REORDER_PROVENANCE = "devanagari-derived-only"
+_TIRHUTA_REORDER_PROVENANCE = "mapped-source-only"
 _TIRHUTA_MAPPING_SHA256 = "0a740647420fdddac4221bfedfa50b46082f1a6f640a172df3f4bc4e94ebb12a"
+_VIDEHA_EXTENSION_MAPPING_SHA256 = (
+    "956bc303050586d39c57b5c008cb4cdbc6a9e2efa6dc7e25e6984e2418310539"
+)
 _TIRHUTA_PASSTHROUGH_SHA256 = "d6422caf7cf326bcd10a5c318e07e4dbf4b5e7ae55120785c7e6f2ddf141a7c4"
 
 _PASSTHROUGH = frozenset(" \t\r\n0123456789,.;:!?()[]{}<>/\\'\"-–—+_=%&@#|~\u00a0‘’“”")
@@ -93,6 +98,160 @@ _TIRHUTA_SOURCE_INVENTORY |= frozenset(range(0x0915, 0x0929))
 _TIRHUTA_SOURCE_INVENTORY |= frozenset(range(0x092A, 0x0931))
 _TIRHUTA_SOURCE_INVENTORY |= frozenset(range(0x0958, 0x0960))
 _TIRHUTA_SOURCE_INVENTORY |= frozenset(range(0x0966, 0x0970))
+
+_VIDEHA_EXTENSION_SOURCE_INVENTORY = frozenset(
+    {
+        0x0080,
+        0x0081,
+        0x0082,
+        0x0083,
+        0x0086,
+        0x0087,
+        0x0088,
+        0x0089,
+        0x008A,
+        0x008B,
+        0x008C,
+        0x008E,
+        0x008F,
+        0x0092,
+        0x0093,
+        0x0094,
+        0x0095,
+        0x0096,
+        0x0097,
+        0x0098,
+        0x0099,
+        0x009A,
+        0x009B,
+        0x009C,
+        0x009D,
+        0x00A7,
+        0x00AC,
+        0x00D5,
+        0x00D6,
+        0x00D7,
+        0x00D8,
+        0x00D9,
+        0x00DA,
+        0x00DB,
+        0x00DD,
+        0x00DE,
+        0x00DF,
+        0x00E0,
+        0x00E2,
+        0x00E6,
+        0x00E7,
+        0x00E9,
+        0x00EA,
+        0x00EB,
+        0x00ED,
+        0x00EF,
+        0x00F1,
+        0x00F3,
+        0x00F5,
+        0x00F6,
+        0x00F7,
+        0x00F8,
+        0x00F9,
+        0x00FA,
+        0x00FB,
+        0x00FC,
+        0x00FD,
+        0x0102,
+        0x0103,
+        0x0104,
+        0x0107,
+        0x0108,
+        0x010A,
+        0x010B,
+        0x010F,
+        0x0110,
+        0x0111,
+        0x0112,
+        0x0114,
+        0x0115,
+        0x0116,
+        0x0117,
+        0x0118,
+        0x0119,
+        0x011A,
+        0x011B,
+        0x011C,
+        0x011D,
+        0x011E,
+        0x011F,
+        0x0121,
+        0x0122,
+        0x0123,
+        0x0124,
+        0x0125,
+        0x0126,
+        0x0127,
+        0x0128,
+        0x0129,
+        0x012A,
+        0x012B,
+        0x012F,
+        0x0130,
+        0x0131,
+        0x0132,
+        0x0134,
+        0x0135,
+        0x0136,
+        0x0137,
+        0x0139,
+        0x013B,
+        0x013C,
+        0x013D,
+        0x013E,
+        0x013F,
+        0x0140,
+        0x0141,
+        0x0142,
+        0x0143,
+        0x0144,
+        0x014C,
+        0x014F,
+        0x0154,
+        0x0158,
+        0x015F,
+        0x0160,
+        0x0162,
+        0x016F,
+        0x0170,
+        0x0171,
+        0x0172,
+        0x0174,
+        0x0175,
+        0x0184,
+        0x0194,
+        0x019E,
+        0x01A3,
+        0x01A8,
+        0x01C4,
+        0x01C9,
+        0x01E1,
+        0x01E6,
+        0x0202,
+        0x0207,
+        0x0215,
+        0x0216,
+        0x021B,
+        0x021D,
+        0x0251,
+        0x0252,
+        0x0254,
+        0x0255,
+        0x025B,
+        0x025D,
+        0x025F,
+        0x0263,
+        0x0264,
+        0x0265,
+        0x0269,
+    }
+)
 
 
 def _compact_json_sha256(value: object) -> str:
@@ -170,9 +329,208 @@ def _build_map() -> dict[int, tuple[int, ...]]:
     return table
 
 
+def _build_videha_extension_map() -> dict[int, tuple[int, ...]]:
+    """Return the audited Janaki Identity-H glyph extension crosswalk."""
+    return {
+        0x0080: (0x114AA, 0x114C2, 0x114AB),
+        0x0081: (0x114AA, 0x114C2, 0x114AE),
+        0x0082: (0x114AA, 0x114C2, 0x114AF),
+        0x0083: (0x114AB, 0x114C2, 0x114A8),
+        0x0086: (0x114AC, 0x114C2, 0x11494),
+        0x0087: (0x114AC, 0x114C2, 0x114AB),
+        0x0088: (0x114AD, 0x114C2, 0x1148F),
+        0x0089: (0x114AD, 0x114C2, 0x11499),
+        0x008A: (0x114AD, 0x114C2, 0x1149A),
+        0x008B: (0x114AD, 0x114C2, 0x1149D),
+        0x008C: (0x114AD, 0x114C2, 0x114A3),
+        0x008E: (0x114AD, 0x114C2, 0x114A7),
+        0x008F: (0x114AD, 0x114C2, 0x114A8),
+        0x0092: (0x114AE, 0x114C2, 0x1148F),
+        0x0093: (0x114AE, 0x114C2, 0x11490),
+        0x0094: (0x114AE, 0x114C2, 0x114A2),
+        0x0095: (0x114AE, 0x114C2, 0x114A7),
+        0x0096: (0x114AE, 0x114C2, 0x114A8),
+        0x0097: (0x114AE, 0x114C2, 0x114AA),
+        0x0098: (0x114AE, 0x114C2, 0x114AB),
+        0x0099: (0x114AE, 0x114C2, 0x114AE),
+        0x009A: (0x1148F, 0x114C2, 0x114AD, 0x114C2),
+        0x009B: (0x1149E, 0x114C2, 0x114A9, 0x114C2),
+        0x009C: (0x114A9, 0x114B3),
+        0x009D: (0x114A9, 0x114B4),
+        0x00A7: (0x1149D, 0x114C2),
+        0x00AC: (0x114A2, 0x114C2),
+        0x00D5: (0x1148F, 0x114C2, 0x114A9),
+        0x00D6: (0x11493, 0x114C2, 0x11491),
+        0x00D7: (0x1149B, 0x114C2, 0x114A8),
+        0x00D8: (0x114AF, 0x114C2, 0x114AA),
+        0x00D9: (0x1148F, 0x114C2, 0x114A8),
+        0x00DA: (0x1148F, 0x114C2, 0x114AE),
+        0x00DB: (0x11492, 0x114C2, 0x114A2),
+        0x00DD: (0x11494, 0x114C2, 0x11495),
+        0x00DE: (0x11496, 0x114C2, 0x11496),
+        0x00DF: (0x11496, 0x114C2, 0x114A8),
+        0x00E0: (0x11498, 0x114C2, 0x11494),
+        0x00E2: (0x11498, 0x114C2, 0x11496),
+        0x00E6: (0x11491, 0x114C2, 0x114A9),
+        0x00E7: (0x11492, 0x114C2, 0x114A9),
+        0x00E9: (0x11494, 0x114C2, 0x114A9),
+        0x00EA: (0x11495, 0x114C2, 0x114A9),
+        0x00EB: (0x11496, 0x114C2, 0x114A9),
+        0x00ED: (0x11499, 0x114C2, 0x114A9),
+        0x00EF: (0x1149B, 0x114C2, 0x114A9),
+        0x00F1: (0x1149E, 0x114C2, 0x114A9),
+        0x00F3: (0x114A1, 0x114C2, 0x114A9),
+        0x00F5: (0x114A3, 0x114C2, 0x114A9),
+        0x00F6: (0x114A4, 0x114C2, 0x114A9),
+        0x00F7: (0x114A5, 0x114C2, 0x114A9),
+        0x00F8: (0x114A6, 0x114C2, 0x114A9),
+        0x00F9: (0x114A7, 0x114C2, 0x114A9),
+        0x00FA: (0x114AB, 0x114C2, 0x114A9),
+        0x00FB: (0x114AC, 0x114C2, 0x114A9),
+        0x00FC: (0x114AE, 0x114C2, 0x114A9),
+        0x00FD: (0x114AF, 0x114C2, 0x114A9),
+        0x0102: (0x1149E, 0x114B5),
+        0x0103: (0x114A6, 0x114B5),
+        0x0104: (0x114AF, 0x114B5),
+        0x0107: (0x1148F, 0x114C2, 0x1148F),
+        0x0108: (0x1148F, 0x114C2, 0x114A2),
+        0x010A: (0x11491, 0x114C2, 0x114A8),
+        0x010B: (0x11491, 0x114C2, 0x114AB),
+        0x010F: (0x1149B, 0x114C2, 0x1149B),
+        0x0110: (0x1149D, 0x114C2, 0x11499),
+        0x0111: (0x1149D, 0x114C2, 0x1149A),
+        0x0112: (0x1149D, 0x114C2, 0x1149B),
+        0x0114: (0x1149D, 0x114C2, 0x1149D),
+        0x0115: (0x1149E, 0x114C2, 0x1149E),
+        0x0116: (0x1149F, 0x114C2, 0x114A8),
+        0x0117: (0x1149F, 0x114C2, 0x114AB),
+        0x0118: (0x114A0, 0x114C2, 0x11491),
+        0x0119: (0x114A0, 0x114C2, 0x11492),
+        0x011A: (0x114A0, 0x114C2, 0x114A0),
+        0x011B: (0x114A0, 0x114C2, 0x114A1),
+        0x011C: (0x114A0, 0x114C2, 0x114A5),
+        0x011D: (0x114A0, 0x114C2, 0x114A6),
+        0x011E: (0x114A0, 0x114C2, 0x114AB),
+        0x011F: (0x114A1, 0x114C2, 0x114AB),
+        0x0121: (0x114A2, 0x114C2, 0x11491),
+        0x0122: (0x114A2, 0x114C2, 0x1149E),
+        0x0123: (0x114A2, 0x114C2, 0x114A0),
+        0x0124: (0x114A2, 0x114C2, 0x114A2),
+        0x0125: (0x114A2, 0x114C2, 0x114A7),
+        0x0126: (0x114A2, 0x114C2, 0x114AB),
+        0x0127: (0x114A2, 0x114C2, 0x114AF),
+        0x0128: (0x114A3, 0x114C2, 0x1149E),
+        0x0129: (0x114A3, 0x114C2, 0x114A2),
+        0x012A: (0x114A3, 0x114C2, 0x114A3),
+        0x012B: (0x114A3, 0x114C2, 0x114AA),
+        0x012F: (0x114A5, 0x114C2, 0x11496),
+        0x0130: (0x114A5, 0x114C2, 0x114A0),
+        0x0131: (0x114A5, 0x114C2, 0x114A1),
+        0x0132: (0x114A5, 0x114C2, 0x114A5),
+        0x0134: (0x114A7, 0x114C2, 0x114A2),
+        0x0135: (0x114A7, 0x114C2, 0x114A5),
+        0x0136: (0x114A7, 0x114C2, 0x114A6),
+        0x0137: (0x114A7, 0x114C2, 0x114A7),
+        0x0139: (0x114AA, 0x114C2, 0x1148F),
+        0x013B: (0x114AA, 0x114C2, 0x114AA),
+        0x013C: (0x114AC, 0x114C2, 0x11495),
+        0x013D: (0x114AC, 0x114C2, 0x114A2),
+        0x013E: (0x114AC, 0x114C2, 0x114A7),
+        0x013F: (0x114AC, 0x114C2, 0x114A8),
+        0x0140: (0x114AE, 0x114C2, 0x11499),
+        0x0141: (0x114AE, 0x114C2, 0x1149E),
+        0x0142: (0x114AE, 0x114C2, 0x1149F),
+        0x0143: (0x114AE, 0x114C2, 0x114A3),
+        0x0144: (0x114AE, 0x114C2, 0x114A4),
+        0x014C: (0x11491, 0x114C2, 0x11491),
+        0x014F: (0x11491, 0x114C2, 0x11492),
+        0x0154: (0x11491, 0x114C2, 0x114A1),
+        0x0158: (0x11491, 0x114C2, 0x114AA),
+        0x015F: (0x1149D, 0x114C2, 0x114A8),
+        0x0160: (0x1149D, 0x114C2, 0x114AB),
+        0x0162: (0x1149E, 0x114C2, 0x1148F, 0x114C2, 0x114AD),
+        0x016F: (0x114A7, 0x114C2, 0x114A3),
+        0x0170: (0x114A7, 0x114C2, 0x114A4),
+        0x0171: (0x114A7, 0x114C2, 0x114AA),
+        0x0172: (0x114A8, 0x114C2, 0x114A8),
+        0x0174: (0x114AC, 0x114C2, 0x114A6),
+        0x0175: (0x114AC, 0x114C2, 0x114AA),
+        0x0184: (0x1149E, 0x114C2, 0x114A7, 0x114C2, 0x114A8),
+        0x0194: (0x114A9, 0x114C2, 0x11491),
+        0x019E: (0x11498, 0x114B9),
+        0x01A3: (0x1149D, 0x114B9),
+        0x01A8: (0x114A2, 0x114B9),
+        0x01C4: (0x1149D, 0x114BB),
+        0x01C9: (0x114A2, 0x114BB),
+        0x01E1: (0x1149D, 0x114BC),
+        0x01E6: (0x114A2, 0x114BC),
+        0x0202: (0x1149D, 0x114BE),
+        0x0207: (0x114A2, 0x114BE),
+        0x0215: (0x1148F, 0x114C2, 0x114AD, 0x114B9),
+        0x0216: (0x1148F, 0x114C2, 0x114AD, 0x114BC),
+        0x021B: (0x1149D, 0x114B3),
+        0x021D: (0x114A2, 0x114B3),
+        0x0251: (0x114A0, 0x114C2, 0x114A9),
+        0x0252: (0x1148F, 0x114C2, 0x114A9, 0x114B9),
+        0x0254: (0x11491, 0x114C2, 0x114A9, 0x114B9),
+        0x0255: (0x11492, 0x114C2, 0x114A9, 0x114B9),
+        0x025B: (0x11499, 0x114C2, 0x114A9, 0x114B9),
+        0x025D: (0x1149B, 0x114C2, 0x114A9, 0x114B9),
+        0x025F: (0x1149E, 0x114C2, 0x114A9, 0x114B9),
+        0x0263: (0x114A3, 0x114C2, 0x114A9, 0x114B9),
+        0x0264: (0x114A4, 0x114C2, 0x114A9, 0x114B9),
+        0x0265: (0x114A5, 0x114C2, 0x114A9, 0x114B9),
+        0x0269: (0x114AC, 0x114C2, 0x114A9, 0x114B9),
+    }
+
+
+def _freeze_videha_extension_map(
+    mapping: Mapping[int, tuple[int, ...]],
+) -> Mapping[int, tuple[int, ...]]:
+    if not isinstance(mapping, Mapping) or len(mapping) != 149:
+        raise ValueError("Videha extension mapping must contain exactly 149 entries")
+    if set(mapping) != _VIDEHA_EXTENSION_SOURCE_INVENTORY:
+        raise ValueError("invalid Videha extension source inventory")
+
+    snapshot: dict[int, tuple[int, ...]] = {}
+    for source, target in mapping.items():
+        if type(source) is not int or not (0x0080 <= source <= 0x02AF):
+            raise ValueError(f"invalid Videha extension source: {source!r}")
+        if type(target) is not tuple or not (2 <= len(target) <= 5):
+            raise ValueError(f"invalid Videha extension target for U+{source:04X}: {target!r}")
+        if any(
+            type(codepoint) is not int
+            or not _is_assigned_script_codepoint(codepoint, "Tirhuta")
+            for codepoint in target
+        ):
+            raise ValueError(f"invalid Videha extension target for U+{source:04X}: {target!r}")
+        text = "".join(chr(codepoint) for codepoint in target)
+        if unicodedata.normalize("NFC", text) != text:
+            raise ValueError(f"non-NFC Videha extension target for U+{source:04X}")
+        snapshot[source] = target
+
+    target_lengths = [len(target) for target in snapshot.values()]
+    if sorted(target_lengths).count(2) != 18 or sorted(target_lengths).count(3) != 115:
+        raise ValueError("invalid Videha extension target-length inventory")
+    if target_lengths.count(4) != 14 or target_lengths.count(5) != 2:
+        raise ValueError("invalid Videha extension target-length inventory")
+    if sum(target_lengths) != 447 or len(set(snapshot.values())) != 149:
+        raise ValueError("Videha extension targets must contain 149 unique sequences")
+    if len({codepoint for target in snapshot.values() for codepoint in target}) != 39:
+        raise ValueError("invalid Videha extension target-codepoint inventory")
+    mapping_rows = [
+        [source, list(snapshot[source])]
+        for source in sorted(_VIDEHA_EXTENSION_SOURCE_INVENTORY)
+    ]
+    if _compact_json_sha256(mapping_rows) != _VIDEHA_EXTENSION_MAPPING_SHA256:
+        raise ValueError("invalid Videha extension mapping payload")
+    return MappingProxyType(snapshot)
+
+
 @dataclass(frozen=True)
 class _TirhutaContract:
     mapping: Mapping[int, tuple[int, ...]]
+    videha_extensions: Mapping[int, tuple[int, ...]]
     passthrough: frozenset[str]
     consonants: frozenset[int]
     dependents: frozenset[int]
@@ -188,6 +546,7 @@ class _TirhutaContract:
 def _freeze_tirhuta_contract(
     mapping: Mapping[int, tuple[int, ...]],
     *,
+    videha_extensions: Mapping[int, tuple[int, ...]],
     passthrough: frozenset[str],
     consonants: frozenset[int],
     dependents: frozenset[int],
@@ -241,11 +600,15 @@ def _freeze_tirhuta_contract(
     if _compact_json_sha256(mapping_rows) != _TIRHUTA_MAPPING_SHA256:
         raise ValueError("invalid Tirhuta mapping payload")
 
+    frozen_extensions = _freeze_videha_extension_map(videha_extensions)
+    if set(snapshot) & set(frozen_extensions):
+        raise ValueError("Tirhuta core and Videha extension sources overlap")
+
     if type(passthrough) is not frozenset or len(passthrough) != 49:
         raise ValueError("Tirhuta passthrough must contain exactly 49 values")
     if any(type(value) is not str or len(value) != 1 for value in passthrough):
         raise ValueError("invalid Tirhuta passthrough value")
-    if set(snapshot) & {ord(value) for value in passthrough}:
+    if (set(snapshot) | set(frozen_extensions)) & {ord(value) for value in passthrough}:
         raise ValueError("Tirhuta mapping and passthrough sources overlap")
     if (
         _compact_json_sha256(sorted(ord(value) for value in passthrough))
@@ -267,11 +630,12 @@ def _freeze_tirhuta_contract(
         type(value) is not int for value in (block_lo, block_hi)
     ):
         raise ValueError("invalid Tirhuta block bounds")
-    if type(provenance) is not str or provenance != "devanagari-derived-only":
+    if type(provenance) is not str or provenance != "mapped-source-only":
         raise ValueError("invalid Tirhuta reorder provenance")
 
     return _TirhutaContract(
         mapping=MappingProxyType(snapshot),
+        videha_extensions=frozen_extensions,
         passthrough=passthrough,
         consonants=consonants,
         dependents=dependents,
@@ -286,8 +650,10 @@ def _freeze_tirhuta_contract(
 
 
 _initial_mapping = _build_map()
+_initial_videha_extensions = _build_videha_extension_map()
 _DEFAULT_CONTRACT = _freeze_tirhuta_contract(
     _initial_mapping,
+    videha_extensions=_initial_videha_extensions,
     passthrough=_PASSTHROUGH,
     consonants=_TIRHUTA_CONSONANTS,
     dependents=_TIRHUTA_DEPENDENTS,
@@ -300,7 +666,10 @@ _DEFAULT_CONTRACT = _freeze_tirhuta_contract(
     provenance=_TIRHUTA_REORDER_PROVENANCE,
 )
 _DEVANAGARI_TO_TIRHUTA: Mapping[int, tuple[int, ...]] = _DEFAULT_CONTRACT.mapping
-del _initial_mapping
+_VIDEHA_EXTENSION_TO_TIRHUTA: Mapping[int, tuple[int, ...]] = (
+    _DEFAULT_CONTRACT.videha_extensions
+)
+del _initial_mapping, _initial_videha_extensions
 
 
 @dataclass(frozen=True)
@@ -424,6 +793,8 @@ class TirhutaConverter:
         for char in text:
             codepoint = ord(char)
             target = self._contract.mapping.get(codepoint)
+            if target is None:
+                target = self._contract.videha_extensions.get(codepoint)
             if target is not None:
                 mapped.extend(target)
                 derived.extend([True] * len(target))

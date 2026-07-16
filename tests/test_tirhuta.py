@@ -13,11 +13,22 @@ import nepal_ttf2utf.tirhuta as tirhuta_module
 from nepal_ttf2utf import convert, convert_tirhuta
 from nepal_ttf2utf.tirhuta import TirhutaConverter
 from nepal_ttf2utf.unicode_span import _is_assigned_script_codepoint
+from nepal_ttf2utf.videha import (
+    JANAKI_GID_EXTENSION_2008_04_15,
+    JANAKI_GID_TO_DEVANAGARI,
+)
 
 
 def _mapping_rows(converter: TirhutaConverter) -> list[list[object]]:
     return [
         [source, list(target)] for source, target in sorted(converter._contract.mapping.items())
+    ]
+
+
+def _videha_extension_rows(converter: TirhutaConverter) -> list[list[object]]:
+    return [
+        [source, list(target)]
+        for source, target in sorted(converter._contract.videha_extensions.items())
     ]
 
 
@@ -78,6 +89,18 @@ def test_corrected_tirhuta_data_and_reorder_contracts_are_pinned():
     assert sum(len(target) for target in mapping.values()) == 99
     assert len(set(mapping.values())) == 90
     assert len({codepoint for target in mapping.values() for codepoint in target}) == 81
+    extensions = contract.videha_extensions
+    assert len(extensions) == 149
+    assert 0x00A9 not in extensions
+    assert Counter(len(target) for target in extensions.values()) == {
+        2: 18,
+        3: 115,
+        4: 14,
+        5: 2,
+    }
+    assert sum(len(target) for target in extensions.values()) == 447
+    assert len(set(extensions.values())) == 149
+    assert len({codepoint for target in extensions.values() for codepoint in target}) == 39
     assert len(contract.passthrough) == 49
     assert contract.consonants == frozenset(range(0x1148F, 0x114B0))
     assert contract.dependents == frozenset(range(0x114B0, 0x114C2)) | {0x114C3}
@@ -88,7 +111,7 @@ def test_corrected_tirhuta_data_and_reorder_contracts_are_pinned():
         0x114C3,
     )
     assert (contract.block_lo, contract.block_hi) == (0x11480, 0x114DF)
-    assert contract.provenance == "devanagari-derived-only"
+    assert contract.provenance == "mapped-source-only"
 
     mapping_payload = _json_payload(_mapping_rows(converter))
     assert len(mapping_payload) == 1403
@@ -96,10 +119,16 @@ def test_corrected_tirhuta_data_and_reorder_contracts_are_pinned():
         "0a740647420fdddac4221bfedfa50b46082f1a6f640a172df3f4bc4e94ebb12a"
     )
 
+    extension_payload = _json_payload(_videha_extension_rows(converter))
+    assert len(extension_payload) == 3875
+    assert hashlib.sha256(extension_payload).hexdigest() == (
+        "956bc303050586d39c57b5c008cb4cdbc6a9e2efa6dc7e25e6984e2418310539"
+    )
+
     reorder_payload = _json_payload(_reorder_contract(converter))
-    assert len(reorder_payload) == 440
+    assert len(reorder_payload) == 435
     assert hashlib.sha256(reorder_payload).hexdigest() == (
-        "050b1b75760b9ac030bb247d83019ea28ccb4a829667a1d35040a7ad8e738a20"
+        "bb0828a4e5e7791f94ce63ff121e8b701d8fa550ca6c0f622af79e2a88e92600"
     )
 
     passthrough_payload = _json_payload(sorted(ord(value) for value in contract.passthrough))
@@ -113,11 +142,12 @@ def test_corrected_tirhuta_data_and_reorder_contracts_are_pinned():
             **_reorder_contract(converter),
             "mapping": _mapping_rows(converter),
             "passthrough": sorted(ord(value) for value in contract.passthrough),
+            "videha_extensions": _videha_extension_rows(converter),
         }
     )
-    assert len(full_payload) == 2033
+    assert len(full_payload) == 5924
     assert hashlib.sha256(full_payload).hexdigest() == (
-        "85ac0769069141339bf23824b9cb435deb5b3f2068d946881c62dd0514bce29f"
+        "7a3a2fc386f24bdd7b242d156ec9daec0ed8902b9797967236fb3ceaefae4973"
     )
 
     source = "".join(chr(codepoint) for codepoint in sorted(mapping))
@@ -130,6 +160,21 @@ def test_corrected_tirhuta_data_and_reorder_contracts_are_pinned():
     )
     assert result.replacement_count == 90
     assert result.tirhuta_char_count == 97
+    assert result.prebase_i_moves == result.reph_moves == 0
+    assert result.unmapped_codepoints == []
+
+    source = "".join(chr(codepoint) for codepoint in sorted(extensions))
+    expected = "".join(
+        chr(codepoint) for key in sorted(extensions) for codepoint in extensions[key]
+    )
+    result = converter.convert(source)
+    assert result.unicode_text == expected
+    assert len(result.unicode_text) == 447
+    assert hashlib.sha256(result.unicode_text.encode("utf-8")).hexdigest() == (
+        "73b822a5ebc407382fcad063199e274a0e675d4473e0512415d7dc762a8b33af"
+    )
+    assert result.replacement_count == 149
+    assert result.tirhuta_char_count == 447
     assert result.prebase_i_moves == result.reph_moves == 0
     assert result.unmapped_codepoints == []
 
@@ -155,6 +200,89 @@ def test_every_supported_tirhuta_mapping_has_an_independent_semantic_anchor():
         )
         assert nukta_source == 0x093C
         assert mapping[source] == mapping[base_source] + (0x114C3,)
+
+
+def test_every_videha_extension_mapping_matches_its_audited_janaki_gid_semantics():
+    extensions = TirhutaConverter()._contract.videha_extensions
+    known_gid_semantics = {
+        **JANAKI_GID_TO_DEVANAGARI,
+        **JANAKI_GID_EXTENSION_2008_04_15,
+    }
+    semantics = {
+        source: known_gid_semantics[source]
+        for source in extensions
+        if source in known_gid_semantics
+    }
+    semantics.update(
+        {
+            0x009A: "क्ष्",
+            0x00E9: "च्र",
+            0x00EA: "छ्र",
+            0x0118: "द्ग",
+            0x011C: "द्ब",
+            0x014F: "ग्घ",
+            0x0162: "त्क्ष",
+            0x0170: "म्फ",
+            0x0174: "श्भ",
+            0x01C4: "णै",
+            0x0202: "णौ",
+            0x0216: "क्षो",
+            0x0252: "क्रे",
+            0x0255: "घ्रे",
+            0x025D: "ड्रे",
+        }
+    )
+    assert set(semantics) == set(extensions)
+
+    for source, devanagari in semantics.items():
+        expected_text = convert_tirhuta(devanagari, strict=True).unicode_text
+        expected = tuple(ord(character) for character in expected_text)
+        assert extensions[source] == expected, f"U+{source:04X}"
+        result = convert_tirhuta(chr(source), strict=True)
+        assert result.unicode_text == expected_text, f"U+{source:04X}"
+        assert result.replacement_count == 1
+        assert result.tirhuta_char_count == len(expected)
+        assert result.prebase_i_moves == result.reph_moves == 0
+        assert result.unmapped_codepoints == []
+
+
+def test_videha_literal_copyright_glyph_remains_unmapped():
+    result = convert_tirhuta("\u00a9")
+    assert result.unicode_text == "\u00a9"
+    assert result.replacement_count == result.tirhuta_char_count == 0
+    assert result.unmapped_codepoints == ["U+00A9"]
+    with pytest.raises(ValueError, match=r"U\+00A9"):
+        convert_tirhuta("\u00a9", strict=True)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        pytest.param(
+            "तखन िवलग अिछ छान ओ प\u014fा ।",
+            "𑒞𑒐𑒢 𑒫𑒱𑒪𑒑 𑒁𑒱𑒕 𑒕𑒰𑒢 𑒍 𑒣𑒑𑓂𑒒𑒰 ।",
+            id="videha-15-04-2010-p0065-b0010-l0004",
+        ),
+        pytest.param(
+            "िश\u008f कऽ िश\u0215 टा निह परी\u0216।",
+            "𑒬𑒱𑒭𑓂𑒨 𑒏𑓄 𑒬𑒱𑒏𑓂𑒭𑒹 𑒙𑒰 𑒢𑒱𑒯 𑒣𑒩𑒲𑒏𑓂𑒭𑒼।",
+            id="videha-15-04-2010-p0089-b0008-l0000",
+        ),
+        pytest.param(
+            "मदन हेयर \u025dसर सञ्चालन करैत आएल मदनकेँ हजामी पेशामे सेहो जवाव निह",
+            "𑒧𑒠𑒢 𑒯𑒹𑒨𑒩 𑒛𑓂𑒩𑒹𑒮𑒩 𑒮𑒘𑓂𑒔𑒰𑒪𑒢 𑒏𑒩𑒻𑒞 𑒂𑒋𑒪 "
+            "𑒧𑒠𑒢𑒏𑒹𑒿 𑒯𑒖𑒰𑒧𑒲 𑒣𑒹𑒬𑒰𑒧𑒹 𑒮𑒹𑒯𑒼 𑒖𑒫𑒰𑒫 𑒢𑒱𑒯",
+            id="videha-15-04-2010-p0025-b0010-l0000",
+        ),
+    ],
+)
+def test_real_silver_pack_dropped_lines_convert_without_residuals(source, expected):
+    result = convert_tirhuta(source, strict=True)
+    assert result.unicode_text == expected
+    assert result.tirhuta_char_count == sum(
+        0x11480 <= ord(character) <= 0x114DF for character in expected
+    )
+    assert result.unmapped_codepoints == []
 
 
 def test_every_tirhuta_mapping_has_exact_isolated_output_and_counts():
@@ -236,18 +364,26 @@ def test_every_byte_and_every_literal_allowlist_value_has_an_exact_classificatio
     for codepoint in range(0x100):
         source = chr(codepoint)
         result = converter.convert(source)
-        if source in converter._contract.passthrough:
+        target = converter._contract.videha_extensions.get(codepoint)
+        if target is not None:
+            counts["videha-extension"] += 1
+            assert result.unicode_text == "".join(chr(value) for value in target)
+            assert result.replacement_count == 1
+            assert result.unmapped_codepoints == []
+            assert convert_tirhuta(source, strict=True) == result
+        elif source in converter._contract.passthrough:
             counts["passthrough"] += 1
             assert result.unicode_text == source
+            assert result.replacement_count == 0
             assert result.unmapped_codepoints == []
             assert convert_tirhuta(source, strict=True) == result
         else:
             counts["diagnosed"] += 1
             assert result.unicode_text == source
+            assert result.replacement_count == 0
             assert result.unmapped_codepoints == [f"U+{codepoint:04X}"]
-        assert result.replacement_count == 0
         assert result.prebase_i_moves == result.reph_moves == 0
-    assert counts == {"passthrough": 43, "diagnosed": 213}
+    assert counts == {"videha-extension": 57, "passthrough": 43, "diagnosed": 156}
 
     for source in converter._contract.passthrough:
         result = convert_tirhuta(source, strict=True)
@@ -585,6 +721,7 @@ def _contract_arguments() -> dict[str, object]:
     contract = TirhutaConverter()._contract
     return {
         "mapping": dict(contract.mapping),
+        "videha_extensions": dict(contract.videha_extensions),
         "passthrough": contract.passthrough,
         "consonants": contract.consonants,
         "dependents": contract.dependents,
@@ -605,6 +742,7 @@ class _IntSubclass(int):
 def _invalid_contract(case: str) -> dict[str, object]:
     values = _contract_arguments()
     mapping = dict(values["mapping"])
+    extensions = dict(values["videha_extensions"])
     first = min(mapping)
     if case == "mapping-type":
         values["mapping"] = list(mapping.items())
@@ -651,6 +789,21 @@ def _invalid_contract(case: str) -> dict[str, object]:
         first, second = sorted(source for source, target in mapping.items() if len(target) == 1)[:2]
         mapping[first], mapping[second] = mapping[second], mapping[first]
         values["mapping"] = mapping
+    elif case == "extension-type":
+        values["videha_extensions"] = list(extensions.items())
+    elif case == "extension-count":
+        extensions.pop(min(extensions))
+        values["videha_extensions"] = extensions
+    elif case == "extension-source-inventory":
+        extensions[0x00A9] = extensions.pop(min(extensions))
+        values["videha_extensions"] = extensions
+    elif case == "extension-semantic-drift":
+        first_extension, second_extension = sorted(extensions)[:2]
+        extensions[first_extension], extensions[second_extension] = (
+            extensions[second_extension],
+            extensions[first_extension],
+        )
+        values["videha_extensions"] = extensions
     elif case == "passthrough-type":
         values["passthrough"] = set(values["passthrough"])
     elif case == "passthrough-count":
@@ -704,6 +857,10 @@ def _invalid_contract(case: str) -> dict[str, object]:
         ("target-nfc", "non-NFC"),
         ("duplicate-target", "unique sequences"),
         ("semantic-drift", "mapping payload"),
+        ("extension-type", "exactly 149"),
+        ("extension-count", "exactly 149"),
+        ("extension-source-inventory", "extension source inventory"),
+        ("extension-semantic-drift", "extension mapping payload"),
         ("passthrough-type", "exactly 49"),
         ("passthrough-count", "exactly 49"),
         ("passthrough-value", "passthrough value"),
@@ -726,19 +883,24 @@ def test_fixed_tirhuta_contract_validation_fails_closed(case, message):
 
 def test_tirhuta_contract_and_default_instances_ignore_live_module_rebinding(monkeypatch):
     converter = TirhutaConverter()
-    source = "\u093f\u0958?\U000114b1\U000114ab"
+    source = "\u00f5\u093f\u0958?\U000114b1\U000114ab"
     expected = converter.convert(source)
 
     with pytest.raises(TypeError):
         tirhuta_module._DEVANAGARI_TO_TIRHUTA[0x0915] = ()
     with pytest.raises(TypeError):
         converter._contract.mapping[0x0915] = ()
+    with pytest.raises(TypeError):
+        tirhuta_module._VIDEHA_EXTENSION_TO_TIRHUTA[0x00F5] = ()
+    with pytest.raises(TypeError):
+        converter._contract.videha_extensions[0x00F5] = ()
     with pytest.raises(AttributeError):
         converter._contract.passthrough.add("A")
     with pytest.raises(AttributeError):
         converter._contract.consonants.add(0x11480)
 
     monkeypatch.setattr(tirhuta_module, "_DEVANAGARI_TO_TIRHUTA", {0x0915: ()})
+    monkeypatch.setattr(tirhuta_module, "_VIDEHA_EXTENSION_TO_TIRHUTA", {0x00F5: ()})
     monkeypatch.setattr(tirhuta_module, "_PASSTHROUGH", frozenset("?"))
     monkeypatch.setattr(tirhuta_module, "_TIRHUTA_CONSONANTS", frozenset())
     monkeypatch.setattr(tirhuta_module, "_TIRHUTA_DEPENDENTS", frozenset())
