@@ -210,6 +210,11 @@ UTF-8 validation, and a string-aware JSON pre-scan. Map files may contain at
 most 1,000,000 bytes and 64 nested JSON containers; brackets and braces inside
 JSON strings do not count toward the nesting limit.
 
+Caller-loadable Sikkim Herald Lepcha and Ol Chiki JSON schemas use canonical
+hexadecimal strings rather than JSON numbers. Their readers reject integer,
+decimal, exponent, `NaN`, and infinity tokens without materializing Python
+integers or floats. Numeric-looking content inside JSON strings remains valid.
+
 `recover_videha_janaki_trace()` is the profile-gated companion API for PyMuPDF
 `get_texttrace()` character tuples. Callers must securely compute and supply a
 built-in profile name, the exact PDF SHA-256, the complete embedded Janaki font

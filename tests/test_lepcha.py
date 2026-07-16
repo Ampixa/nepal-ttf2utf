@@ -227,6 +227,10 @@ def test_every_single_byte_has_an_explicit_default_conversion_classification():
             '{"map": {"41": ["1C00"], "41": ["1C01"]}}',
             "duplicate JSON key",
         ),
+        (
+            '{"_doc": 0, "map": {"41": ["1C00"], "41": ["1C01"]}}',
+            "duplicate JSON key",
+        ),
         ('{"map": {"0x41": ["1C00"]}}', "expected two uppercase hex digits"),
         ('{"map": {"041": ["1C00"]}}', "expected two uppercase hex digits"),
         ('{"map": {"4a": ["1C00"]}}', "expected two uppercase hex digits"),
@@ -238,8 +242,8 @@ def test_every_single_byte_has_an_explicit_default_conversion_classification():
         ('{"map": {"2D": ["1C00"]}}', "fixed passthrough"),
         ('{"map": {"41": []}}', "must be a non-empty list"),
         ('{"map": {"41": "1C00"}}', "must be a non-empty list"),
-        ('{"map": {"41": {"1C00": 1}}}', "must be a non-empty list"),
-        ('{"map": {"41": [7168]}}', "expected four uppercase hex digits"),
+        ('{"map": {"41": {"1C00": "1"}}}', "must be a non-empty list"),
+        ('{"map": {"41": [7168]}}', "numeric JSON values are not permitted"),
         ('{"map": {"41": ["0x1C00"]}}', "expected four uppercase hex digits"),
         ('{"map": {"41": ["1c00"]}}', "expected four uppercase hex digits"),
         ('{"map": {"41": ["1C000"]}}', "expected four uppercase hex digits"),
@@ -303,6 +307,109 @@ def test_lepcha_map_parser_accepts_an_exact_custom_schema(tmp_path):
     assert result.unmapped_bytes == ["0x42"]
 
 
+@pytest.mark.parametrize(
+    "literal",
+    [
+        pytest.param("0", id="zero"),
+        pytest.param("-1", id="negative-integer"),
+        pytest.param("1.25", id="decimal"),
+        pytest.param("-0.25", id="negative-decimal"),
+        pytest.param("1e400", id="positive-exponent"),
+        pytest.param("1E-4000", id="negative-exponent"),
+        pytest.param("NaN", id="nan"),
+        pytest.param("Infinity", id="infinity"),
+        pytest.param("-Infinity", id="negative-infinity"),
+        pytest.param("9" * 4_301, id="long-integer"),
+    ],
+)
+def test_lepcha_map_parser_rejects_every_json_numeric_form(literal, tmp_path):
+    map_path = tmp_path / "numeric.json"
+    map_path.write_text(
+        '{"_doc":' + literal + ',"map":{"41":["1C00"]}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError) as error:
+        LepchaConverter.from_map_file(map_path)
+    assert str(error.value) == (
+        f"numeric JSON values are not permitted in Lepcha legacy map: {map_path}"
+    )
+
+
+@pytest.mark.parametrize(
+    "map_text",
+    [
+        "0",
+        '{"_doc":0,"map":{"41":["1C00"]}}',
+        '{"_confidence":0,"map":{"41":["1C00"]}}',
+        '{"map":0}',
+        '{"map":{"41":[0]}}',
+        '{"_unresolved_bytes":[0],"map":{"41":["1C00"]}}',
+    ],
+)
+def test_lepcha_map_parser_rejects_numeric_values_in_every_schema_position(map_text, tmp_path):
+    map_path = tmp_path / "numeric-position.json"
+    map_path.write_text(map_text, encoding="utf-8")
+
+    with pytest.raises(ValueError) as error:
+        LepchaConverter.from_map_file(map_path)
+    assert str(error.value) == (
+        f"numeric JSON values are not permitted in Lepcha legacy map: {map_path}"
+    )
+
+
+@pytest.mark.parametrize("malformed_number", ["1e", "01"])
+def test_lepcha_map_parser_preserves_invalid_json_precedence(malformed_number, tmp_path):
+    map_path = tmp_path / "malformed-number.json"
+    map_path.write_text('{"_doc":' + malformed_number + "}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid JSON in Lepcha legacy map"):
+        LepchaConverter.from_map_file(map_path)
+
+
+@pytest.mark.parametrize("literal", ["true", "false", "null"])
+def test_lepcha_map_parser_keeps_boolean_and_null_schema_validation(literal, tmp_path):
+    map_path = tmp_path / "non-numeric-scalar.json"
+    map_path.write_text(
+        '{"_doc":' + literal + ',"map":{"41":["1C00"]}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="metadata must be a string"):
+        LepchaConverter.from_map_file(map_path)
+
+
+def test_lepcha_map_parser_accepts_numeric_looking_metadata_strings(tmp_path):
+    map_path = tmp_path / "numeric-looking-string.json"
+    map_path.write_text(
+        json.dumps(
+            {
+                "_doc": "0 -1 1.25 1e400 NaN Infinity -Infinity",
+                "map": {"41": ["1C00"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert LepchaConverter.from_map_file(map_path).convert("A").unicode_text == "ᰀ"
+
+
+def test_lepcha_map_parser_rejects_exact_size_numeric_token_without_conversion(tmp_path):
+    map_path = tmp_path / "exact-size-numeric.json"
+    prefix = b'{"_doc":'
+    suffix = b',"map":{"41":["1C00"]}}'
+    digits = b"9" * (lepcha_module._MAX_MAP_FILE_BYTES - len(prefix) - len(suffix))
+    payload = prefix + digits + suffix
+    assert len(payload) == lepcha_module._MAX_MAP_FILE_BYTES
+    map_path.write_bytes(payload)
+
+    with pytest.raises(ValueError) as error:
+        LepchaConverter.from_map_file(map_path)
+    assert str(error.value) == (
+        f"numeric JSON values are not permitted in Lepcha legacy map: {map_path}"
+    )
+
+
 def test_lepcha_map_parser_rejects_oversized_targets(tmp_path):
     map_path = tmp_path / "oversized.json"
     map_path.write_text(
@@ -331,7 +438,7 @@ def test_lepcha_map_parser_rejects_oversized_files_before_decoding(tmp_path):
 def test_lepcha_map_parser_fails_closed_on_deep_json(tmp_path):
     map_path = tmp_path / "deeply-nested.json"
     map_path.write_text(
-        '{"map":' + "[" * 10_000 + "0" + "]" * 10_000 + "}",
+        '{"map":' + "[" * 10_000 + '"x"' + "]" * 10_000 + "}",
         encoding="utf-8",
     )
 
@@ -342,13 +449,23 @@ def test_lepcha_map_parser_fails_closed_on_deep_json(tmp_path):
 def test_lepcha_map_parser_normalizes_decoder_recursion_error(monkeypatch, tmp_path):
     map_path = tmp_path / "recursive-decoder.json"
     map_path.write_text('{"map":{"41":["1C00"]}}', encoding="utf-8")
+    decoder_calls = []
 
     def recursive_decoder(*args, **kwargs):
+        decoder_calls.append((args, kwargs))
         raise RecursionError("decoder nesting limit")
 
     monkeypatch.setattr(lepcha_module.json, "loads", recursive_decoder)
     with pytest.raises(ValueError, match="invalid nested JSON in Lepcha legacy map"):
         LepchaConverter.from_map_file(map_path)
+    assert len(decoder_calls) == 1
+    args, kwargs = decoder_calls[0]
+    assert args == ('{"map":{"41":["1C00"]}}',)
+    assert kwargs["object_pairs_hook"] is lepcha_module._unique_json_object
+    number_token = kwargs["parse_int"]
+    assert isinstance(number_token, lepcha_module._JSONNumberToken)
+    assert kwargs["parse_float"] is number_token
+    assert kwargs["parse_constant"] is number_token
 
 
 def test_lepcha_json_depth_scan_ignores_container_tokens_inside_strings(tmp_path):

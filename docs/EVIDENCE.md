@@ -167,6 +167,30 @@ private reorder provenance marker is also type-checked before comparison. The
 vendored resources, parsed contracts, functional digests, mapping output,
 diagnostics, precedence, and routing are unchanged.
 
+## Public JSON numeric-token invariant
+
+Caller-loadable Sikkim Herald Lepcha and Ol Chiki Optimum/Latic JSON maps have
+no numeric fields. Byte keys, Unicode targets, uncertainty inventories, and
+metadata use canonical strings inside bounded containers. The readers therefore
+reject JSON integers, decimals, exponents, `NaN`, `Infinity`, and `-Infinity`
+without materializing Python integers or floats.
+
+Each decode uses one private stateful token marker for the standard library
+JSON parser's integer, float, and constant hooks. The marker does not inspect or
+retain the numeric lexeme. Decoding completes before its state is checked, so
+malformed JSON, duplicate keys, excessive nesting, and decoder recursion retain
+their established error precedence. A recognized numeric token in an otherwise
+decoded document then produces a contextual `ValueError` containing the map
+path before root or schema validation. Numeric-looking strings remain ordinary
+metadata, and JSON Booleans and `null` retain their existing schema validation.
+
+Regression tests exercise every numeric token family and every schema position,
+the interpreter's historical 4,300-digit integer boundary, exact 1,000,000-byte
+numeric inputs, syntax and duplicate-key precedence, both Ol Chiki factories,
+and installed-wheel behavior on Python 3.9. Default resource bytes, parsed
+contracts, functional digests, mapping output, diagnostics, precedence, and
+routing are unchanged.
+
 ## Structural whitespace invariant
 
 ASCII space, TAB, CR, and LF delimit words, columns, and lines; they are not

@@ -142,6 +142,17 @@ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+class _JSONNumberToken:
+    __slots__ = ("seen",)
+
+    def __init__(self) -> None:
+        self.seen = False
+
+    def __call__(self, _literal: str) -> object:
+        self.seen = True
+        return self
+
+
 def _reject_excessive_json_depth(map_text: str, map_path: Path) -> None:
     depth = 0
     in_string = False
@@ -180,12 +191,21 @@ def _load_map_file(path: str | Path) -> tuple[dict[int, int], dict[int, int]]:
     except UnicodeDecodeError as error:
         raise ValueError(f"invalid UTF-8 in Ol Chiki map {map_path}") from error
     _reject_excessive_json_depth(map_text, map_path)
+    number_token = _JSONNumberToken()
     try:
-        raw = json.loads(map_text, object_pairs_hook=_unique_json_object)
+        raw = json.loads(
+            map_text,
+            object_pairs_hook=_unique_json_object,
+            parse_int=number_token,
+            parse_float=number_token,
+            parse_constant=number_token,
+        )
     except json.JSONDecodeError as error:
         raise ValueError(f"invalid JSON in Ol Chiki map {map_path}: {error.msg}") from error
     except RecursionError as error:
         raise ValueError(f"invalid nested JSON in Ol Chiki map {map_path}") from error
+    if number_token.seen:
+        raise ValueError(f"numeric JSON values are not permitted in Ol Chiki map: {map_path}")
     if not isinstance(raw, dict):
         raise ValueError(f"Ol Chiki map must be a JSON object: {map_path}")
     unexpected_fields = set(raw) - _MAP_FIELDS

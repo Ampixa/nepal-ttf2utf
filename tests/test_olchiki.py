@@ -533,7 +533,7 @@ def test_olchiki_map_factories_reject_empty_confirmed_map(tmp_path):
     ("payload", "message"),
     [
         ([], "must be a JSON object"),
-        ({"map": {"61": [123]}, "uncertain_map": {}}, "single hexadecimal-codepoint list"),
+        ({"map": {"61": [123]}, "uncertain_map": {}}, "numeric JSON values are not permitted"),
         ({"map": {"61": ["not-hex"]}, "uncertain_map": {}}, "invalid Ol Chiki codepoint"),
     ],
 )
@@ -647,6 +647,7 @@ def test_olchiki_map_loader_rejects_noncanonical_or_invalid_targets(target, tmp_
         '{"map":{"61":["1C5F"],"61":["1C60"]},"uncertain_map":{}}',
         '{"map":{"61":["1C5F"]},"map":{"62":["1C60"]},"uncertain_map":{}}',
         '{"map":{"61":["1C5F"]},"uncertain_map":{"62":["1C60"],"62":["1C61"]}}',
+        '{"_doc":0,"map":{"61":["1C5F"],"61":["1C60"]},"uncertain_map":{}}',
     ],
 )
 def test_olchiki_map_loader_rejects_duplicate_json_keys(raw_json, tmp_path):
@@ -666,6 +667,127 @@ def test_olchiki_map_loader_rejects_invalid_utf8_and_json(tmp_path):
     invalid_json.write_text("{", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid JSON"):
         OLChikiConverter.from_map_file(invalid_json)
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize(
+    "literal",
+    [
+        pytest.param("0", id="zero"),
+        pytest.param("-1", id="negative-integer"),
+        pytest.param("1.25", id="decimal"),
+        pytest.param("-0.25", id="negative-decimal"),
+        pytest.param("1e400", id="positive-exponent"),
+        pytest.param("1E-4000", id="negative-exponent"),
+        pytest.param("NaN", id="nan"),
+        pytest.param("Infinity", id="infinity"),
+        pytest.param("-Infinity", id="negative-infinity"),
+        pytest.param("9" * 4_301, id="long-integer"),
+    ],
+)
+def test_olchiki_map_loader_rejects_every_json_numeric_form(converter_type, literal, tmp_path):
+    map_path = tmp_path / "numeric.json"
+    map_path.write_text(
+        '{"_doc":' + literal + ',"map":{"61":["1C5F"]},"uncertain_map":{}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError) as error:
+        converter_type.from_map_file(map_path)
+    assert str(error.value) == (
+        f"numeric JSON values are not permitted in Ol Chiki map: {map_path}"
+    )
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize(
+    "map_text",
+    [
+        "0",
+        '{"_doc":0,"map":{"61":["1C5F"]},"uncertain_map":{}}',
+        '{"_derivation":0,"map":{"61":["1C5F"]},"uncertain_map":{}}',
+        '{"_confidence":0,"map":{"61":["1C5F"]},"uncertain_map":{}}',
+        '{"map":0,"uncertain_map":{}}',
+        '{"map":{"61":["1C5F"]},"uncertain_map":0}',
+        '{"map":{"61":[0]},"uncertain_map":{}}',
+        '{"map":{"61":["1C5F"]},"uncertain_map":{"62":[0]}}',
+        '{"_uncertain_bytes":[0],"map":{"61":["1C5F"]},"uncertain_map":{}}',
+    ],
+)
+def test_olchiki_map_loader_rejects_numeric_values_in_every_schema_position(
+    converter_type, map_text, tmp_path
+):
+    map_path = tmp_path / "numeric-position.json"
+    map_path.write_text(map_text, encoding="utf-8")
+
+    with pytest.raises(ValueError) as error:
+        converter_type.from_map_file(map_path)
+    assert str(error.value) == (
+        f"numeric JSON values are not permitted in Ol Chiki map: {map_path}"
+    )
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize("malformed_number", ["1e", "01"])
+def test_olchiki_map_loader_preserves_invalid_json_precedence(
+    converter_type, malformed_number, tmp_path
+):
+    map_path = tmp_path / "malformed-number.json"
+    map_path.write_text('{"_doc":' + malformed_number + "}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid JSON in Ol Chiki map"):
+        converter_type.from_map_file(map_path)
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+@pytest.mark.parametrize("literal", ["true", "false", "null"])
+def test_olchiki_map_loader_keeps_boolean_and_null_schema_validation(
+    converter_type, literal, tmp_path
+):
+    map_path = tmp_path / "non-numeric-scalar.json"
+    map_path.write_text(
+        '{"_doc":' + literal + ',"map":{"61":["1C5F"]},"uncertain_map":{}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="metadata must be a string"):
+        converter_type.from_map_file(map_path)
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+def test_olchiki_map_loader_accepts_numeric_looking_metadata_strings(converter_type, tmp_path):
+    map_path = tmp_path / "numeric-looking-string.json"
+    map_path.write_text(
+        json.dumps(
+            {
+                "_doc": "0 -1 1.25 1e400 NaN Infinity -Infinity",
+                "map": {"61": ["1C5F"]},
+                "uncertain_map": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert converter_type.from_map_file(map_path).convert("a").unicode_text == "ᱟ"
+
+
+@pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
+def test_olchiki_map_loader_rejects_exact_size_numeric_token_without_conversion(
+    converter_type, tmp_path
+):
+    map_path = tmp_path / "exact-size-numeric.json"
+    prefix = b'{"_doc":'
+    suffix = b',"map":{"61":["1C5F"]},"uncertain_map":{}}'
+    digits = b"9" * (olchiki_module._MAX_MAP_FILE_BYTES - len(prefix) - len(suffix))
+    payload = prefix + digits + suffix
+    assert len(payload) == olchiki_module._MAX_MAP_FILE_BYTES
+    map_path.write_bytes(payload)
+
+    with pytest.raises(ValueError) as error:
+        converter_type.from_map_file(map_path)
+    assert str(error.value) == (
+        f"numeric JSON values are not permitted in Ol Chiki map: {map_path}"
+    )
 
 
 @pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
@@ -704,7 +826,7 @@ def test_olchiki_json_depth_64_reaches_schema_validation(
     converter_type, opening, closing, downstream_error, monkeypatch, tmp_path
 ):
     map_path = tmp_path / "depth-64.json"
-    map_text = '{"map":' + opening * 63 + "0" + closing * 63 + ',"uncertain_map":{}}'
+    map_text = '{"map":' + opening * 63 + '"x"' + closing * 63 + ',"uncertain_map":{}}'
     map_path.write_text(map_text, encoding="utf-8")
     real_json_loads = json.loads
     decoder_calls = []
@@ -717,9 +839,14 @@ def test_olchiki_json_depth_64_reaches_schema_validation(
     with pytest.raises(ValueError, match=downstream_error):
         converter_type.from_map_file(map_path)
 
-    assert decoder_calls == [
-        ((map_text,), {"object_pairs_hook": olchiki_module._unique_json_object})
-    ]
+    assert len(decoder_calls) == 1
+    args, kwargs = decoder_calls[0]
+    assert args == (map_text,)
+    assert kwargs["object_pairs_hook"] is olchiki_module._unique_json_object
+    number_token = kwargs["parse_int"]
+    assert isinstance(number_token, olchiki_module._JSONNumberToken)
+    assert kwargs["parse_float"] is number_token
+    assert kwargs["parse_constant"] is number_token
 
 
 @pytest.mark.parametrize("converter_type", [OLChikiConverter, OLChikiLaticConverter])
@@ -729,7 +856,7 @@ def test_olchiki_json_depth_65_is_rejected_before_decoding(
 ):
     map_path = tmp_path / "depth-65.json"
     map_path.write_text(
-        '{"map":' + opening * 64 + "0" + closing * 64 + ',"uncertain_map":{}}',
+        '{"map":' + opening * 64 + '"x"' + closing * 64 + ',"uncertain_map":{}}',
         encoding="utf-8",
     )
 
@@ -777,12 +904,14 @@ def test_olchiki_map_loader_normalizes_decoder_recursion_error(
     with pytest.raises(ValueError) as error:
         converter_type.from_map_file(map_path)
     assert str(error.value) == f"invalid nested JSON in Ol Chiki map {map_path}"
-    assert decoder_calls == [
-        (
-            ('{"map":{},"uncertain_map":{}}',),
-            {"object_pairs_hook": olchiki_module._unique_json_object},
-        )
-    ]
+    assert len(decoder_calls) == 1
+    args, kwargs = decoder_calls[0]
+    assert args == ('{"map":{},"uncertain_map":{}}',)
+    assert kwargs["object_pairs_hook"] is olchiki_module._unique_json_object
+    number_token = kwargs["parse_int"]
+    assert isinstance(number_token, olchiki_module._JSONNumberToken)
+    assert kwargs["parse_float"] is number_token
+    assert kwargs["parse_constant"] is number_token
 
 
 def test_olchiki_map_loader_bounds_section_inventory(tmp_path):

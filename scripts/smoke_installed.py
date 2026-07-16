@@ -8,6 +8,7 @@ import json
 import subprocess
 from importlib import metadata, resources
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import MappingProxyType
 
 import nepal_ttf2utf
@@ -187,6 +188,44 @@ def main() -> int:
             pass
         else:
             raise AssertionError(f"installed {surface} accepted a string subclass")
+
+    with TemporaryDirectory() as temporary_directory:
+        temporary_path = Path(temporary_directory)
+        numeric_literal = "9" * 4_301
+        lepcha_map_path = temporary_path / "numeric-lepcha.json"
+        lepcha_map_path.write_text(
+            '{"_doc":' + numeric_literal + ',"map":{"41":["1C00"]}}',
+            encoding="utf-8",
+        )
+        olchiki_map_path = temporary_path / "numeric-olchiki.json"
+        olchiki_map_path.write_text(
+            '{"_doc":' + numeric_literal + ',"map":{"61":["1C5F"]},"uncertain_map":{}}',
+            encoding="utf-8",
+        )
+        invalid_numeric_map_calls = (
+            (
+                "Herald Lepcha JSON number",
+                f"numeric JSON values are not permitted in Lepcha legacy map: {lepcha_map_path}",
+                lambda: LepchaConverter.from_map_file(lepcha_map_path),
+            ),
+            (
+                "Ol Chiki JSON number",
+                f"numeric JSON values are not permitted in Ol Chiki map: {olchiki_map_path}",
+                lambda: OLChikiConverter.from_map_file(olchiki_map_path),
+            ),
+            (
+                "Ol Chiki Latic JSON number",
+                f"numeric JSON values are not permitted in Ol Chiki map: {olchiki_map_path}",
+                lambda: OLChikiLaticConverter.from_map_file(olchiki_map_path),
+            ),
+        )
+        for surface, message, call in invalid_numeric_map_calls:
+            try:
+                call()
+            except ValueError as error:
+                assert str(error) == message, surface
+            else:
+                raise AssertionError(f"installed {surface} accepted a numeric token")
 
     font_inventory_payload = json.dumps(
         font_inventory, sort_keys=True, separators=(",", ":")

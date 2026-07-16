@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Reject every JSON numeric token in caller-supplied Sikkim Herald Lepcha and
+  Ol Chiki Optimum/Latic maps before Python integer or float materialization.
+  Integers, decimals, exponents, `NaN`, and infinities now produce stable,
+  path-bearing validation errors across supported Python versions. Malformed
+  JSON, duplicate keys, recursion, numeric-looking strings, valid maps, bundled
+  resources, outputs, diagnostics, precedence, and routing are unchanged.
 - Bound caller-supplied Ol Chiki Optimum and Latic JSON maps to 64 container-
   nesting levels with a string-aware scan before JSON decoding. Depth 64
   reaches normal JSON and schema validation, and valid exact 1,000,000-byte
