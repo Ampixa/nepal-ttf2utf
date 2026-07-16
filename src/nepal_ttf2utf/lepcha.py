@@ -187,7 +187,9 @@ def _reject_excessive_json_depth(map_text: str, map_path: Path) -> None:
 def _bounded_map_items(byte_map: Mapping[object, object]) -> tuple[object, ...]:
     try:
         map_items = tuple(islice(iter(byte_map.items()), _MAX_MAP_ENTRIES + 1))
-    except (TypeError, ValueError) as error:
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
         raise ValueError("invalid Lepcha source map item sequence") from error
     if not map_items:
         raise ValueError("LepchaConverter requires a non-empty map")
@@ -213,11 +215,13 @@ class LepchaConverter:
         normalized: dict[int, tuple[int, ...]] = {}
         for raw_item in map_items:
             if isinstance(raw_item, (str, bytes, Mapping, Set)):
-                raise ValueError(f"invalid Lepcha source map entry: {raw_item!r}")
+                raise ValueError("invalid Lepcha source map entry")
             try:
                 raw_source, raw_target = raw_item  # type: ignore[misc]
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"invalid Lepcha source map entry: {raw_item!r}") from error
+            except Exception as error:
+                if isinstance(error, (MemoryError, RecursionError)):
+                    raise
+                raise ValueError("invalid Lepcha source map entry") from error
             source = _validate_source_byte(raw_source)
             if source in normalized:
                 raise ValueError(f"duplicate Lepcha source byte: 0x{source:02X}")
@@ -225,7 +229,9 @@ class LepchaConverter:
                 raise ValueError(f"invalid Lepcha target sequence for source 0x{source:02X}")
             try:
                 target = tuple(islice(iter(raw_target), _MAX_TARGET_CODEPOINTS + 1))
-            except TypeError as error:
+            except Exception as error:
+                if isinstance(error, (MemoryError, RecursionError)):
+                    raise
                 raise ValueError(
                     f"invalid Lepcha target sequence for source 0x{source:02X}"
                 ) from error

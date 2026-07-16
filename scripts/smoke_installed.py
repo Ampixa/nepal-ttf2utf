@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from collections.abc import Mapping
 from importlib import metadata, resources
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -73,6 +74,34 @@ class _IntSubclass(int):
 
 class _StringSubclass(str):
     pass
+
+
+class _NextBomb:
+    def __init__(self, error: BaseException):
+        self.error = error
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise self.error
+
+
+class _ItemsBombMapping(Mapping):
+    def __init__(self, error: BaseException):
+        self.error = error
+
+    def __getitem__(self, key):
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return 1
+
+    def items(self):
+        raise self.error
 
 
 def main() -> int:
@@ -188,6 +217,32 @@ def main() -> int:
             pass
         else:
             raise AssertionError(f"installed {surface} accepted a string subclass")
+
+    iterator_error = RuntimeError("installed iterator failure")
+    try:
+        KiratRaiConverter(_NextBomb(iterator_error))
+    except ValueError as error:
+        assert str(error) == "invalid Kirat Rai byte-rule sequence"
+        assert error.__cause__ is iterator_error
+    else:
+        raise AssertionError("installed Kirat Rai leaked an iterator failure")
+
+    items_error = RuntimeError("installed mapping items failure")
+    try:
+        TibetanMachineConverter(_ItemsBombMapping(items_error))
+    except ValueError as error:
+        assert str(error) == "invalid TibetanMachine table item sequence"
+        assert error.__cause__ is items_error
+    else:
+        raise AssertionError("installed TibetanMachine leaked a mapping items failure")
+
+    memory_error = MemoryError("installed critical failure")
+    try:
+        TibetanMachineConverter(_ItemsBombMapping(memory_error))
+    except MemoryError as error:
+        assert error is memory_error
+    else:
+        raise AssertionError("installed TibetanMachine masked MemoryError")
 
     with TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)

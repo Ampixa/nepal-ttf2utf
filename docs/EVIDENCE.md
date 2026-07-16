@@ -167,6 +167,33 @@ private reorder provenance marker is also type-checked before comparison. The
 vendored resources, parsed contracts, functional digests, mapping output,
 diagnostics, precedence, and routing are unchanged.
 
+## Public bounded-container exception invariant
+
+The Kirat Rai, Limbu, JG Lepcha, Sikkim Herald Lepcha, Ol Chiki
+Optimum/Latic, and TibetanMachine custom constructors snapshot caller-owned
+containers within fixed limits. Mapping contracts acquire `items()` before
+bounded iteration; general containers and nested sequences are consumed
+through `iter()` and at most the documented limit plus one `next()` operation.
+Entry shape is checked before yielded scalar values are validated.
+
+An ordinary `Exception` raised by those caller protocol operations becomes a
+static, format-specific `ValueError`, and the original exception is retained as
+its cause. Shape errors do not interpolate or otherwise represent the malformed
+caller object. `MemoryError` and `RecursionError` are re-raised unchanged, and
+`BaseException` subclasses outside `Exception`, such as `KeyboardInterrupt`,
+`SystemExit`, and `GeneratorExit`, are never caught. Normal iterator exhaustion,
+exact bounds, and finite one-shot inputs retain their established behavior.
+Parser-internal generators remain outside this caller-contract boundary so
+implementation faults are not relabeled as invalid external input.
+
+Regression tests cover mapping-item acquisition, `iter()` and `next()` failures,
+nested source and target sequences, malformed pair representation safety,
+ordinary exception causes, critical and process-control exception identity, and
+cross-family one-shot conversion anchors. Installed-wheel smoke repeats both
+ordinary normalization paths and critical-exception propagation. Default
+resource bytes, parsed contracts, functional digests, conversion output,
+diagnostics, precedence, and routing are unchanged.
+
 ## Public JSON numeric-token invariant
 
 Caller-loadable Sikkim Herald Lepcha and Ol Chiki Optimum/Latic JSON maps have

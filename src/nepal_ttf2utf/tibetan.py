@@ -55,11 +55,25 @@ def _bounded_tuple(values: object, limit: int, label: str) -> tuple[object, ...]
         raise ValueError(f"invalid TibetanMachine {label}")
     try:
         result = tuple(islice(iter(values), limit + 1))  # type: ignore[arg-type]
-    except TypeError as error:
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
         raise ValueError(f"invalid TibetanMachine {label}") from error
     if len(result) > limit:
         raise ValueError(f"TibetanMachine {label} exceeds {limit} entries")
     return result
+
+
+def _bounded_mapping_items(
+    values: Mapping[object, object], limit: int, label: str
+) -> tuple[object, ...]:
+    try:
+        items = values.items()
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
+        raise ValueError(f"invalid TibetanMachine {label}") from error
+    return _bounded_tuple(items, limit, label)
 
 
 def _validate_source(source: object) -> int:
@@ -90,14 +104,14 @@ def _validate_target(target: object, source: int) -> str:
 def _normalize_table(table: object) -> dict[int, str]:
     if not isinstance(table, Mapping):
         raise ValueError("TibetanMachine table must be a mapping")
-    items = _bounded_tuple(table.items(), _MAX_TABLE_ENTRIES, "table item sequence")
+    items = _bounded_mapping_items(table, _MAX_TABLE_ENTRIES, "table item sequence")
     normalized: dict[int, str] = {}
     for raw_item in items:
         if isinstance(raw_item, (str, bytes, Mapping, Set)):
-            raise ValueError(f"invalid TibetanMachine table entry: {raw_item!r}")
+            raise ValueError("invalid TibetanMachine table entry")
         pair = _bounded_tuple(raw_item, 2, "table entry")
         if len(pair) != 2:
-            raise ValueError(f"invalid TibetanMachine table entry: {raw_item!r}")
+            raise ValueError("invalid TibetanMachine table entry")
         source = _validate_source(pair[0])
         if source in normalized:
             raise ValueError(f"duplicate TibetanMachine source: {source}")

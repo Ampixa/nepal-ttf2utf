@@ -105,6 +105,34 @@ def _bounded_tuple(
     return result
 
 
+def _bounded_contract_tuple(
+    values: object, limit: int, label: str, *, reject_unordered: bool = False
+) -> tuple[object, ...]:
+    if isinstance(values, (str, bytes, Mapping)) or (reject_unordered and isinstance(values, Set)):
+        raise ValueError(f"invalid JG Lepcha {label}")
+    try:
+        result = tuple(islice(iter(values), limit + 1))  # type: ignore[arg-type]
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
+        raise ValueError(f"invalid JG Lepcha {label}") from error
+    if len(result) > limit:
+        raise ValueError(f"JG Lepcha {label} exceeds {limit} entries")
+    return result
+
+
+def _bounded_contract_mapping_items(
+    values: Mapping[object, object], limit: int, label: str
+) -> tuple[object, ...]:
+    try:
+        items = values.items()
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
+        raise ValueError(f"invalid JG Lepcha {label}") from error
+    return _bounded_contract_tuple(items, limit, label)
+
+
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
     values: list[int] = []
     tokens = _tokens(body)
@@ -250,7 +278,7 @@ class JGLepchaConverter:
         context_rule: tuple[int, Iterable[int], int] | None,
         uncertain_source_codepoints: Iterable[int] = frozenset(),
     ) -> None:
-        raw_byte_rules = _bounded_tuple(
+        raw_byte_rules = _bounded_contract_tuple(
             byte_rules, _MAX_BYTE_RULES, "byte-rule sequence", reject_unordered=True
         )
         if not raw_byte_rules:
@@ -259,14 +287,14 @@ class JGLepchaConverter:
         seen_sources: set[tuple[int, ...]] = set()
         for raw_rule in raw_byte_rules:
             if isinstance(raw_rule, (str, bytes, Mapping, Set)):
-                raise ValueError(f"invalid JG Lepcha byte rule: {raw_rule!r}")
-            try:
-                raw_source, raw_target = raw_rule  # type: ignore[misc]
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"invalid JG Lepcha byte rule: {raw_rule!r}") from error
+                raise ValueError("invalid JG Lepcha byte rule")
+            raw_parts = _bounded_contract_tuple(raw_rule, 2, "byte rule", reject_unordered=True)
+            if len(raw_parts) != 2:
+                raise ValueError("invalid JG Lepcha byte rule")
+            raw_source, raw_target = raw_parts
             source = tuple(
                 _validate_byte(value, "source")
-                for value in _bounded_tuple(
+                for value in _bounded_contract_tuple(
                     raw_source,
                     _MAX_SOURCE_LENGTH,
                     "source rule",
@@ -275,7 +303,7 @@ class JGLepchaConverter:
             )
             target = tuple(
                 _validate_unicode_scalar(value)
-                for value in _bounded_tuple(
+                for value in _bounded_contract_tuple(
                     raw_target,
                     _MAX_TARGET_LENGTH,
                     "target rule",
@@ -310,17 +338,17 @@ class JGLepchaConverter:
 
         if not isinstance(unicode_classes, Mapping):
             raise ValueError("JG Lepcha Unicode classes must be a mapping")
-        class_items = _bounded_tuple(
-            unicode_classes.items(), _MAX_UNICODE_CLASSES, "Unicode class sequence"
+        class_items = _bounded_contract_mapping_items(
+            unicode_classes, _MAX_UNICODE_CLASSES, "Unicode class sequence"
         )
         normalized_classes: dict[str, frozenset[int]] = {}
         for raw_item in class_items:
             if isinstance(raw_item, (str, bytes, Mapping, Set)):
-                raise ValueError(f"invalid JG Lepcha Unicode class entry: {raw_item!r}")
-            try:
-                name, raw_members = raw_item  # type: ignore[misc]
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"invalid JG Lepcha Unicode class entry: {raw_item!r}") from error
+                raise ValueError("invalid JG Lepcha Unicode class entry")
+            raw_parts = _bounded_contract_tuple(raw_item, 2, "Unicode class entry")
+            if len(raw_parts) != 2:
+                raise ValueError("invalid JG Lepcha Unicode class entry")
+            name, raw_members = raw_parts
             if type(name) is not str:
                 raise ValueError("invalid JG Lepcha Unicode class name")
             if re.fullmatch(_NAME, name) is None:
@@ -329,7 +357,7 @@ class JGLepchaConverter:
                 raise ValueError(f"duplicate JG Lepcha Unicode class: {name!r}")
             member_sequence = tuple(
                 _validate_unicode_scalar(value)
-                for value in _bounded_tuple(
+                for value in _bounded_contract_tuple(
                     raw_members, _MAX_CLASS_MEMBERS, f"class {name!r} members"
                 )
             )
@@ -342,7 +370,7 @@ class JGLepchaConverter:
                 raise ValueError(f"non-Lepcha member in JG Lepcha Unicode class: {name!r}")
             normalized_classes[name] = members
 
-        raw_reorder_rules = _bounded_tuple(
+        raw_reorder_rules = _bounded_contract_tuple(
             reorder_rules,
             _MAX_REORDER_RULES,
             "reorder-rule sequence",
@@ -352,15 +380,15 @@ class JGLepchaConverter:
         reorder_patterns: dict[tuple[str, ...], tuple[int, ...]] = {}
         reorder_semantics: list[tuple[tuple[str, ...], tuple[int, ...]]] = []
         for raw_rule in raw_reorder_rules:
-            if not isinstance(raw_rule, _ReorderRule):
-                raise ValueError(f"invalid JG Lepcha reorder rule: {raw_rule!r}")
-            raw_slots = _bounded_tuple(
+            if type(raw_rule) is not _ReorderRule:
+                raise ValueError("invalid JG Lepcha reorder rule")
+            raw_slots = _bounded_contract_tuple(
                 raw_rule.slots,
                 _MAX_REORDER_SLOTS,
                 "reorder slots",
                 reject_unordered=True,
             )
-            raw_output_vars = _bounded_tuple(
+            raw_output_vars = _bounded_contract_tuple(
                 raw_rule.output_vars,
                 _MAX_REORDER_SLOTS,
                 "reorder output",
@@ -371,15 +399,15 @@ class JGLepchaConverter:
             slots: list[tuple[str, str]] = []
             for raw_slot in raw_slots:
                 if isinstance(raw_slot, (str, bytes, Mapping, Set)):
-                    raise ValueError(f"invalid JG Lepcha reorder slot: {raw_slot!r}")
-                try:
-                    class_name, variable = raw_slot  # type: ignore[misc]
-                except (TypeError, ValueError) as error:
-                    raise ValueError(f"invalid JG Lepcha reorder slot: {raw_slot!r}") from error
+                    raise ValueError("invalid JG Lepcha reorder slot")
+                raw_parts = _bounded_contract_tuple(raw_slot, 2, "reorder slot")
+                if len(raw_parts) != 2:
+                    raise ValueError("invalid JG Lepcha reorder slot")
+                class_name, variable = raw_parts
                 if type(class_name) is not str or type(variable) is not str:
                     raise ValueError("invalid JG Lepcha reorder slot")
                 if re.fullmatch(_NAME, class_name) is None or re.fullmatch(_NAME, variable) is None:
-                    raise ValueError(f"invalid JG Lepcha reorder slot: {raw_slot!r}")
+                    raise ValueError("invalid JG Lepcha reorder slot")
                 if class_name not in normalized_classes:
                     raise ValueError(
                         f"JG Lepcha reorder rule references unknown class: {class_name!r}"
@@ -420,7 +448,7 @@ class JGLepchaConverter:
 
         uncertain_sequence = tuple(
             _validate_byte(value, "uncertain source")
-            for value in _bounded_tuple(
+            for value in _bounded_contract_tuple(
                 uncertain_source_codepoints, 256, "uncertain-source sequence"
             )
         )
@@ -460,19 +488,24 @@ class JGLepchaConverter:
 
         normalized_context: tuple[int, frozenset[int], int] | None = None
         if context_rule is not None:
-            if not isinstance(context_rule, tuple) or len(context_rule) != 3:
+            if not isinstance(context_rule, tuple):
                 raise ValueError("invalid JG Lepcha context rule")
-            trigger = _validate_byte(context_rule[0], "context trigger")
+            context_parts = _bounded_contract_tuple(context_rule, 3, "context rule")
+            if len(context_parts) != 3:
+                raise ValueError("invalid JG Lepcha context rule")
+            trigger = _validate_byte(context_parts[0], "context trigger")
             if trigger <= 0x20:
                 raise ValueError("JG Lepcha context trigger cannot be C0 or SPACE")
             excluded_sequence = tuple(
                 _validate_byte(value, "context class")
-                for value in _bounded_tuple(context_rule[1], 256, "context exclusion class")
+                for value in _bounded_contract_tuple(
+                    context_parts[1], 256, "context exclusion class"
+                )
             )
             if len(excluded_sequence) != len(set(excluded_sequence)):
                 raise ValueError("duplicate byte in JG Lepcha context exclusion class")
             excluded = frozenset(excluded_sequence)
-            replacement = _validate_unicode_scalar(context_rule[2])
+            replacement = _validate_unicode_scalar(context_parts[2])
             if not excluded:
                 raise ValueError("empty JG Lepcha context exclusion class")
             if not _is_assigned_script_codepoint(replacement, "Lepcha"):

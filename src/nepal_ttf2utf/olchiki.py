@@ -73,11 +73,25 @@ def _bounded_tuple(values: object, limit: int, label: str) -> tuple[object, ...]
         raise ValueError(f"invalid Ol Chiki {label}")
     try:
         result = tuple(islice(iter(values), limit + 1))  # type: ignore[arg-type]
-    except TypeError as error:
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
         raise ValueError(f"invalid Ol Chiki {label}") from error
     if len(result) > limit:
         raise ValueError(f"Ol Chiki {label} exceeds {limit} entries")
     return result
+
+
+def _bounded_mapping_items(
+    values: Mapping[object, object], limit: int, label: str
+) -> tuple[object, ...]:
+    try:
+        items = values.items()
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
+        raise ValueError(f"invalid Ol Chiki {label}") from error
+    return _bounded_tuple(items, limit, label)
 
 
 def _validate_source_byte(source: object, label: str) -> int:
@@ -103,15 +117,15 @@ def _validate_target_codepoint(target: object, source: int, label: str) -> int:
 def _normalize_map(entries: object, label: str) -> dict[int, int]:
     if not isinstance(entries, Mapping):
         raise ValueError(f"Ol Chiki {label} must be a mapping")
-    items = _bounded_tuple(entries.items(), _MAX_MAP_ENTRIES, f"{label} item sequence")
+    items = _bounded_mapping_items(entries, _MAX_MAP_ENTRIES, f"{label} item sequence")
     table: dict[int, int] = {}
     for raw_item in items:
         if isinstance(raw_item, (str, bytes, Mapping, Set)):
-            raise ValueError(f"invalid Ol Chiki {label} entry: {raw_item!r}")
-        try:
-            raw_source, raw_target = raw_item  # type: ignore[misc]
-        except (TypeError, ValueError) as error:
-            raise ValueError(f"invalid Ol Chiki {label} entry: {raw_item!r}") from error
+            raise ValueError(f"invalid Ol Chiki {label} entry")
+        pair = _bounded_tuple(raw_item, 2, f"{label} entry")
+        if len(pair) != 2:
+            raise ValueError(f"invalid Ol Chiki {label} entry")
+        raw_source, raw_target = pair
         source = _validate_source_byte(raw_source, label)
         if source in table:
             raise ValueError(f"duplicate Ol Chiki {label} source: 0x{source:02X}")

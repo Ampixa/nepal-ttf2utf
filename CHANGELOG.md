@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Normalize ordinary caller-container protocol failures across the Kirat Rai,
+  Limbu, JG Lepcha, Sikkim Herald Lepcha, Ol Chiki Optimum/Latic, and
+  TibetanMachine custom constructors. Mapping-item acquisition, bounded
+  iteration, nested sequences, and pair extraction now produce static
+  contextual `ValueError` messages without representing malformed objects;
+  the original exception remains the cause. `MemoryError`, `RecursionError`,
+  and process-control exceptions propagate unchanged. Valid finite and
+  one-shot contracts, bounds, default resources, functional digests, outputs,
+  diagnostics, precedence, and routing are unchanged.
 - Reject every JSON numeric token in caller-supplied Sikkim Herald Lepcha and
   Ol Chiki Optimum/Latic maps before Python integer or float materialization.
   Integers, decimals, exponents, `NaN`, and infinities now produce stable,

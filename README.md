@@ -205,6 +205,15 @@ runtime contracts. The JG TECkit reader produces built-in identifiers from
 validated decoded text, while the default Ol Chiki passthrough strings are
 fixed module-defined built-in strings.
 
+Caller-owned containers in these custom constructors are read through bounded
+snapshots. Ordinary failures from mapping-item acquisition, iteration, nested
+sequences, or pair extraction become format-specific `ValueError` exceptions
+with the original exception retained as the cause. Malformed container objects
+are not represented while shape errors are reported. `MemoryError`,
+`RecursionError`, and exceptions outside the ordinary `Exception` hierarchy,
+including `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit`, propagate
+unchanged. Finite one-shot iterables are accepted within the documented limits.
+
 The Ol Chiki Optimum and Latic map-file factories share a bounded binary read,
 UTF-8 validation, and a string-aware JSON pre-scan. Map files may contain at
 most 1,000,000 bytes and 64 nested JSON containers; brackets and braces inside

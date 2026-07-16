@@ -113,6 +113,22 @@ def _bounded_tuple(
     return result
 
 
+def _bounded_contract_tuple(
+    values: object, limit: int, label: str, *, reject_unordered: bool = False
+) -> tuple[object, ...]:
+    if isinstance(values, (str, bytes, Mapping)) or (reject_unordered and isinstance(values, Set)):
+        raise ValueError(f"invalid Limbu {label}")
+    try:
+        result = tuple(islice(iter(values), limit + 1))  # type: ignore[call-overload]
+    except Exception as error:
+        if isinstance(error, (MemoryError, RecursionError)):
+            raise
+        raise ValueError(f"invalid Limbu {label}") from error
+    if len(result) > limit:
+        raise ValueError(f"Limbu {label} exceeds {limit} entries")
+    return result
+
+
 def _expand_byte_tokens(body: str) -> tuple[int, ...]:
     values: list[int] = []
     tokens = _tokens(body)
@@ -358,7 +374,7 @@ class LimbuConverter:
         *,
         _reorder_contract: _LimbuReorderContract = _DEFAULT_REORDER_CONTRACT,
     ) -> None:
-        raw_rules = _bounded_tuple(
+        raw_rules = _bounded_contract_tuple(
             rules, _MAX_BYTE_RULES, "byte-rule sequence", reject_unordered=True
         )
         if not raw_rules:
@@ -367,14 +383,14 @@ class LimbuConverter:
         seen: set[tuple[int, ...]] = set()
         for raw_rule in raw_rules:
             if isinstance(raw_rule, (str, bytes, Mapping, Set)):
-                raise ValueError(f"invalid Limbu byte rule: {raw_rule!r}")
-            raw_parts = _bounded_tuple(raw_rule, 2, "byte rule", reject_unordered=True)
+                raise ValueError("invalid Limbu byte rule")
+            raw_parts = _bounded_contract_tuple(raw_rule, 2, "byte rule", reject_unordered=True)
             if len(raw_parts) != 2:
-                raise ValueError(f"invalid Limbu byte rule: {raw_rule!r}")
+                raise ValueError("invalid Limbu byte rule")
             raw_source, raw_target = raw_parts
             source = tuple(
                 _validate_byte(value)
-                for value in _bounded_tuple(
+                for value in _bounded_contract_tuple(
                     raw_source,
                     _MAX_SOURCE_LENGTH,
                     "source rule",
@@ -383,7 +399,7 @@ class LimbuConverter:
             )
             target = tuple(
                 _validate_unicode_scalar(value)
-                for value in _bounded_tuple(
+                for value in _bounded_contract_tuple(
                     raw_target,
                     _MAX_TARGET_LENGTH,
                     "target rule",
