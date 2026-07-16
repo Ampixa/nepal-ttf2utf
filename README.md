@@ -197,6 +197,14 @@ without coercion. `TibetanMachineConverter` applies the same exact source-key
 rule. Map-file readers parse their documented text schemas into built-in
 integers before constructing these immutable contracts.
 
+`JGLepchaConverter` also requires exact built-in strings for Unicode-class
+names, reorder class names, bound variables, and output variables.
+`OLChikiConverter` applies the same rule to custom passthrough members. String
+subclasses and string-coercible objects are rejected rather than retained in
+runtime contracts. The JG TECkit reader produces built-in identifiers from
+validated decoded text, while the default Ol Chiki passthrough strings are
+fixed module-defined built-in strings.
+
 `recover_videha_janaki_trace()` is the profile-gated companion API for PyMuPDF
 `get_texttrace()` character tuples. Callers must securely compute and supply a
 built-in profile name, the exact PDF SHA-256, the complete embedded Janaki font

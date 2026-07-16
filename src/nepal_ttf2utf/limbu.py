@@ -333,6 +333,7 @@ def _normalize_reorder_contract(contract: object) -> _LimbuReorderContract:
         vowels != _VOWELS
         or subjoined != _SUBJOINED
         or kemphreng != _KEMPHRENG
+        or type(contract.provenance) is not str
         or contract.provenance != "legacy-byte-derived-only"
         or any(
             not _is_assigned_script_codepoint(codepoint, "Limbu")

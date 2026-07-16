@@ -70,6 +70,10 @@ class _IntSubclass(int):
     pass
 
 
+class _StringSubclass(str):
+    pass
+
+
 def main() -> int:
     repository_source = Path(__file__).resolve().parents[1] / "src"
     imported_from = Path(nepal_ttf2utf.__file__).resolve()
@@ -160,6 +164,29 @@ def main() -> int:
             assert str(error).endswith("must be an int"), surface
         else:
             raise AssertionError(f"installed {surface} accepted an integer subclass")
+
+    invalid_string_contracts = (
+        (
+            "JG Lepcha class name",
+            lambda: JGLepchaConverter(
+                [((0x41,), (0x1C00,))],
+                [],
+                {_StringSubclass("Cons"): (0x1C00,)},
+                None,
+            ),
+        ),
+        (
+            "Ol Chiki passthrough",
+            lambda: OLChikiConverter({0x61: 0x1C5F}, passthrough=(_StringSubclass("!"),)),
+        ),
+    )
+    for surface, call in invalid_string_contracts:
+        try:
+            call()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"installed {surface} accepted a string subclass")
 
     font_inventory_payload = json.dumps(
         font_inventory, sort_keys=True, separators=(",", ":")

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Require exact built-in strings for caller-supplied JG Lepcha Unicode-class
+  names and reorder identifiers and for Ol Chiki passthrough members. String
+  subclasses and coercible proxies now fail before converter-side length,
+  regular-expression, classification, hashing, equality, representation, or
+  storage hooks. Default contracts, parsed digests, outputs, diagnostics,
+  precedence, and routing are unchanged.
 - Require exact built-in integers for every caller-supplied byte and Unicode
   scalar in the Kirat Rai, Limbu, JG Lepcha, Herald Lepcha, and Ol Chiki custom
   converter contracts. Integer subclasses and numeric proxies now fail before

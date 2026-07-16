@@ -122,12 +122,9 @@ def _normalize_passthrough(values: object) -> frozenset[str]:
     members = _bounded_tuple(values, _MAX_PASSTHROUGH, "passthrough sequence")
     normalized: set[str] = set()
     for member in members:
-        if (
-            not isinstance(member, str)
-            or len(member) != 1
-            or member.isspace()
-            or unicodedata.category(member).startswith("C")
-        ):
+        if type(member) is not str:
+            raise ValueError("invalid Ol Chiki passthrough character")
+        if len(member) != 1 or member.isspace() or unicodedata.category(member).startswith("C"):
             raise ValueError(f"invalid Ol Chiki passthrough character: {member!r}")
         if member in normalized:
             raise ValueError(f"duplicate Ol Chiki passthrough character: {member!r}")

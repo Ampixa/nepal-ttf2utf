@@ -147,6 +147,26 @@ exactness, and require exact integers throughout every default runtime snapshot.
 The vendored resources, parsed contracts, functional
 digests, mapping output, diagnostics, precedence, and routing are unchanged.
 
+## Public custom-contract string invariant
+
+Caller-supplied JG Lepcha Unicode-class names, reorder class names, bound
+variables, and output variables must be exact built-in strings. Custom Ol Chiki
+Optimum passthrough members follow the same rule; the Latic converter uses its
+fixed internal passthrough contract. String subclasses and coercible proxy
+objects fail with `ValueError` before converter-side length checks, regular
+expressions, character classification, hashing, equality, representation, or
+immutable storage. Container iteration remains the necessary earlier step that
+yields each scalar for validation.
+
+The JG TECkit reader produces built-in identifiers from validated decoded text.
+The default Ol Chiki Optimum passthrough strings are fixed module-defined
+built-in strings. Regression tests exercise every public caller-supplied string
+position with hostile hooks, reject coercion, accept built-in-string contracts,
+and require exact strings throughout the default runtime snapshots. Limbu's
+private reorder provenance marker is also type-checked before comparison. The
+vendored resources, parsed contracts, functional digests, mapping output,
+diagnostics, precedence, and routing are unchanged.
+
 ## Structural whitespace invariant
 
 ASCII space, TAB, CR, and LF delimit words, columns, and lines; they are not

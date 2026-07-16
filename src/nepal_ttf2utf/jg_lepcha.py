@@ -321,7 +321,9 @@ class JGLepchaConverter:
                 name, raw_members = raw_item  # type: ignore[misc]
             except (TypeError, ValueError) as error:
                 raise ValueError(f"invalid JG Lepcha Unicode class entry: {raw_item!r}") from error
-            if not isinstance(name, str) or re.fullmatch(_NAME, name) is None:
+            if type(name) is not str:
+                raise ValueError("invalid JG Lepcha Unicode class name")
+            if re.fullmatch(_NAME, name) is None:
                 raise ValueError(f"invalid JG Lepcha Unicode class name: {name!r}")
             if name in normalized_classes:
                 raise ValueError(f"duplicate JG Lepcha Unicode class: {name!r}")
@@ -374,12 +376,9 @@ class JGLepchaConverter:
                     class_name, variable = raw_slot  # type: ignore[misc]
                 except (TypeError, ValueError) as error:
                     raise ValueError(f"invalid JG Lepcha reorder slot: {raw_slot!r}") from error
-                if (
-                    not isinstance(class_name, str)
-                    or re.fullmatch(_NAME, class_name) is None
-                    or not isinstance(variable, str)
-                    or re.fullmatch(_NAME, variable) is None
-                ):
+                if type(class_name) is not str or type(variable) is not str:
+                    raise ValueError("invalid JG Lepcha reorder slot")
+                if re.fullmatch(_NAME, class_name) is None or re.fullmatch(_NAME, variable) is None:
                     raise ValueError(f"invalid JG Lepcha reorder slot: {raw_slot!r}")
                 if class_name not in normalized_classes:
                     raise ValueError(
@@ -387,10 +386,9 @@ class JGLepchaConverter:
                     )
                 slots.append((class_name, variable))
             output_vars = tuple(raw_output_vars)
-            if any(
-                not isinstance(variable, str) or re.fullmatch(_NAME, variable) is None
-                for variable in output_vars
-            ):
+            if any(type(variable) is not str for variable in output_vars):
+                raise ValueError("invalid JG Lepcha reorder output")
+            if any(re.fullmatch(_NAME, variable) is None for variable in output_vars):
                 raise ValueError(f"invalid JG Lepcha reorder output: {output_vars!r}")
             bound_variables = tuple(variable for _class_name, variable in slots)
             if len(bound_variables) != len(set(bound_variables)):
